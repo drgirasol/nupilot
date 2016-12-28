@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          Planets.nu - NUPilot
 // @description   Plugin to enable semi-intelligent auto-pilot for freighters
-// @version       0.22
+// @version       0.03 (40)
 // @date          2016-11-19
 // @author        drgirasol
 // @include       http://planets.nu/*
