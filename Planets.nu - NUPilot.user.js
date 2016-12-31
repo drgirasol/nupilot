@@ -7,7 +7,6 @@
 // @include       http://planets.nu/*
 // @include       http://play.planets.nu/*
 // @include       http://test.planets.nu/*
-// @resource      https://openuserjs.org/scripts/drgirasol/Planets.nu_-_NUPilot
 // @updateURL     https://openuserjs.org/meta/drgirasol/Planets.nu_-_NUPilot.meta.js
 // @downloadURL   https://openuserjs.org/scripts/drgirasol/Planets.nu_-_NUPilot
 // @history       0.01 (01)  Initial [2016-11-19]
