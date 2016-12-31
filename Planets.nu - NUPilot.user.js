@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name          Planets.nu - NUPilot
+// @name          NUPilot
 // @description   Planets.nu plugin to enable semi-intelligent auto-pilots
 // @version       0.04 (41)
 // @date          2016-12-28
@@ -7,8 +7,8 @@
 // @include       http://planets.nu/*
 // @include       http://play.planets.nu/*
 // @include       http://test.planets.nu/*
-// @updateURL     https://openuserjs.org/meta/drgirasol/Planets.nu_-_NUPilot.meta.js
-// @downloadURL   https://openuserjs.org/scripts/drgirasol/Planets.nu_-_NUPilot
+// @updateURL     https://openuserjs.org/meta/drgirasol/NUPilot.meta.js
+// @downloadURL   https://openuserjs.org/scripts/drgirasol/NUPilot
 // @history       0.01 (01)  Initial [2016-11-19]
 // @history       0.02 (22)  Collectors & Distributers - an Introduction [2016-12-05]
 // @history       0.03 (35)  Transition from note configuration to shipScreen Mission Dialog configuration [2016-12-26]
