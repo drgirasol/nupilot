@@ -1,19 +1,21 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable semi-intelligent auto-pilots
-// @version       0.04 (41)
-// @date          2016-12-28
+// @version       0.04 (43)
+// @date          2016-12-31
 // @author        drgirasol
 // @include       http://planets.nu/*
 // @include       http://play.planets.nu/*
 // @include       http://test.planets.nu/*
+// @resource	  Documentation https://github.com/drgirasol/nupilot/wiki
 // @updateURL     https://greasyfork.org/scripts/26189-nupilot/code/nuPilot.user.js
 // @downloadURL   https://greasyfork.org/scripts/26189-nupilot/code/nuPilot.user.js
 // @history       0.01 (01)  Initial [2016-11-19]
 // @history       0.02 (22)  Collectors & Distributers - an Introduction [2016-12-05]
 // @history       0.03 (35)  Transition from note configuration to shipScreen Mission Dialog configuration [2016-12-26]
 // @history       0.04 (40)  Colonization module (Expander) added [2016-12-28]
-// @history       0.04 (41)  Ally minefields, planets and ships are no longer recognized as danger [2016-12-31]
+// @history       0.04 (41)  Ally minefields, planets and ships are no longer recognized as danger [2016-12-30]
+// @history       0.04 (43)  Alchemy module (Alchemist) added [2016-12-31]
 // ==/UserScript==
 
 
@@ -355,33 +357,46 @@ function wrapper () { // wrapper for injection
 				name: "Collect Resources",
 			 	desc: "Collect resources and deliver them to the current planet.",
 				shipFunction: "col",
-				ooiOptions: [ "all", "neu", "dur", "tri", "mol", "cla", "mcs", "sup" ]
+				ooiOptions: [ "all", "neu", "dur", "tri", "mol", "cla", "mcs", "sup" ],
+				hullId: 0
 			},
 			{
 				name: "Distribute Resources",
 				desc: "Distribute resources from sources to sinks.",
 				shipFunction: "dis",
-				ooiOptions: [ "neu", "cla", "mcs" ]
+				ooiOptions: [ "neu", "cla", "mcs" ],
+				hullId: 0
+			},
+			{
+				name: "Alchemy",
+				desc: "Load supply and unload products",
+				shipFunction: "alc",
+				ooiOptions: [ "all", "dur", "tri", "mol" ],
+				hullId: 0
 			},
 			{
 				name: "Colonize",
 				desc: "Colonize unowned planets",
 				shipFunction: "exp",
-				ooiOptions: [ "cla" ]
+				ooiOptions: [ "cla" ],
+				hullId: 0
 			},
 			{
 				name: "Deactivate",
 				desc: "Deactivate auto-pilot",
 				shipFunction: "000",
-				ooiOptions: [ "END" ]
+				ooiOptions: [ "END" ],
+				hullId: 0
 			}
 		];
 		var curMission = vgap.shipScreen.ship.mission;
 		vgap.more.empty();
         $("<div id='OrdersScreen'><h1>Auto-Pilot-Control</h1></div>").appendTo(vgap.more);
 		//
-        for (var a = 0; a < apcOptions.length; a++) {
+        for (var a = 0; a < apcOptions.length; a++) 
+		{
             var c = apcOptions[a];
+			if (vgap.shipScreen.ship.hullid != 105 && c.shipFunction == "alc") continue; // only show alchemy module if its an alchemy ship
 			//
 			var d = function(g) {
 				return function() {
@@ -421,7 +436,39 @@ function wrapper () { // wrapper for injection
         shtml.moreBack();
         vgap.showMore();
 	};
-	// display current APC "orders"
+	// display current APC "orders" -> loadOrders
+	vgapShipScreen.prototype.autopilotInfo = function(r)
+	{
+		var apcFunctions = {
+			col: "Collect",
+			dis: "Distribute",
+			exp: "Colonize",
+			alc: "Alchemy"
+		};
+		var apcPriorities = {
+			all: "Dur/Tri/Mol",
+			neu: "Neutronium",
+			dur: "Duranium",
+			tri: "Tritanium",
+			mol: "Molybdenum",
+			sup: "Supplies",
+			mcs: "Megacredits",
+			cla: "Clans"
+		};
+		var h = "";
+		var apcData = autopilot.isInStorage(r.id);
+		if (apcData)
+		{
+			h += "<table width='100%'><tr><td class='widehead' data-topic='ShipAutoPilot'>APC:</td><td class='textval'>";
+			h += apcFunctions[apcData.shipFunction] + " " + apcPriorities[apcData.ooiPriority];
+			h += " <span class='valsup'>(Base: " + apcData.base;
+			if (apcData.destination) h += " |-> " + apcData.destination;
+			h += ")</span>";
+			h += "</td></tr>";
+			h += "</table>";
+		}
+		return h;
+	};
 	vgapShipScreen.prototype.loadOrders = function()
 	{
         var r = this.ship;
@@ -510,27 +557,9 @@ function wrapper () { // wrapper for injection
         }
         h += "</td></tr>";
         h += "</table>";
-		// pilot info
-		var apcData = autopilot.isInStorage(r.id);
-		if (apcData)
-		{
-			h += "<table width='100%'><tr><td class='widehead' data-topic='ShipAutoPilot'>APC:</td><td class='textval'>";
-			if (apcData.shipFunction == "col")
-			{
-				h += "Collecting " + apcData.ooiPriority;
-				h += " <span class='valsup'>(" + apcData.destination + " -> " + apcData.base + ")</span>";
-			} else if (apcData.shipFunction == "dis")
-			{
-				h += "Distributing " + apcData.ooiPriority;
-				h += " <span class='valsup'>(-> " + apcData.destination + ")</span>";
-			} else if (apcData.shipFunction == "exp")
-			{
-				h += "Expander";
-				h += " <span class='valsup'>(" + apcData.destination + ")</span>";
-			}
-			h += "</td></tr>";
-			h += "</table>";
-		}
+		// auto pilot control info
+		h += vgap.shipScreen.autopilotInfo(r);
+		//
         var b = null ;
         if (r.hullid == 1023 || r.hullid == 109 || r.hullid == 1049) {
             var d = parseInt(r.friendlycode);
@@ -725,6 +754,160 @@ function wrapper () { // wrapper for injection
 		}
 		return inRange;
 	};
+		/*
+	 * Autopilot - Expansion Module
+	 */
+	function alchemyAPS(aps)
+	{
+		this.minimalCargoRatioToGo = 0.5; // in percent of cargo capacity (e.g. 0.7 = 70%)
+		this.cruiseMode = "safe"; // safe = 1-turn-connetions, fast = direct if faster, direct = always direct
+		this.energyMode = "conservative"; // conservative = use only the required amount of fuel, moderate = use 20 % above required amount, max = use complete tank capacity
+		this.ooiPriority = "all"; // object of interest (ooi) priority: always "cla"
+		this.alwaysLoadMC = true; // freighter missions will always include MCs
+		this.sellSupply = "notBov"; // true, false, "notBov" (true, but don't sell supply on Bovinoid planets)
+		this.supplyRetentionRatio = 0.1; // if selling supplies, we keep some for other purposes
+		this.fuelRetentionMass = 500;
+		this.mcRetentionAmount = 100;
+		this.enemySafetyZone = 81; // radius of each enemy planet and ship that will be avoided by us (planets in that range are not used as targets)
+		// fixed to ship porperties
+		this.devideThresh = 0;
+		// data container
+		this.frnnSources = [];
+		this.sources = [];
+		this.frnnSinks = [];
+		this.sinks = [];
+	}
+	alchemyAPS.prototype.setSinks = function(aps)
+	{
+		// as alchemist, current planet is a sink
+		this.sinks = [{ x: aps.ship.x, y: aps.ship.y , distance: 0, deficiency: 0}];
+	};
+	alchemyAPS.prototype.setSources = function(aps)
+	{
+		// as alchemist, current planet is a sink
+		this.sources = [{ x: aps.ship.x, y: aps.ship.y , distance: 0, deficiency: 0}];
+	};
+	alchemyAPS.prototype.isSource = function(planet)
+	{
+		if (planet.supplies > 0) return true;
+		return false;
+	};
+	alchemyAPS.prototype.setPotentialDestinations = function(aps)
+	{
+		if (aps.destination) return;
+		console.log("Determine potential destinations...");
+		// by planet.id sorted sinks (deficiencies)
+		if (this.sinks.length === 0) this.setSinks(aps);
+		// by planet.id sorted sources (two piles -high/low value- by distance)
+		if (this.sources.length === 0) this.setSources(aps);
+		//
+		if (this.isSource(aps.planet))
+		{
+			// if we are at source, set sinks as potential destinations
+			console.log("...for expander at source...");
+			// aps.potDest = this.sinks;
+		} else
+		{
+			// set sources as potential destinations, if we are at a sink
+			console.log("...for expander at an unowned planet...");
+			// aps.potDest = this.sources;
+		}
+		if (aps.potDest.length === 0)
+		{
+			console.log("setPotentialDestinations: no destinations available...");
+		} else
+		{
+			console.log(aps.potDest);
+		}
+	};
+	alchemyAPS.prototype.updateMission = function(aps)
+	{
+		if (aps.potDest.length > 0) // we are at a planet and have potential destinations set
+		{
+			// evaluate mission destinations & select Target
+			aps.potDest = aps.evaluateMissionDestinations();
+			//console.log("Potential target: ");
+			//console.log(aps.potDest[0]);
+			//console.log(aps.potDest);
+			this.selectMissionDestination(aps);
+			// load cargo if at source
+			// this.handleCargo(aps); // load specific amount...
+		} else
+		{
+			console.log("Alchemist stays...");
+			this.updateFC(aps);
+			this.handleCargo(aps); // load specific amount...
+			// toDo: check for danger
+		}
+	};
+	alchemyAPS.prototype.updateFC = function(aps)
+	{
+		if (this.ooiPriority == "all")
+		{
+			aps.ship.friendlycode = "abc"; // toDo: random FC
+		} else if (this.ooiPriority == "dur")
+		{
+			aps.ship.friendlycode = "ald";
+		} else if (this.ooiPriority == "tri")
+		{
+			aps.ship.friendlycode = "alt";
+		} else if (this.ooiPriority == "mol")
+		{
+			aps.ship.friendlycode = "alm";
+		}
+	};
+	alchemyAPS.prototype.confirmMission = function(aps)
+	{
+		if (aps.potDest === 0) // we are not at our destination
+		{
+			console.log("Collector is in-route to its destination...");
+			var curTarget = vgap.planetAt(aps.ship.targetx, aps.ship.targety);
+			if (aps.objectInRangeOfEnemy(curTarget))
+			{
+				// return to base, if we are in dangerous space
+				// jettison cargo?
+				aps.setShipTarget(aps.base.x, aps.base.y);
+			}
+			if (aps.checkFuel()) {
+				//
+			} else
+			{
+				// stay indevinently, send SOS ;)
+			}
+		} else {
+			if (aps.checkFuel()) {
+				//
+			} else
+			{
+				// stay indevinently, send SOS ;)
+			}
+		}
+	};
+	alchemyAPS.prototype.selectMissionDestination = function(aps)
+	{
+		if (aps.potDest.length > 0)
+		{
+			// set Target (and if not set yet, destination)
+			aps.setShipTarget(aps.potDest[0].x, aps.potDest[0].y);
+			// set full warp
+			aps.setWarp();
+		}
+	};
+	alchemyAPS.prototype.handleCargo = function (aps)
+	{
+		if (aps.planet)
+		{
+			aps.unloadCargo();
+			var transCargo = this.loadCargo(aps);
+			console.log("Cargo summary: " + transCargo);
+		}
+	};
+	alchemyAPS.prototype.loadCargo = function(aps)
+	{
+		var curCargo = 0;
+		curCargo += aps.loadObject("supplies", aps.planet);
+		return curCargo;
+	};
 	/*
 	 * Autopilot - Expansion Module
 	 */
@@ -863,54 +1046,19 @@ function wrapper () { // wrapper for injection
 				// jettison cargo?
 				aps.setShipTarget(aps.base.x, aps.base.y);
 			}
-			if (this.checkFuel(aps)) {
+			if (aps.checkFuel()) {
 				//
 			} else
 			{
 				// stay indevinently, send SOS ;)
 			}
 		} else {
-			if (this.checkFuel(aps)) {
+			if (aps.checkFuel()) {
 				//
 			} else
 			{
 				// stay indevinently, send SOS ;)
 			}
-		}
-	};
-	expanderAPS.prototype.checkFuel = function(aps)
-	{
-		if (aps.planet && aps.planet.ownerid == vgap.player.id)
-		{
-			aps.setWarp(); // set most efficient warp factor for fuel consumption estimation
-			var fuel = Math.floor(aps.getFuelConsumptionEstimate() * 1.5); // use more, so there will be enough for return trip
-			var loadedFuel = aps.loadObject("neutronium", aps.planet, fuel);
-			console.log("We have " + loadedFuel + " neutronium aboard and need " + fuel);
-			if (loadedFuel >= fuel)
-			{
-				return true;
-			} else
-			{
-				// there is not enough fuel!
-				var shortage = fuel - loadedFuel;
-				var futureFuel = aps.planet.neutronium + aps.getMiningOutput("neutronium", 2);
-				if (futureFuel >= shortage)
-				{
-					// if there will be enough in 2 turns, lets wait
-					console.log("Waiting for enough fuel (" + shortage + ") to be available (" + futureFuel + ")...");
-					aps.setWarp(0);
-					return false;
-				} else
-				{
-					aps.setWarp(0);
-					return false; // consider other options
-				}
-			}
-		} else
-		{
-			// in space...
-			aps.setWarp(); // set most efficient warp factor
-			return true;
 		}
 	};
 	expanderAPS.prototype.selectMissionDestination = function(aps)
@@ -1100,77 +1248,19 @@ function wrapper () { // wrapper for injection
 				// jettison cargo?
 				aps.setShipTarget(aps.base.x, aps.base.y);
 			}
-			if (this.checkFuel(aps)) {
+			if (aps.checkFuel()) {
 				//
 			} else
 			{
 				// stay indevinently, send SOS ;)
 			}
 		} else {
-			if (this.checkFuel(aps)) {
+			if (aps.checkFuel()) {
 				//
 			} else
 			{
 				// stay indevinently, send SOS ;)
 			}
-		}
-	};
-	collectorAPS.prototype.checkFuel = function(aps)
-	{
-		if (aps.planet)
-		{
-			aps.setWarp(); // set most efficient warp factor for fuel consumption estimation
-			var fuel = aps.getFuelConsumptionEstimate();
-			// if we are at Base we need to consider the available fuel on the target planet to check if it will be sufficient for our return trip
-			if (aps.atBase && aps.destination)
-			{
-				console.log("Fuelcheck: atBase with destination set");
-				// toDo: determine "turns in space" so we can calculate future resources better
-				var getFutureSurfaceResources = aps.getFutureSurfaceResources(aps.destination, aps.getETA());
-				console.log(getFutureSurfaceResources);
-				var returnFuel = aps.getFuelConsumptionEstimate([getFutureSurfaceResources.duranium, getFutureSurfaceResources.tritanium, getFutureSurfaceResources.molybdenum]);
-				//console.log(returnFuel);
-				if (!returnFuel)
-				{
-					// required fuel exceeds tank capacity
-					aps.setWarp(0);
-					return false; // consider other options
-				} else if (returnFuel > getFutureSurfaceResources.neutronium)
-				{
-					// if there won't be enough fuel, we need to take it with us... very inefficient
-					var additionalFuel = returnFuel - getFutureSurfaceResources.neutronium;
-					console.log("We need fuel for the return trip!");
-					// toDo: probably won't be enough
-					fuel += additionalFuel;
-				}
-			}
-			var loadedFuel = aps.loadObject("neutronium", aps.planet, fuel);
-			console.log("We have " + loadedFuel + " neutronium aboard and need " + fuel);
-			if (loadedFuel >= fuel)
-			{
-				return true;
-			} else
-			{
-				// there is not enough fuel!
-				var shortage = fuel - loadedFuel;
-				var futureFuel = aps.planet.neutronium + aps.getMiningOutput("neutronium", 2);
-				if (futureFuel >= shortage)
-				{
-					// if there will be enough in 2 turns, lets wait
-					console.log("Waiting for enough fuel (" + shortage + ") to be available (" + futureFuel + ")...");
-					aps.setWarp(0);
-					return false;
-				} else
-				{
-					aps.setWarp(0);
-					return false; // consider other options
-				}
-			}
-		} else
-		{
-			// in space...
-			aps.setWarp(); // set most efficient warp factor
-			return true;
 		}
 	};
 	collectorAPS.prototype.selectMissionDestination = function(aps)
@@ -1442,7 +1532,7 @@ function wrapper () { // wrapper for injection
 		{
 			if (aps.planet) // we are at planet
 			{
-				if (this.checkFuel(aps)) {
+				if (aps.checkFuel()) {
 					console.log("Checkfuel ok...");
 				} else
 				{
@@ -1499,41 +1589,6 @@ function wrapper () { // wrapper for injection
 		}
 		console.log("Loaded (" + this.ooiPriority + "): " + transCargo + "/" + deficiency);
 		return (transCargo - deficiency);
-	};
-	distributorAPS.prototype.checkFuel = function(aps)
-	{
-		if (aps.planet)
-		{
-			aps.setWarp(); // set most efficient warp factor for fuel consumption estimation
-			var fuel = aps.getFuelConsumptionEstimate();
-			var loadedFuel = aps.loadObject("neutronium", aps.planet, fuel);
-			console.log("We have " + loadedFuel + " neutronium aboard and need " + fuel);
-			if (loadedFuel >= fuel)
-			{
-				return true;
-			} else
-			{
-				// there is not enough fuel!
-				var shortage = fuel - loadedFuel;
-				var futureFuel = aps.planet.neutronium + aps.getMiningOutput("neutronium", 2);
-				if (futureFuel >= shortage)
-				{
-					// if there will be enough in 2 turns, lets wait
-					console.log("Waiting for enough fuel (" + shortage + ") to be available (" + futureFuel + ")...");
-					aps.setWarp(0);
-					return false;
-				} else
-				{
-					aps.setWarp(0);
-					return false; // consider other options
-				}
-			}
-		} else
-		{
-			// in space...
-			aps.setWarp(); // set most efficient warp factor
-			return true;
-		}
 	};
 	distributorAPS.prototype.selectMissionDestination = function(aps)
 	{
@@ -1636,6 +1691,29 @@ function wrapper () { // wrapper for injection
 			this.isAPS = false;
 		}
 	}
+	APS.prototype.bootFunctionModule = function(func)
+	{
+		if (func == "col")
+		{
+			console.log("...Collector Mode");
+			this.functionModule = new collectorAPS(this);
+		} else if (func == "dis")
+		{
+			console.log("...Distributer Mode");
+			this.functionModule = new distributorAPS(this);
+		} else if (func == "alc")
+		{
+			console.log("...Alchemy Mode");
+			this.functionModule = new alchemyAPS(this);
+		} else if (func == "exp")
+		{
+			console.log("...Expander Mode");
+			this.functionModule = new expanderAPS(this);
+		} else
+		{
+			this.isAPS = false;
+		}
+	};
 	APS.prototype.initializeBoardComputer = function(configuration)
 	{
 		console.error("Initializing flight computer of APC " + this.ship.id);
@@ -1668,24 +1746,9 @@ function wrapper () { // wrapper for injection
 		console.log(storageData);
 		if (!this.isValidDestination(storageData.destination)) storageData.destination = false; // e.g. is destination (still) our planet
 		//
-		// load function specific module
+		// initialize ship function module
 		//
-		if (cfgFunction == "col")
-		{
-			console.log("...Collector Mode");
-			this.functionModule = new collectorAPS(this);
-		} else if (cfgFunction == "dis")
-		{
-			console.log("...Distributer Mode");
-			this.functionModule = new distributorAPS(this);
-		} else if (cfgFunction == "exp")
-		{
-			console.log("...Expander Mode");
-			this.functionModule = new expanderAPS(this);
-		} else
-		{
-			this.isAPS = false;
-		}
+		this.bootFunctionModule(cfgFunction);
 		//
 		this.functionModule.devideThresh = this.getDevisionThresh();
 		this.functionModule.ooiPriority = cfgOoiPriority;
@@ -2291,6 +2354,41 @@ function wrapper () { // wrapper for injection
 		return turnTargets;
 	};
 	// interaction specifics
+	APS.prototype.checkFuel = function()
+	{
+		if (this.planet && this.planet.ownerid == vgap.player.id)
+		{
+			this.setWarp(); // set most efficient warp factor for fuel consumption estimation
+			var fuel = Math.floor(this.getFuelConsumptionEstimate() * 1.5); // use more, so there will be enough for return trip
+			var loadedFuel = this.loadObject("neutronium", this.planet, fuel);
+			console.log("We have " + loadedFuel + " neutronium aboard and need " + fuel);
+			if (loadedFuel >= fuel)
+			{
+				return true;
+			} else
+			{
+				// there is not enough fuel!
+				var shortage = fuel - loadedFuel;
+				var futureFuel = this.planet.neutronium + this.getMiningOutput("neutronium", 2);
+				if (futureFuel >= shortage)
+				{
+					// if there will be enough in 2 turns, lets wait
+					console.log("Waiting for enough fuel (" + shortage + ") to be available (" + futureFuel + ")...");
+					this.setWarp(0);
+					return false;
+				} else
+				{
+					this.setWarp(0);
+					return false; // consider other options
+				}
+			}
+		} else
+		{
+			// in space...
+			this.setWarp(); // set most efficient warp factor
+			return true;
+		}
+	};
 	APS.prototype.unloadFuel = function()
 	{
 		if (this.planet)
