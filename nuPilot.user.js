@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable semi-intelligent auto-pilots
-// @version       0.04 (43)
+// @version       0.05 (44)
 // @date          2016-12-31
 // @author        drgirasol
 // @include       http://planets.nu/*
@@ -15,7 +15,7 @@
 // @history       0.03 (35)  Transition from note configuration to shipScreen Mission Dialog configuration [2016-12-26]
 // @history       0.04 (40)  Colonization module (Expander) added [2016-12-28]
 // @history       0.04 (41)  Ally minefields, planets and ships are no longer recognized as danger [2016-12-30]
-// @history       0.04 (43)  Alchemy module (Alchemist) added [2016-12-31]
+// @history       0.05 (44)  Alchemy module (Alchemist) added [2016-12-31]
 // ==/UserScript==
 
 
