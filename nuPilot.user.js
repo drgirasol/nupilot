@@ -1122,7 +1122,7 @@ function wrapper () { // wrapper for injection
 		this.minimalCargoRatioToGo = 0.5; // in percent of cargo capacity (e.g. 0.7 = 70%)
 		this.cruiseMode = "safe"; // safe = 1-turn-connetions, fast = direct if faster, direct = always direct
 		this.energyMode = "conservative"; // conservative = use only the required amount of fuel, moderate = use 20 % above required amount, max = use complete tank capacity
-		this.ooiPriority = "all"; // object of interest (ooi) priority: "all" (=dur, tri, mol), "dur", "tri", "mol", "mcs", "sup", "cla"
+        this.ooiPriority = "all"; // object of interest (ooi) priority: "all" (=dur, tri, mol), "dur", "tri", "mol", "mcs", "sup", "cla"
 		this.alwaysLoadMC = true; // freighter missions will always include MCs
 		this.sellSupply = "notBov"; // true, false, "notBov" (true, but don't sell supply on Bovinoid planets)
 		this.supplyRetentionRatio = 0.1; // if selling supplies, we keep some for other purposes
@@ -1150,10 +1150,21 @@ function wrapper () { // wrapper for injection
 			this.sinks = [{ x: aps.base.x, y: aps.base.y, pid: aps.base.id, deficiency: priorityres }];
 		}
 	};
+	collectorAPS.prototype.setScopeRange = function(aps)
+    {
+        var inRange = aps.getAPSinRange(aps.scopeRange);
+        if (inRange.length > 2)
+        {
+            aps.scopeRange *= 2;
+        } else if (inRange.length > 5)
+        {
+            aps.scopeRange *= 3;
+        }
+    };
 	collectorAPS.prototype.setSources = function(aps)
 	{
-		//
-		var targetsInRange = aps.getTargetsInRange(autopilot.frnnOwnPlanets, aps.base.x, aps.base.y, aps.defaultFixedRadius);
+		this.setScopeRange(aps);
+		var targetsInRange = aps.getTargetsInRange(autopilot.frnnOwnPlanets, aps.base.x, aps.base.y, aps.scopeRange);
 		//
 		for (var i = 0; i < targetsInRange.length; i++)
 		{
@@ -1632,9 +1643,13 @@ function wrapper () { // wrapper for injection
 			t9: [0,100,400,900,1600,2500,3600,4900,6400,8100]
 		};
 		this.gravitonic = false;
+
+		this.scopeRange = 162;
+
 		this.simpleRange = 81; // warp 9 max turn distance
 		this.maxRange = 160; // adjusted by maxRange
 		this.defaultFixedRadius = 160; // adjusted by maxRange (=50 %)
+
 		this.planet = false; // current planet (if at any)
 		this.base = false; // the fixed base, as set in note
 		this.atBase = false;
@@ -1647,7 +1662,9 @@ function wrapper () { // wrapper for injection
 		this.hasToSetPotDes = false;
 		this.shipFunctions = {
 			col: "collector",
-			dis: "distributor"
+			dis: "distributor",
+            exp: "expander",
+            alc: "alchemy"
 		};
 		this.moveables = {
 			neu: "neutronium",
@@ -1659,11 +1676,8 @@ function wrapper () { // wrapper for injection
 			cla: "clans"
 		};
 		//
-		this.enemyAlert = false; // if enemies are in range posing immediate danger (freighters = danger?, is enemy "in our way"?)
+		// this.enemyAlert = false; // if enemies are in range posing immediate danger (freighters = danger?, is enemy "in our way"?)
 		//
-
-		// this.nextDestination = [ship.targetx, .targety]
-		// this.waypoints = ship.waypoints
 		this.potDest = []; // potential destinations
 		//
 		if (this.ship.note && this.ship.ownerid == vgap.player.id || (typeof cfgData != "undefined" && cfgData !== false))
@@ -1809,6 +1823,33 @@ function wrapper () { // wrapper for injection
 			}
 		}
 	};
+	APS.prototype.getAPSinRange = function(range)
+    {
+        var lStorage = autopilot.getLocalStorage();
+        if (lStorage)
+        {
+            var pids = [];
+            for(var i = 0; i < lStorage.length; i++)
+            {
+                if (lStorage[i].shipFunction == this.ship.primaryFunction)
+                {
+                    pids.push(lStorage[i].base);
+                }
+            }
+            var frnnPositions = this.getPositions4Planets(pids);
+            return this.getTargetsInRange(frnnPositions, this.base.x, this.base.y, range);
+        }
+    };
+	APS.prototype.getPositions4Planets = function(pids)
+    {
+        var frnnPositions = [];
+        for(var i = 0; i < pids.length; i++)
+        {
+            var p = vgap.getPlanet(pids[i]);
+            frnnPositions.push( { x: p.x , y: p.y } );
+        }
+        return frnnPositions;
+    };
 	APS.prototype.getETA = function(tx, ty)
 	{
 		if (typeof tx == "undefined") tx = this.ship.targetx;
@@ -2555,7 +2596,7 @@ function wrapper () { // wrapper for injection
 			}
 		}
 		return true;
-	}
+	};
 	APS.prototype.isSaveShipTarget = function(targetx, targety)
 	{
 		return this.isSavePosition({ x: targetx, y: targety });
@@ -3154,15 +3195,24 @@ function wrapper () { // wrapper for injection
 				ship.note.body = "";
 			}
 		},
+        getLocalStorage: function()
+        {
+            // each game has a different storage
+            var storeId = "nuPilot" + vgap.game.createdby + vgap.game.id;
+            var storedGameData = JSON.parse(localStorage.getItem(storeId));
+            if (storedGameData === null) // no storage setup yet
+            {
+                return false;
+            } else {
+                return storedGameData;
+            }
+        },
 		syncLocalStorage: function(data, update)
 		{
 			if (typeof update == "undefined") update = false;
-			//var storedShipData = false;
-			// each game has a different storage
-			var storeId = "nuPilot" + vgap.game.createdby + vgap.game.id;
 			// load data
-			var storedGameData = JSON.parse(localStorage.getItem(storeId));
-			if (storedGameData === null) // no storage setup yet
+			var storedGameData = autopilot.getLocalStorage();
+			if (!storedGameData) // no storage setup yet
 			{
 				if (data.ooiPriority == "END") return false; // if turned off 
 				storedGameData = [];
