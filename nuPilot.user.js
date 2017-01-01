@@ -2330,29 +2330,30 @@ function wrapper () { // wrapper for injection
 		var inRange = frnn.inRange({x: x,y: y}, r);
 		return inRange;
 	};
+	/*
+	 *
+	 * TurnTargets: x, y, distance(toDestination), planetId
+	 *
+	 */
 	APS.prototype.getTurnTargets = function(ship, destination, adjustment)
 	{
 		var frnnTargets = [];
 		if (this.primaryFunction == "exp")
 		{
-			frnnTargets = autopilot.frnnPlanets;
+			frnnTargets = autopilot.frnnUnownedPlanets;
 		} else
 		{
 			frnnTargets = autopilot.frnnOwnPlanets;
 		}
 		var turnTargets = this.getTargetsInRange(frnnTargets, ship.x, ship.y, (this.simpleRange + adjustment));
-		for (var i = 0; i < turnTargets.length; i++) {
+		for (var i = 0; i < turnTargets.length; i++)
+		{
 			var tt = turnTargets[i];
-			var dist = this.getDistance({x: tt.x , y: tt.y}, {x: destination.x , y: destination.y});
-			if (tt.x == destination.x && tt.y == destination.y && dist <= this.simpleRange)
-			{
-				// targets include final destination...
-				// if it can be reached in one turn, make sure it will be "closest".
-				turnTargets[i].distance = 1;
-			} else
-			{
-				turnTargets[i].distance = dist;
-			}
+			// distance between potential next stop and the destination
+			//  - in case the potential next stop is the destination, distance is 0
+            turnTargets[i].distance = this.getDistance({x: tt.x , y: tt.y}, {x: destination.x , y: destination.y});
+            var ttPlanet = vgap.planetAt(tt.x , tt.y);
+            turnTargets[i].pid = ttPlanet.id;
 		}
 		// sort the targets by distance
 		turnTargets.sort(function(a, b) {
@@ -2364,9 +2365,9 @@ function wrapper () { // wrapper for injection
 			});
 		return turnTargets;
 	};
-    APS.prototype.isSaveShipTarget = function(targetx, targety)
+    APS.prototype.isSaveShipTarget = function(x, y, pid)
     {
-        return this.isSavePosition({ x: targetx, y: targety });
+        return this.isSavePosition({ x: x, y: y , pid: pid});
     };
     APS.prototype.isSavePosition = function(pos)
     {
@@ -2405,9 +2406,9 @@ function wrapper () { // wrapper for injection
             curDistToEnemy = this.getDistance({x: eP[i].x, y: eP[i].y}, {x: object.x, y: object.y});
             // prevent ships from getting to close to enemy planets while traveling to destination
             // ignore when object is the base planet
-            if (curDistToEnemy < this.functionModule.enemySafetyZone && object.id != this.base.id)
+            if (curDistToEnemy < this.functionModule.enemySafetyZone && object.pid != this.base.id)
             {
-                console.log("...position (" + eP[i].x + "/" + eP[i].y + ") is in range of enemy planet!");
+                console.log("...position (" + object.pid + ":" + object.x + "x" + object.y + ") is in range of enemy planet!");
                 return true;
             }
         }
@@ -2415,8 +2416,11 @@ function wrapper () { // wrapper for injection
         for (var j = 0; j < eS.length; j++)
         {
             curDistToEnemy = this.getDistance({x: eS[j].x, y: eS[j].y}, {x: object.x, y: object.y});
+            // prevent ships from getting to close to enemy ships while traveling to destination
+            // ignore when ship has no weapons toDo: danger of robbing?
+            // ignore when object is the base planet
             curShip = vgap.getShip(eS[j].sid);
-            if (curDistToEnemy < this.functionModule.enemySafetyZone && this.shipHasWeapons(curShip))
+            if (curDistToEnemy < this.functionModule.enemySafetyZone && this.shipHasWeapons(curShip) && object.pid != this.base.id)
             {
                 console.log("...position (" + object.x + "/" + object.y + ") is in range (" + curDistToEnemy + " lj) of enemy ship - (" + eS[j].x + "/" + eS[j].y + ")!");
                 return true;
@@ -2603,6 +2607,9 @@ function wrapper () { // wrapper for injection
 		}
 		return this.ship[object];
 	};
+	/*
+	 * set next stop to destination x, y
+	 */
 	APS.prototype.setShipTarget = function(x, y)
 	{
 		if (!this.destination)
@@ -2624,10 +2631,11 @@ function wrapper () { // wrapper for injection
 		console.log("Searching target on the way to " + destinationPlanet.name + " (" + destinationPlanet.id + ")...");
 		var adjustment = 0;
 		var turnTargets = this.getTurnTargets(this.ship, destinationPlanet, adjustment);
-		// distance from current location to destination
+		// distance from current location to destination planet
 		var curPosDistance = Math.floor(this.getDistance({x: this.ship.x , y: this.ship.y}, {x: x , y: y}));
 		//
-		console.log("...found " + turnTargets.length + " turn-targets within a " + (this.simpleRange + adjustment) + " ly radius...");
+		console.log("Turntargets: " + adjustment);
+        console.log(turnTargets);
 		//console.log(turnTargets);
 		//
 		while(turnTargets.length === 0 || turnTargets[0].distance >= (curPosDistance * 0.9)) // only use targets that are (considerably? 10 %?) closer to the destination than the current position
@@ -2639,7 +2647,7 @@ function wrapper () { // wrapper for injection
 		}
 		if (turnTargets.length > 0)
 		{
-			if (this.isSaveShipTarget(turnTargets[0].x, turnTargets[0].y))
+			if (this.isSaveShipTarget(turnTargets[0].x, turnTargets[0].y, turnTargets[0].pid))
 			{
 				this.ship.targetx = turnTargets[0].x;
 				this.ship.targety = turnTargets[0].y;
@@ -2650,7 +2658,7 @@ function wrapper () { // wrapper for injection
 				if (turnTargets.length > 1)
 				{
 					console.log("Current target is unsave... try one alternative...");
-					if (this.isSaveShipTarget(turnTargets[1].x, turnTargets[1].y))
+					if (this.isSaveShipTarget(turnTargets[1].x, turnTargets[1].y, turnTargets[0].pid))
 					{
 						this.ship.targetx = turnTargets[1].x;
 						this.ship.targety = turnTargets[1].y;
@@ -2856,6 +2864,7 @@ function wrapper () { // wrapper for injection
 				{
 					autopilot.frnnEnemyPlanets.push({x: planet.x, y: planet.y});
 				}
+				// toDo: ownerid === 0 = unowned? or also unknown owner?
 				if (planet.ownerid === 0) autopilot.frnnUnownedPlanets.push({pid: planet.id, x: planet.x, y: planet.y});
 			});
 		},
