@@ -3210,6 +3210,8 @@ function wrapper () { // wrapper for injection
 		syncLocalStorage: function(data, update)
 		{
 			if (typeof update == "undefined") update = false;
+            // each game has a different storage
+            var storeId = "nuPilot" + vgap.game.createdby + vgap.game.id;
 			// load data
 			var storedGameData = autopilot.getLocalStorage();
 			if (!storedGameData) // no storage setup yet
@@ -3228,7 +3230,6 @@ function wrapper () { // wrapper for injection
 			} else
 			{
 				// storage available...
-				var newGameData = [];
 				for(var i = 0; i < storedGameData.length; i++)
 				{
 					// ...look for entry of the current APS
