@@ -1651,9 +1651,9 @@ function wrapper () { // wrapper for injection
 		this.defaultFixedRadius = 160; // adjusted by maxRange (=50 %)
 
 		this.planet = false; // current planet (if at any)
-		this.base = false; // the fixed base, as set in note
+		this.base = false; // base -> planet object
 		this.atBase = false;
-		this.destination = false; // destination planet
+		this.destination = false; // destination -> planet object
 		this.atDestination = false;
 		//
 		this.primaryFunction = false;
@@ -1918,36 +1918,6 @@ function wrapper () { // wrapper for injection
 		if (shipHull.beams > 0 || shipHull.fighterbays > 0 || shipHull.launchers > 0)
 		{
 			return true;
-		}
-		return false;
-	};
-	APS.prototype.objectInRangeOfEnemy = function(object)
-	{
-		// in range of enemy ships
-		// in range of enemy planet
-		// in range = 1 turn movement
-		if (typeof object == "undefined") return false;
-		var curDistToEnemy = 0;
-		var eP = autopilot.frnnEnemyPlanets;
-		for (var i = 0; i < eP.length; i++)
-		{
-			curDistToEnemy = this.getDistance({x: eP[i].x, y: eP[i].y}, {x: object.x, y: object.y});
-			if (curDistToEnemy < this.functionModule.enemySafetyZone)
-			{
-				console.log("...position (" + eP[i].x + "/" + eP[i].y + ") is in range of enemy planet!");
-				return true;
-			}
-		}
-		var eS = autopilot.frnnEnemyShips;
-		for (var j = 0; j < eS.length; j++)
-		{
-			curDistToEnemy = this.getDistance({x: eS[j].x, y: eS[j].y}, {x: object.x, y: object.y});
-			curShip = vgap.getShip(eS[j].sid);
-			if (curDistToEnemy < this.functionModule.enemySafetyZone && this.shipHasWeapons(curShip))
-			{
-				console.log("...position (" + object.x + "/" + object.y + ") is in range (" + curDistToEnemy + " lj) of enemy ship - (" + eS[j].x + "/" + eS[j].y + ")!");
-				return true;
-			}
 		}
 		return false;
 	};
@@ -2394,6 +2364,66 @@ function wrapper () { // wrapper for injection
 			});
 		return turnTargets;
 	};
+    APS.prototype.isSaveShipTarget = function(targetx, targety)
+    {
+        return this.isSavePosition({ x: targetx, y: targety });
+    };
+    APS.prototype.isSavePosition = function(pos)
+    {
+        // don't visit planets in or close to minefields
+        // toDo: planets in radiation zones, if you don't have special shielding
+        if (this.objectInsideMineField(pos))
+        {
+            console.log("...position is inside / close to minefield!");
+            return false;
+        }
+        // don't visit planets close to enemy planets or ships
+        if (this.objectInRangeOfEnemy(pos)) {
+            return false;
+        }
+        var ionStormId = false;
+        if ((ionStormId = this.objectInsideIonStorm(pos)))
+        {
+            if (this.isDangerousIonStorm(ionStormId))
+            {
+                console.log("...position is inside / close to dangerous ionstorm...");
+                return false;
+            }
+        }
+        return true;
+    };
+    APS.prototype.objectInRangeOfEnemy = function(object)
+    {
+        // in range of enemy ships
+        // in range of enemy planet
+        // in range = 1 turn movement
+        if (typeof object == "undefined") return true;
+        var curDistToEnemy = 0;
+        var eP = autopilot.frnnEnemyPlanets;
+        for (var i = 0; i < eP.length; i++)
+        {
+            curDistToEnemy = this.getDistance({x: eP[i].x, y: eP[i].y}, {x: object.x, y: object.y});
+            // prevent ships from getting to close to enemy planets while traveling to destination
+            // ignore when object is the base planet
+            if (curDistToEnemy < this.functionModule.enemySafetyZone && object.id != this.base.id)
+            {
+                console.log("...position (" + eP[i].x + "/" + eP[i].y + ") is in range of enemy planet!");
+                return true;
+            }
+        }
+        var eS = autopilot.frnnEnemyShips;
+        for (var j = 0; j < eS.length; j++)
+        {
+            curDistToEnemy = this.getDistance({x: eS[j].x, y: eS[j].y}, {x: object.x, y: object.y});
+            curShip = vgap.getShip(eS[j].sid);
+            if (curDistToEnemy < this.functionModule.enemySafetyZone && this.shipHasWeapons(curShip))
+            {
+                console.log("...position (" + object.x + "/" + object.y + ") is in range (" + curDistToEnemy + " lj) of enemy ship - (" + eS[j].x + "/" + eS[j].y + ")!");
+                return true;
+            }
+        }
+        return false;
+    };
 	// interaction specifics
 	APS.prototype.checkFuel = function()
 	{
@@ -2572,34 +2602,6 @@ function wrapper () { // wrapper for injection
 			// return curCapacity; // no more room
 		}
 		return this.ship[object];
-	};
-	APS.prototype.isSavePosition = function(pos)
-	{
-		// don't visit planets in or close to minefields
-		// toDo: planets in radiation zones, if you don't have special shielding
-		if (this.objectInsideMineField(pos))
-		{
-			console.log("...position is inside / close to minefield!");
-			return false;
-		}
-		// don't visit planets close to enemy planets or ships
-		if (this.objectInRangeOfEnemy(pos)) {
-			return false;
-		}
-		var ionStormId = false;
-		if ((ionStormId = this.objectInsideIonStorm(pos)))
-		{
-			if (this.isDangerousIonStorm(ionStormId))
-			{
-				console.log("...position is inside / close to dangerous ionstorm...");
-				return false;
-			}
-		}
-		return true;
-	};
-	APS.prototype.isSaveShipTarget = function(targetx, targety)
-	{
-		return this.isSavePosition({ x: targetx, y: targety });
 	};
 	APS.prototype.setShipTarget = function(x, y)
 	{
