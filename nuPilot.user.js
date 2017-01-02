@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable semi-intelligent auto-pilots
-// @version       0.05 (49)
+// @version       0.05 (50)
 // @date          2017-01-02
 // @author        drgirasol
 // @include       http://planets.nu/*
@@ -1487,7 +1487,7 @@ function wrapper () { // wrapper for injection
 		if (this.sources.length === 0) this.setSources(aps);
 		//
 		// set sinks as potential destinations if we are at a source
-		if (this.isSource(aps.planet))
+		if (aps.planet && this.isSource(aps.planet))
 		{
 			aps.potDest = this.sinks;
 		} else
@@ -1548,11 +1548,12 @@ function wrapper () { // wrapper for injection
 				} else
 				{
 					console.warn("Checkfuel not ok...");
-					// stay indevinently, send SOS ;)
+					// stay indefinently, send SOS ;)
+                    aps.isIdle = 1;
+                    aps.updateStoredData();
 				}
 			} else // we are in space
 			{
-				// check if target is in range of enemies or close/in minefield (toDo)
 				var curTarget = vgap.planetAt(aps.ship.targetx, aps.ship.targety);
 				if (aps.objectInRangeOfEnemy(curTarget))
 				{
@@ -1564,6 +1565,8 @@ function wrapper () { // wrapper for injection
 			}
 		} else {
 			console.warn("Distributor is idle...");
+			aps.isIdle = 1;
+            aps.updateStoredData();
 		}
 	};
 	distributorAPS.prototype.handleCargo = function (aps)
@@ -1630,6 +1633,7 @@ function wrapper () { // wrapper for injection
 		this.ship = ship;
 		this.hull = false;
 		this.isAPS = false;
+		this.isIdle = false;
 		this.fFactor = 0;
 		this.fuelFactor = {
 			t1: [0,100,800,2700,6400,12500,21600,34300,51200,72900],
@@ -1656,6 +1660,7 @@ function wrapper () { // wrapper for injection
 		this.destination = false; // destination -> planet object
 		this.atDestination = false;
 		//
+        this.storedData = false;
 		this.primaryFunction = false;
 		this.objectOfInterest = false;
 		this.functionModule = {};
@@ -1682,6 +1687,7 @@ function wrapper () { // wrapper for injection
 		//
 		if (typeof cfgData != "undefined" && cfgData !== false)
 		{
+		    this.storedData = cfgData;
 			// null, base planet id, primary function, object of interest
             var apsConfig = [ null, cfgData.base, cfgData.shipFunction, cfgData.ooiPriority ];
 			if (apsConfig)
@@ -2129,7 +2135,7 @@ function wrapper () { // wrapper for injection
 		{
 			var potPlanet = vgap.getPlanet(this.potDest[i].pid);
 			var hasBase = vgap.getStarbase(this.potDest[i].pid);
-			if (potPlanet.id == this.planet.id) continue;
+			if (this.planet && potPlanet.id == this.planet.id) continue;
 			// don't use prospected base planets
 			if (potPlanet.note && potPlanet.note.body.match(/nup:base/))
 			{
@@ -2641,6 +2647,7 @@ function wrapper () { // wrapper for injection
 				this.setShipDestination(x, y);
 			} else
 			{
+                console.warn("Destination is not a planet!");
 				return;
 			}
 		} else
@@ -2707,18 +2714,22 @@ function wrapper () { // wrapper for injection
 			}
 		}
 	};
+	APS.prototype.updateStoredData = function()
+    {
+        this.storedData = {
+            sid: this.ship.id,
+            base: this.base.id,
+            destination: this.destination.id,
+            shipFunction: this.primaryFunction,
+            ooiPriority: this.functionModule.ooiPriority,
+            idle: this.isIdle
+        };
+        autopilot.syncLocalStorage(this.storedData);
+    };
 	APS.prototype.setShipDestination = function(x, y)
 	{
 		this.destination = vgap.planetAt(x, y);
-		var data = {
-			sid: this.ship.id,
-			base: this.base.id,
-			destination: this.destination.id,
-			shipFunction: this.primaryFunction,
-			ooiPriority: this.functionModule.ooiPriority
-		};
-		autopilot.syncLocalStorage(data);
-		//localStorage.setItem(this.ship.id, JSON.stringify(data));
+        this.updateStoredData();
 	};
 	APS.prototype.isValidDestination = function(destination)
 	{
@@ -3292,6 +3303,7 @@ function wrapper () { // wrapper for injection
 				if (typeof data.destination == "undefined") data.destination = false;
 				if (typeof data.newFunction == "undefined") data.newFunction = false;
 				if (typeof data.newOoiPriority == "undefined") data.newOoiPriority = false;
+                if (typeof data.idle == "undefined") data.idle = false;
 				storedGameData.push(data);
 				// save data
 				localStorage.setItem(storeId, JSON.stringify(storedGameData));
@@ -3310,7 +3322,7 @@ function wrapper () { // wrapper for injection
 						{
 							storedGameData.splice(i, 1); // delete entry
 							autopilot.clearShipTarget(data.sid);
-							autopilot.clearShipNote(data.sid);
+							autopilot.clearShipNote(data.sid); // toDO: not working
 						} else
 						{
 							// if ship function or priority has been changed...
@@ -3329,6 +3341,7 @@ function wrapper () { // wrapper for injection
 							// if the base has changed, update
 							if (data.base && storedGameData[i].base != data.base) storedGameData[i].base = data.base;
 							// if destination is provided, update
+                            if (data.idle && storedGameData[i].idle != data.idle) storedGameData[i].idle = data.idle;
 							if (typeof data.destination != "undefined") storedGameData[i].destination = data.destination;
 						}
 						localStorage.setItem(storeId, JSON.stringify(storedGameData));
@@ -3341,6 +3354,7 @@ function wrapper () { // wrapper for injection
 				if (typeof data.destination == "undefined") data.destination = false;
 				if (typeof data.newFunction == "undefined") data.newFunction = false;
 				if (typeof data.newOoiPriority == "undefined") data.newOoiPriority = false;
+                if (typeof data.idle == "undefined") data.idle = false;
 				storedGameData.push(data);
 				localStorage.setItem(storeId, JSON.stringify(storedGameData));
 				return data;
@@ -3390,10 +3404,6 @@ function wrapper () { // wrapper for injection
 				{
 					// if configuration is available in storage
 					aps = new APS(ship, cfgData);
-				} else
-				{
-					// if configuration is available in note... deprecated!
-					aps = new APS(ship);
 				}
 				if (aps.isAPS)
 				{
@@ -3404,7 +3414,6 @@ function wrapper () { // wrapper for injection
 			// ships that arrived at destination have been unloaded...
 			autopilot.collectSourceSinkData();
 			apsControl.forEach(function(shipcontrol) {
-				// toDo: here we could sort the APS by cargo capacity or res priority, or , or
 				if (shipcontrol.hasToSetPotDes)
 				{
 					console.error("Set potential destinations for APS " + shipcontrol.ship.id);
@@ -3420,9 +3429,7 @@ function wrapper () { // wrapper for injection
 			//	   - check fuel and warp... go
 			//
 			//  toDo: move all loading unloadig in finale round
-			var curApsMissions = autopilot.apsMissions;
 			apsControl.forEach(function(shipcontrol) {
-				// toDo: here we could sort the APS by cargo capacity or res priority, or , or
 				console.error("Updating mission of APS " + shipcontrol.ship.id);
 				// setting up a brief mission list for ship-ship coordination
 				//
@@ -3433,10 +3440,21 @@ function wrapper () { // wrapper for injection
 				//console.log(autopilot.apsMissions);
 				// collect info and evaluate optimization possibiities...
 			});
-			//apsControl.forEach(function(shipcontrol)
-			//{
-				// finalize the mission parameters
-			//});
+			apsControl.forEach(function(shipcontrol)
+			{
+				// retry idle ships
+                if (shipcontrol.isIdle)
+                {
+                    console.error("Retry idle ship " + shipcontrol.ship.id);
+                    if (!shipcontrol.destination)
+                    {
+                        shipcontrol.functionModule.setPotentialDestinations(shipcontrol);
+                    }
+                    shipcontrol.updateMissionControl();
+                    shipcontrol.confirmMission();
+                    shipcontrol.updateNote();
+                }
+            });
 		},
 		/*
 			 * loaddashboard: executed to rebuild the dashboard content after a turn is loaded
