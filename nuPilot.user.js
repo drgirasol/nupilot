@@ -1651,9 +1651,9 @@ function wrapper () { // wrapper for injection
 		this.defaultFixedRadius = 160; // adjusted by maxRange (=50 %)
 
 		this.planet = false; // current planet (if at any)
-		this.base = false; // the fixed base, as set in note
+		this.base = false; // base -> planet object
 		this.atBase = false;
-		this.destination = false; // destination planet
+		this.destination = false; // destination -> planet object
 		this.atDestination = false;
 		//
 		this.primaryFunction = false;
@@ -1840,16 +1840,6 @@ function wrapper () { // wrapper for injection
             return this.getTargetsInRange(frnnPositions, this.base.x, this.base.y, range);
         }
     };
-	APS.prototype.getPositions4Planets = function(pids)
-    {
-        var frnnPositions = [];
-        for(var i = 0; i < pids.length; i++)
-        {
-            var p = vgap.getPlanet(pids[i]);
-            frnnPositions.push( { x: p.x , y: p.y } );
-        }
-        return frnnPositions;
-    };
 	APS.prototype.getETA = function(tx, ty)
 	{
 		if (typeof tx == "undefined") tx = this.ship.targetx;
@@ -1860,16 +1850,28 @@ function wrapper () { // wrapper for injection
 		if (journeyDist > maxTurnDist) ETA = Math.ceil(journeyDist / maxTurnDist);
 		return ETA;
 	};
-	APS.prototype.objectInsideMineField = function(object, strict)
+	/*
+	 *  positional information
+	 */
+	APS.prototype.objectInsideMineField = function(object, friendly, strict)
 	{
 		if (typeof object == "undefined") return false;
 		if (typeof strict == "undefined") strict = false;
-		var mf = autopilot.frnnEnemyMinefields;
+        if (typeof friendly == "undefined") friendly = false;
+        var mf = [];
+        if (friendly)
+        {
+            mf = autopilot.frnnFriendlyMinefields;
+        } else
+        {
+            mf = autopilot.frnnEnemyMinefields;
+        }
 		for (var i = 0; i < mf.length; i++)
 		{
 			var curDistToMinefieldCenter = Math.floor(this.getDistance({x: mf[i].x, y: mf[i].y}, {x: object.x, y: object.y}));
 			if (strict) // only true if we are INSIDE minefield
 			{
+			    if (friendly) console.log("Object inside friendly minefield.");
 				if (mf[i].radius > curDistToMinefieldCenter) return true;
 			} else // non-strict, also true if we are too close to a minefield
 			{
@@ -1878,6 +1880,36 @@ function wrapper () { // wrapper for injection
 		}
 		return false;
 	};
+    APS.prototype.objectInsideIonStorm = function(object, strict)
+    {
+        if (typeof object == "undefined") return false;
+        if (typeof strict == "undefined") strict = false;
+        var ionStorms = vgap.ionstorms;
+        for (var i = 0; i < ionStorms.length; i++)
+        {
+            var curDistToIonStormCenter = Math.floor(this.getDistance({x: ionStorms[i].x, y: ionStorms[i].y}, {x: object.x, y: object.y}));
+            if (strict) // only true if object is INSIDE ionstorm
+            {
+                if (ionStorms[i].radius > curDistToIonStormCenter) return ionStorms[i];
+            } else // non-strict, also true if we are too close to the ionstorm
+            {
+                // toDo: check heading of storm and consider heading of ship
+                if (ionStorms[i].radius > curDistToIonStormCenter || (curDistToIonStormCenter - ionStorms[i].radius) < Math.pow(ionStorms[i].warp,2)) return ionStorms[i];
+            }
+        }
+        return false;
+    };
+    APS.prototype.getPositions4Planets = function(pids)
+    {
+        var frnnPositions = [];
+        for(var i = 0; i < pids.length; i++)
+        {
+            var p = vgap.getPlanet(pids[i]);
+            frnnPositions.push( { x: p.x , y: p.y } );
+        }
+        return frnnPositions;
+    };
+    //
 	APS.prototype.isDangerousIonStorm = function(iStorm)
 	{
 		if (this.getIonStormClass(iStorm) == "dangerous" || this.getIonStormClass(iStorm) == "very dangerous") return true;
@@ -1892,25 +1924,6 @@ function wrapper () { // wrapper for injection
 		else if (iStorm.voltage >= 200) { return "very dangerous" }
 		return false;
 	};
-	APS.prototype.objectInsideIonStorm = function(object, strict)
-	{
-		if (typeof object == "undefined") return false;
-		if (typeof strict == "undefined") strict = false;
-		var ionStorms = vgap.ionstorms;
-		for (var i = 0; i < ionStorms.length; i++)
-		{
-			var curDistToIonStormCenter = Math.floor(this.getDistance({x: ionStorms[i].x, y: ionStorms[i].y}, {x: object.x, y: object.y}));
-			if (strict) // only true if object is INSIDE ionstorm
-			{
-				if (ionStorms[i].radius > curDistToIonStormCenter) return ionStorms[i];
-			} else // non-strict, also true if we are too close to the ionstorm
-			{
-				// toDo: check heading of storm and consider heading of ship
-				if (ionStorms[i].radius > curDistToIonStormCenter || (curDistToIonStormCenter - ionStorms[i].radius) < Math.pow(ionStorms[i].warp,2)) return ionStorms[i];
-			}
-		}
-		return false;
-	};
 	APS.prototype.shipHasWeapons = function(ship)
 	{
 		var shipHull = vgap.getHull(ship.hullid);
@@ -1918,36 +1931,6 @@ function wrapper () { // wrapper for injection
 		if (shipHull.beams > 0 || shipHull.fighterbays > 0 || shipHull.launchers > 0)
 		{
 			return true;
-		}
-		return false;
-	};
-	APS.prototype.objectInRangeOfEnemy = function(object)
-	{
-		// in range of enemy ships
-		// in range of enemy planet
-		// in range = 1 turn movement
-		if (typeof object == "undefined") return false;
-		var curDistToEnemy = 0;
-		var eP = autopilot.frnnEnemyPlanets;
-		for (var i = 0; i < eP.length; i++)
-		{
-			curDistToEnemy = this.getDistance({x: eP[i].x, y: eP[i].y}, {x: object.x, y: object.y});
-			if (curDistToEnemy < this.functionModule.enemySafetyZone)
-			{
-				console.log("...position (" + eP[i].x + "/" + eP[i].y + ") is in range of enemy planet!");
-				return true;
-			}
-		}
-		var eS = autopilot.frnnEnemyShips;
-		for (var j = 0; j < eS.length; j++)
-		{
-			curDistToEnemy = this.getDistance({x: eS[j].x, y: eS[j].y}, {x: object.x, y: object.y});
-			curShip = vgap.getShip(eS[j].sid);
-			if (curDistToEnemy < this.functionModule.enemySafetyZone && this.shipHasWeapons(curShip))
-			{
-				console.log("...position (" + object.x + "/" + object.y + ") is in range (" + curDistToEnemy + " lj) of enemy ship - (" + eS[j].x + "/" + eS[j].y + ")!");
-				return true;
-			}
 		}
 		return false;
 	};
@@ -2063,7 +2046,7 @@ function wrapper () { // wrapper for injection
 		if (typeof warp == "undefined") this.ship.warp = this.ship.engineid;
 		if (warp > 0 && warp < 10) this.ship.warp = warp;
 		// reduce speed if we are currently inside a minefield
-		if (this.objectInsideMineField( {x: this.ship.x, y: this.ship.y}, true ) && this.ship.engineid > 4) this.ship.warp = 4;
+		if (this.objectInsideMineField( {x: this.ship.x, y: this.ship.y}, false, true ) && this.ship.engineid > 4) this.ship.warp = 4;
 		// update fuelFactor
 		this.fFactor = this.fuelFactor["t" + this.ship.engineid][this.ship.warp];
 	};
@@ -2128,7 +2111,9 @@ function wrapper () { // wrapper for injection
 		//console.log("APS cargo capacity: " + cargoCapacity);
 		return cargoCapacity;
 	};
-	// mission specifics
+	/*
+	 *  mission specifics
+	 */
 	APS.prototype.evaluateMissionDestinations = function()
 	{
 		// pre filter destinations (e.g. remove destinations located in problematic zones)
@@ -2281,7 +2266,9 @@ function wrapper () { // wrapper for injection
 			note.body = "";
 		}
 	};
-	// target selection specifics
+	/*
+	 *  target selection specifics
+	 */
 	APS.prototype.getDevidedCollection = function(collection, devisor, thresh, order, direction)
 	{
 		var pileA = [];
@@ -2362,27 +2349,24 @@ function wrapper () { // wrapper for injection
 	};
 	APS.prototype.getTurnTargets = function(ship, destination, adjustment)
 	{
+	    // TurnTargets: x, y, distance(toDestination), planetId
 		var frnnTargets = [];
 		if (this.primaryFunction == "exp")
 		{
-			frnnTargets = autopilot.frnnPlanets;
+			frnnTargets = autopilot.frnnUnownedPlanets;
 		} else
 		{
 			frnnTargets = autopilot.frnnOwnPlanets;
 		}
 		var turnTargets = this.getTargetsInRange(frnnTargets, ship.x, ship.y, (this.simpleRange + adjustment));
-		for (var i = 0; i < turnTargets.length; i++) {
+		for (var i = 0; i < turnTargets.length; i++)
+		{
 			var tt = turnTargets[i];
-			var dist = this.getDistance({x: tt.x , y: tt.y}, {x: destination.x , y: destination.y});
-			if (tt.x == destination.x && tt.y == destination.y && dist <= this.simpleRange)
-			{
-				// targets include final destination...
-				// if it can be reached in one turn, make sure it will be "closest".
-				turnTargets[i].distance = 1;
-			} else
-			{
-				turnTargets[i].distance = dist;
-			}
+			// distance between potential next stop and the destination
+			//  - in case the potential next stop is the destination, distance is 0
+            turnTargets[i].distance = this.getDistance({x: tt.x , y: tt.y}, {x: destination.x , y: destination.y});
+            var ttPlanet = vgap.planetAt(tt.x , tt.y);
+            turnTargets[i].pid = ttPlanet.id;
 		}
 		// sort the targets by distance
 		turnTargets.sort(function(a, b) {
@@ -2394,6 +2378,71 @@ function wrapper () { // wrapper for injection
 			});
 		return turnTargets;
 	};
+    APS.prototype.isSaveShipTarget = function(x, y, pid)
+    {
+        return this.isSavePosition({ x: x, y: y , pid: pid});
+    };
+    APS.prototype.isSavePosition = function(pos)
+    {
+        // don't visit planets in or close to minefields
+        // toDo: planets in radiation zones, if you don't have special shielding
+        if (this.objectInsideMineField(pos))
+        {
+            console.log("...position is inside / close to minefield!");
+            return false;
+        }
+        // don't visit planets close to enemy planets or ships
+        // except planets that are base planets and planets protected by friendly minefield
+        if (this.objectInRangeOfEnemy(pos) && !this.objectInsideMineField(pos,true,true))
+        {
+            return false;
+        }
+        var ionStormId = false;
+        if ((ionStormId = this.objectInsideIonStorm(pos)))
+        {
+            if (this.isDangerousIonStorm(ionStormId))
+            {
+                console.log("...position is inside / close to dangerous ionstorm...");
+                return false;
+            }
+        }
+        return true;
+    };
+    APS.prototype.objectInRangeOfEnemy = function(object)
+    {
+        // in range of enemy ships
+        // in range of enemy planet
+        // in range = 1 turn movement
+        if (typeof object == "undefined") return true;
+        var curDistToEnemy = 0;
+        var eP = autopilot.frnnEnemyPlanets;
+        for (var i = 0; i < eP.length; i++)
+        {
+            curDistToEnemy = this.getDistance({x: eP[i].x, y: eP[i].y}, {x: object.x, y: object.y});
+            // prevent ships from getting to close to enemy planets while traveling to destination
+            // ignore when object is the base planet
+            if (curDistToEnemy < this.functionModule.enemySafetyZone && object.pid != this.base.id)
+            {
+                console.log("...position (" + object.pid + ":" + object.x + "x" + object.y + ") is in range of enemy planet!");
+                return true;
+            }
+        }
+        var eS = autopilot.frnnEnemyShips;
+        for (var j = 0; j < eS.length; j++)
+        {
+            curDistToEnemy = this.getDistance({x: eS[j].x, y: eS[j].y}, {x: object.x, y: object.y});
+            // prevent ships from getting to close to enemy ships while traveling to destination
+            // ignore when ship has no weapons toDo: danger of robbing?
+            // ignore when object is the base planet
+            curShip = vgap.getShip(eS[j].sid);
+            if (curDistToEnemy < this.functionModule.enemySafetyZone && this.shipHasWeapons(curShip) && object.pid != this.base.id)
+            {
+                console.log("...position (" + object.x + "/" + object.y + ") is in range (" + curDistToEnemy + " lj) of enemy ship - (" + eS[j].x + "/" + eS[j].y + ")!");
+                return true;
+            }
+        }
+        return false;
+    };
 	// interaction specifics
 	APS.prototype.checkFuel = function()
 	{
@@ -2573,34 +2622,9 @@ function wrapper () { // wrapper for injection
 		}
 		return this.ship[object];
 	};
-	APS.prototype.isSavePosition = function(pos)
-	{
-		// don't visit planets in or close to minefields
-		// toDo: planets in radiation zones, if you don't have special shielding
-		if (this.objectInsideMineField(pos))
-		{
-			console.log("...position is inside / close to minefield!");
-			return false;
-		}
-		// don't visit planets close to enemy planets or ships
-		if (this.objectInRangeOfEnemy(pos)) {
-			return false;
-		}
-		var ionStormId = false;
-		if ((ionStormId = this.objectInsideIonStorm(pos)))
-		{
-			if (this.isDangerousIonStorm(ionStormId))
-			{
-				console.log("...position is inside / close to dangerous ionstorm...");
-				return false;
-			}
-		}
-		return true;
-	};
-	APS.prototype.isSaveShipTarget = function(targetx, targety)
-	{
-		return this.isSavePosition({ x: targetx, y: targety });
-	};
+	/*
+	 * set next stop to destination x, y
+	 */
 	APS.prototype.setShipTarget = function(x, y)
 	{
 		if (!this.destination)
@@ -2622,10 +2646,11 @@ function wrapper () { // wrapper for injection
 		console.log("Searching target on the way to " + destinationPlanet.name + " (" + destinationPlanet.id + ")...");
 		var adjustment = 0;
 		var turnTargets = this.getTurnTargets(this.ship, destinationPlanet, adjustment);
-		// distance from current location to destination
+		// distance from current location to destination planet
 		var curPosDistance = Math.floor(this.getDistance({x: this.ship.x , y: this.ship.y}, {x: x , y: y}));
 		//
-		console.log("...found " + turnTargets.length + " turn-targets within a " + (this.simpleRange + adjustment) + " ly radius...");
+		console.log("Turntargets: " + adjustment);
+        console.log(turnTargets);
 		//console.log(turnTargets);
 		//
 		while(turnTargets.length === 0 || turnTargets[0].distance >= (curPosDistance * 0.9)) // only use targets that are (considerably? 10 %?) closer to the destination than the current position
@@ -2637,7 +2662,7 @@ function wrapper () { // wrapper for injection
 		}
 		if (turnTargets.length > 0)
 		{
-			if (this.isSaveShipTarget(turnTargets[0].x, turnTargets[0].y))
+			if (this.isSaveShipTarget(turnTargets[0].x, turnTargets[0].y, turnTargets[0].pid))
 			{
 				this.ship.targetx = turnTargets[0].x;
 				this.ship.targety = turnTargets[0].y;
@@ -2648,7 +2673,7 @@ function wrapper () { // wrapper for injection
 				if (turnTargets.length > 1)
 				{
 					console.log("Current target is unsave... try one alternative...");
-					if (this.isSaveShipTarget(turnTargets[1].x, turnTargets[1].y))
+					if (this.isSaveShipTarget(turnTargets[1].x, turnTargets[1].y, turnTargets[0].pid))
 					{
 						this.ship.targetx = turnTargets[1].x;
 						this.ship.targety = turnTargets[1].y;
@@ -2777,6 +2802,7 @@ function wrapper () { // wrapper for injection
 		frnnPlanets: [],
 		frnnOwnPlanets: [],
 		frnnEnemyMinefields: [],
+        frnnFriendlyMinefields: [],
 		frnnEnemyShips: [],
 		frnnEnemyPlanets: [],
 		apsLocations: [],
@@ -2807,11 +2833,14 @@ function wrapper () { // wrapper for injection
 		populateFrnnMinefields: function()
 		{
 			autopilot.frnnEnemyMinefields = [];
+			autopilot.frnnFriendlyMinefields = [];
 			vgap.minefields.forEach(function(minefield) {
 				if (minefield.ownerid != vgap.player.id && !autopilot.isAlly(minefield.ownerid))
 				{
 					autopilot.frnnEnemyMinefields.push({x: minefield.x, y: minefield.y, radius: minefield.radius, owner: minefield.ownerid});
-				}
+				} else {
+                    autopilot.frnnFriendlyMinefields.push({x: minefield.x, y: minefield.y, radius: minefield.radius, owner: minefield.ownerid});
+                }
 			});
 		},
 		isAlly: function(playerId)
@@ -2854,6 +2883,7 @@ function wrapper () { // wrapper for injection
 				{
 					autopilot.frnnEnemyPlanets.push({x: planet.x, y: planet.y});
 				}
+				// toDo: ownerid === 0 = unowned? or also unknown owner?
 				if (planet.ownerid === 0) autopilot.frnnUnownedPlanets.push({pid: planet.id, x: planet.x, y: planet.y});
 			});
 		},
@@ -3210,6 +3240,8 @@ function wrapper () { // wrapper for injection
 		syncLocalStorage: function(data, update)
 		{
 			if (typeof update == "undefined") update = false;
+            // each game has a different storage
+            var storeId = "nuPilot" + vgap.game.createdby + vgap.game.id;
 			// load data
 			var storedGameData = autopilot.getLocalStorage();
 			if (!storedGameData) // no storage setup yet
@@ -3228,7 +3260,6 @@ function wrapper () { // wrapper for injection
 			} else
 			{
 				// storage available...
-				var newGameData = [];
 				for(var i = 0; i < storedGameData.length; i++)
 				{
 					// ...look for entry of the current APS
