@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable semi-intelligent auto-pilots
-// @version       0.05 (44)
-// @date          2016-12-31
+// @version       0.05 (49)
+// @date          2017-01-02
 // @author        drgirasol
 // @include       http://planets.nu/*
 // @include       http://play.planets.nu/*
@@ -765,7 +765,7 @@ function wrapper () { // wrapper for injection
 		this.ooiPriority = "all"; // object of interest (ooi) priority: always "cla"
 		this.alwaysLoadMC = true; // freighter missions will always include MCs
 		this.sellSupply = "notBov"; // true, false, "notBov" (true, but don't sell supply on Bovinoid planets)
-		this.supplyRetentionRatio = 0.1; // if selling supplies, we keep some for other purposes
+		this.supplyRetentionAmount = 150; // if selling supplies, we keep some for other purposes
 		this.fuelRetentionMass = 500;
 		this.mcRetentionAmount = 100;
 		this.enemySafetyZone = 81; // radius of each enemy planet and ship that will be avoided by us (planets in that range are not used as targets)
@@ -919,7 +919,7 @@ function wrapper () { // wrapper for injection
 		this.ooiPriority = "cla"; // object of interest (ooi) priority: always "cla"
 		this.alwaysLoadMC = true; // freighter missions will always include MCs
 		this.sellSupply = "notBov"; // true, false, "notBov" (true, but don't sell supply on Bovinoid planets)
-		this.supplyRetentionRatio = 0.1; // if selling supplies, we keep some for other purposes
+		this.supplyRetentionAmount = 150; // if selling supplies, we keep some for other purposes
 		this.fuelRetentionMass = 500;
 		this.mcRetentionAmount = 100;
 		this.enemySafetyZone = 81; // radius of each enemy planet and ship that will be avoided by us (planets in that range are not used as targets)
@@ -1125,7 +1125,7 @@ function wrapper () { // wrapper for injection
         this.ooiPriority = "all"; // object of interest (ooi) priority: "all" (=dur, tri, mol), "dur", "tri", "mol", "mcs", "sup", "cla"
 		this.alwaysLoadMC = true; // freighter missions will always include MCs
 		this.sellSupply = "notBov"; // true, false, "notBov" (true, but don't sell supply on Bovinoid planets)
-		this.supplyRetentionRatio = 0.1; // if selling supplies, we keep some for other purposes
+		this.supplyRetentionAmount = 150; // if selling supplies, we keep some for other purposes
 		this.fuelRetentionMass = 500;
 		this.mcRetentionAmount = 100;
 		this.enemySafetyZone = 81; // radius of each enemy planet and ship that will be avoided by us (planets in that range are not used as targets)
@@ -1366,7 +1366,7 @@ function wrapper () { // wrapper for injection
 		this.ooiPriority = "cla"; // object of interest (ooi) priority = "all" (=dur, tri, mol), "dur", "tri", "mol", "mcs", "sup", "cla"
 		this.alwaysLoadMC = true; // freighter missions will always include MCs
 		this.sellSupply = "notBov"; // true, false, "notBov" (true, but don't sell supply on Bovinoid planets)
-		this.supplyRetentionRatio = 0.1; // if selling supplies, we keep some for other purposes
+		this.supplyRetentionAmount = 150; // if selling supplies, we keep some for other purposes
 		this.fuelRetentionMass = 500;
 		this.mcRetentionAmount = 100;
 		this.enemySafetyZone = 81; // radius of each enemy planet and ship that will be avoided by us (planets in that range are not used as targets)
@@ -1680,23 +1680,16 @@ function wrapper () { // wrapper for injection
 		//
 		this.potDest = []; // potential destinations
 		//
-		if (this.ship.note && this.ship.ownerid == vgap.player.id || (typeof cfgData != "undefined" && cfgData !== false))
+		if (typeof cfgData != "undefined" && cfgData !== false)
 		{
-			var apsConfig = []; // null, base planet id, primary function, object of interest
-			if (typeof cfgData != "undefined")
-			{
-				apsConfig = [ null, cfgData.base, cfgData.shipFunction, cfgData.ooiPriority ];
-			} else
-			{
-				apsConfig = this.getShipConfig(ship.note.body);
-			}
+			// null, base planet id, primary function, object of interest
+            var apsConfig = [ null, cfgData.base, cfgData.shipFunction, cfgData.ooiPriority ];
 			if (apsConfig)
 			{
 				this.isAPS = true;
 				this.initializeBoardComputer(apsConfig);
 			} else
 			{
-				console.warn("no configuration could be recognized in note...");
 				this.isAPS = false;
 			}
 		} else
@@ -1899,6 +1892,16 @@ function wrapper () { // wrapper for injection
         }
         return false;
     };
+    APS.prototype.isInWarpWell = function(coords)
+    {
+        if (typeof coords == "undefined") coords = {x: this.ship.x,y: this.ship.y};
+        var planet = vgap.planetAt(coords.x, coords.y);
+        if (planet) return false; // if we are at planet, we are not in warp well
+        var closestPlanets = this.getTargetsInRange(autopilot.frnnOwnPlanets, coords.x, coords.y, 3);
+        if (closestPlanets.length < 1) return false; // if there are no planets within 3 lj, we are not in warp well
+        // <= 3 lj distance between planet and ship -> within warp well
+        return true;
+    };
     APS.prototype.getPositions4Planets = function(pids)
     {
         var frnnPositions = [];
@@ -2045,8 +2048,10 @@ function wrapper () { // wrapper for injection
 		this.ship.warp = 0;
 		if (typeof warp == "undefined") this.ship.warp = this.ship.engineid;
 		if (warp > 0 && warp < 10) this.ship.warp = warp;
-		// reduce speed if we are currently inside a minefield
-		if (this.objectInsideMineField( {x: this.ship.x, y: this.ship.y}, false, true ) && this.ship.engineid > 4) this.ship.warp = 4;
+        // reduce speed to warp 4, if we are currently inside a minefield
+        if (this.objectInsideMineField( {x: this.ship.x, y: this.ship.y}, false, true ) && this.ship.engineid > 4) this.ship.warp = 4;
+		// set warp 1 if we are moving into or inside warp well
+        if (this.isInWarpWell({x: this.ship.targetx, y: this.ship.targety})) this.ship.warp = 1;
 		// update fuelFactor
 		this.fFactor = this.fuelFactor["t" + this.ship.engineid][this.ship.warp];
 	};
@@ -2668,24 +2673,34 @@ function wrapper () { // wrapper for injection
 				this.ship.targety = turnTargets[0].y;
 			} else
 			{
-				// toTo... if danger is closing in on current position... flee
+				// toDo... if danger is closing in on current position... flee
 				//
 				if (turnTargets.length > 1)
 				{
 					console.log("Current target is unsave... try one alternative...");
-					if (this.isSaveShipTarget(turnTargets[1].x, turnTargets[1].y, turnTargets[0].pid))
+					if (this.isSaveShipTarget(turnTargets[1].x, turnTargets[1].y, turnTargets[1].pid))
 					{
 						this.ship.targetx = turnTargets[1].x;
 						this.ship.targety = turnTargets[1].y;
 					} else
 					{
-						console.log("Alternative target is unsave... stay at current position...");
-						this.ship.targetx = this.ship.x;
-						this.ship.targety = this.ship.y;
+						console.log("Primary and alternative targets are unsave...");
+						if (this.isInWarpWell())
+                        {
+                            console.log("We are in warp well...");
+                            // toDo: do we have to move? are there enemy ships close by?
+                        } else
+                        {
+                            console.log("Moving into warp well...");
+                            var coords = this.getRandomWarpWellEntryPosition();
+                            this.ship.targetx = coords.x;
+                            this.ship.targety = coords.y;
+                        }
 					}
 				} else
 				{
-					console.log("Current target is unsave... stay at current position...");
+				    // toDo: no turntargets... should be almost impossible... if player has only 1 planet left?
+					console.log("No turn targets... stay at current position...");
 					this.ship.targetx = this.ship.x;
 					this.ship.targety = this.ship.y;
 				}
@@ -2717,13 +2732,38 @@ function wrapper () { // wrapper for injection
 	// planet specifics
 	APS.prototype.sellSupply = function()
 	{
-		var supplies = Math.floor(this.planet.supplies * (1 - this.functionModule.supplyRetentionRatio));
+		var supplies = this.planet.supplies - this.functionModule.supplyRetentionAmount;
 		if (supplies < 10) return;
 		this.planet.supplies -= supplies;
 		this.planet.suppliessold += supplies;
 		this.planet.megacredits += supplies;
 		this.planet.changed = 1;
 	};
+	APS.prototype.getRandomWarpWellEntryPosition = function ()
+    {
+        if (this.planet)
+        {
+            // warp well entry from planet
+            var p = this.planet;
+            var coords = [
+                { x: p.x - 1, y: p.y + 1},
+                { x: p.x, y: p.y + 1},
+                { x: p.x + 1, y: p.y + 1},
+                { x: p.x - 1, y: p.y},
+                { x: p.x + 1, y: p.y},
+                { x: p.x - 1, y: p.y - 1},
+                { x: p.x, y: p.y - 1},
+                { x: p.x + 1, y: p.y - 1}
+            ]; // 8 positions (0-7)
+            var pick = Math.floor(Math.random() * 10);
+            if (pick > 7) pick = Math.floor(pick / 2);
+            return coords[pick];
+        } else
+        {
+            // toDo: warp well entry from space
+            return { x: this.ship.x, y: this.ship.y };
+        }
+    };
 	// Ship specifics
 	APS.prototype.getShipConfig = function (note)
 	{
