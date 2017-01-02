@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable semi-intelligent auto-pilots
-// @version       0.05 (50)
+// @version       0.05 (55)
 // @date          2017-01-02
 // @author        drgirasol
 // @include       http://planets.nu/*
@@ -410,10 +410,19 @@ function wrapper () { // wrapper for injection
 				{
 					var clickf = function(g, h) {
 						return function() {
-							var planet = vgap.planetAt(vgap.shipScreen.ship.x, vgap.shipScreen.ship.y);
-							var data = { sid: vgap.shipScreen.ship.id, base: planet.id, shipFunction: g, ooiPriority: h };
-							var cfgData = autopilot.syncLocalStorage(data);
-							if (h != "END") autopilot.setupAPS(vgap.shipScreen.ship.id, cfgData);
+						    var cfgData = autopilot.isInStorage(vgap.shipScreen.ship.id);
+						    var data = {};
+						    if (!cfgData)
+                            {
+                                var planet = vgap.planetAt(vgap.shipScreen.ship.x, vgap.shipScreen.ship.y);
+                                data = { sid: vgap.shipScreen.ship.id, base: planet.id, shipFunction: g, ooiPriority: h };
+                                cfgData = autopilot.syncLocalStorage(data); // will get default cfgData (=data)
+                                if (h != "END") autopilot.setupAPS(vgap.shipScreen.ship.id, cfgData);
+                            } else {
+						        cfgData.shipFunction = g;
+						        cfgData.ooiPriority = h;
+                                if (h != "END") autopilot.updateAPS(vgap.shipScreen.ship.id, cfgData);
+                            }
 							return false;
 						};
 					};
@@ -1119,7 +1128,7 @@ function wrapper () { // wrapper for injection
 	 */
 	function collectorAPS(aps)
 	{
-		this.minimalCargoRatioToGo = 0.5; // in percent of cargo capacity (e.g. 0.7 = 70%)
+		this.minimalCargoRatioToGo = 0.25; // in percent of cargo capacity (e.g. 0.7 = 70%)
 		this.cruiseMode = "safe"; // safe = 1-turn-connetions, fast = direct if faster, direct = always direct
 		this.energyMode = "conservative"; // conservative = use only the required amount of fuel, moderate = use 20 % above required amount, max = use complete tank capacity
         this.ooiPriority = "all"; // object of interest (ooi) priority: "all" (=dur, tri, mol), "dur", "tri", "mol", "mcs", "sup", "cla"
@@ -1360,7 +1369,7 @@ function wrapper () { // wrapper for injection
 	 */
 	function distributorAPS(aps)
 	{
-		this.minimalCargoRatioToGo = 0.5; // in percent of cargo capacity (e.g. 0.7 = 70%)
+		this.minimalCargoRatioToGo = 0.25; // in percent of cargo capacity (e.g. 0.7 = 70%)
 		this.cruiseMode = "safe"; // safe = 1-turn-connetions, fast = direct if faster, direct = always direct
 		this.energyMode = "conservative"; // conservative = use only the required amount of fuel, moderate = use 20 % above required amount, max = use complete tank capacity
 		this.ooiPriority = "cla"; // object of interest (ooi) priority = "all" (=dur, tri, mol), "dur", "tri", "mol", "mcs", "sup", "cla"
@@ -1380,23 +1389,29 @@ function wrapper () { // wrapper for injection
 	}
 	distributorAPS.prototype.setSinks = function(aps)
 	{
+	    var splitBy = "deficiency";
 		if (this.ooiPriority == "cla")
 		{
 			this.sinks = autopilot.clanDeficiencies;
+			splitBy = "government";
+			this.devideThresh = 5;
 		} else if (this.ooiPriority == "neu")
 		{
 			this.sinks = autopilot.neuDeficiencies;
 		} else if (this.ooiPriority == "mcs")
 		{
 			this.sinks = autopilot.mcDeficiencies;
+			splitBy = "resources";
+			this.devideThresh = 4000; // toDo: average of all planets?
 		}
+
 		for (var i = 0; i < this.sinks.length; i++)
 		{
 			if (aps.getMissionConflict(this.sinks[i].pid)) continue;
 			var sinkPlanet = vgap.getPlanet(this.sinks[i].pid);
 			this.frnnSinks.push({x: sinkPlanet.x, y: sinkPlanet.y});
 			var distance = Math.floor(aps.getDistance({x: sinkPlanet.x, y: sinkPlanet.y}, {x:aps.ship.x ,y:aps.ship.y}));
-			// update deficiencies (...unloading has occured)
+			// update deficiencies (...unloading could have occured)
 			var def = 0;
 			if (this.ooiPriority == "cla")
 			{
@@ -1415,7 +1430,7 @@ function wrapper () { // wrapper for injection
 			this.sinks[i].y = sinkPlanet.y;
 		}
 		// priorities by degree of deficiency (split)... and sort splits by distance
-		this.sinks = aps.getDevidedCollection(this.sinks, "deficiency", this.devideThresh, "distance");
+		this.sinks = aps.getDevidedCollection(this.sinks, splitBy, this.devideThresh, "distance");
 		console.log(this.sinks);
 	};
 	distributorAPS.prototype.isSink = function(planet)
@@ -1596,7 +1611,7 @@ function wrapper () { // wrapper for injection
 		if (deficiency > 0)
 		{
 			var object = aps.moveables[this.ooiPriority];
-			var available = autopilot.getAvailability(aps.planet, object);
+			var available = autopilot.getSumAvailableObjects(aps.planet, object);
 			if (available < 0) available = 0;
 			if (deficiency > available) deficiency = available;
 			transCargo = aps.loadObject(object, aps.planet, deficiency);
@@ -1680,9 +1695,7 @@ function wrapper () { // wrapper for injection
 			mcs: "megacredits",
 			cla: "clans"
 		};
-		//
-		// this.enemyAlert = false; // if enemies are in range posing immediate danger (freighters = danger?, is enemy "in our way"?)
-		//
+		this.noteColor = "ff9900";
 		this.potDest = []; // potential destinations
 		//
 		if (typeof cfgData != "undefined" && cfgData !== false)
@@ -1787,7 +1800,7 @@ function wrapper () { // wrapper for injection
 					storageData.ooiPriority = storageData.newOoiPriority;
 					storageData.newOoiPriority = false;
 				}
-				storageData = autopilot.syncLocalStorage(storageData);
+				autopilot.syncLocalStorage(storageData);
 				this.hasToSetPotDes = true;
 				//this.functionModule.setPotentialDestinations(this);
 			} else
@@ -2263,18 +2276,20 @@ function wrapper () { // wrapper for injection
 			var destination = "";
 			if (this.destination)
 			{
-				destination = "(" + this.destination.id + ")";
+			    if (this.destination.id == this.base.id)
+                {
+                    destination = ">home";
+                } else
+                {
+                    destination = ">"+this.destination.id;
+                }
 			}
-			if (this.primaryFunction == "col")
-			{
-				note.body = this.primaryFunction + " -> " + this.objectOfInterest + " -> " + this.base.id + destination;
-			} else
-			{
-				note.body = this.primaryFunction + " -> " + this.objectOfInterest + destination;
-			}
+			note.body = "B|" + this.base.id + " | " + this.primaryFunction + " | " + this.objectOfInterest + " " + destination;
+			note.color = this.noteColor;
 		} else
 		{
-			note.body = "";
+			note.body = " ";
+            note.color = "000000";
 		}
 	};
 	/*
@@ -2776,11 +2791,6 @@ function wrapper () { // wrapper for injection
         }
     };
 	// Ship specifics
-	APS.prototype.getShipConfig = function (note)
-	{
-		return note.match(/nup:b:(\d+):(col|dis):(neu|dur|tri|mol|all|mcs|cla)/);
-		// toDo: return a nice object
-	};
 	APS.prototype.getShipMass = function(cargo)
 	{
 		var shipMass = 0;
@@ -3123,7 +3133,13 @@ function wrapper () { // wrapper for injection
 			deficiency = parseInt(planet.megacredits) - deficiency;
 			return deficiency;
 		},
-		getAvailability: function(planet, object)
+        getSumOfAllMinerals: function(planet)
+        {
+            var p = planet;
+            return parseInt(p.tritanium+p.groundtritanium+p.molybdenum+p.groundmolybdenum);
+            //return (p.neutronium+p.groundneutronium+p.tritanium+p.groundtritanium+p.molybdenum+p.groundmolybdenum);
+        },
+		getSumAvailableObjects: function(planet, object)
 		{
 			if (object == "clans")
 			{
@@ -3134,7 +3150,10 @@ function wrapper () { // wrapper for injection
 			} else if (object == "megacredits")
 			{
 				return autopilot.getMcDeficiency(planet);
-			}
+			} else if (object == "minerals")
+            {
+                return autopilot.getSumOfAllMinerals(planet);
+            }
 			return 0;
 		},
 		collectSourceSinkData: function(planet)
@@ -3148,7 +3167,7 @@ function wrapper () { // wrapper for injection
 			vgap.planets.forEach(function(planet) {
 				if (planet.ownerid == vgap.player.id)
 				{
-					// clan sink (-) or source (+)
+					// clan sinks (-) and sources (+)
 					var def = autopilot.getClanDeficiency(planet);
 					if (def >= 0)
 					{
@@ -3156,9 +3175,9 @@ function wrapper () { // wrapper for injection
 						if (def > 50 && planet.nativeracename != "Amorphous") autopilot.clanSources.push({pid: planet.id, value: def});
 					} else
 					{
-						autopilot.clanDeficiencies.push({pid: planet.id, deficiency: def});
+						autopilot.clanDeficiencies.push({pid: planet.id, deficiency: def, government: planet.nativegovernment});
 					}
-					// neutronium sources...
+					// neutronium sinks (-) and sources (+)
 					def = autopilot.getFuelDeficiency(planet);
 					if (def >= 0)
 					{
@@ -3167,14 +3186,14 @@ function wrapper () { // wrapper for injection
 					{
 						autopilot.neuDeficiencies.push({pid: planet.id, deficiency: def});
 					}
-					// megacredit sources...
+					// megacredit sinks (-) and sources (+)
 					def = autopilot.getMcDeficiency(planet);
 					if (def >= 0)
 					{
 						if (def > 500) autopilot.mcSources.push({pid: planet.id, value: def});
 					} else
 					{
-						autopilot.mcDeficiencies.push({pid: planet.id, deficiency: def});
+						autopilot.mcDeficiencies.push({pid: planet.id, deficiency: def, resources: autopilot.getSumAvailableObjects(planet, "minerals")});
 					}
 				}
 			});
@@ -3273,7 +3292,7 @@ function wrapper () { // wrapper for injection
 			var ship = vgap.getShip(shipId);
 			if (ship.note)
 			{
-				ship.note.body = "";
+				ship.note.body = " ";
 			}
 		},
         getLocalStorage: function()
@@ -3290,7 +3309,7 @@ function wrapper () { // wrapper for injection
         },
 		syncLocalStorage: function(data, update)
 		{
-			if (typeof update == "undefined") update = false;
+			if (typeof update == "undefined") update = false; // toDo: redundant?
             // each game has a different storage
             var storeId = "nuPilot" + vgap.game.createdby + vgap.game.id;
 			// load data
@@ -3360,6 +3379,13 @@ function wrapper () { // wrapper for injection
 				return data;
 			}
 		},
+        updateAPS: function(shipId, cfgData)
+        {
+            console.log("Updating APS " + shipId);
+            var ship = vgap.getShip(shipId);
+            autopilot.syncLocalStorage(cfgData);
+            ship.note.body += "(*)";
+        },
 		setupAPS: function(shipId, cfgData)
 		{
 			console.log("Setting up new APS " + shipId);
@@ -3385,7 +3411,7 @@ function wrapper () { // wrapper for injection
 			 * an older turn through time machine
 			 */
 		processload: function() {
-			//autopilot.storage = window.localStorage;
+			var nCols = ["ff3399", "6666ff", "ffc299", "66b3ff", "ff99ff", "6699ff"];
 			if (typeof(localStorage) !== "undefined") {
 				//console.log(localStorage); // Code for localStorage/sessionStorage.
 			} else {
@@ -3393,10 +3419,9 @@ function wrapper () { // wrapper for injection
 			}
 			// toDo: return if an old turn is loaded?
 			autopilot.populateFrnnCollections();
-			// scan ship notes for APS instructions
 			console.log(vgap);
+			var noteColByBase = {}; // color of note text
 			var apsControl = [];
-			apsLocations = [];
 			vgap.myships.forEach(function(ship) {
 				var aps = {};
 				var cfgData = autopilot.isInStorage(ship.id);
@@ -3404,6 +3429,19 @@ function wrapper () { // wrapper for injection
 				{
 					// if configuration is available in storage
 					aps = new APS(ship, cfgData);
+					if (noteColByBase[aps.base.id])
+                    {
+                        aps.noteColor = noteColByBase[aps.base.id];
+                    } else
+                    {
+                        if (nCols.length > 0)
+                        {
+                            noteColByBase[aps.base.id] = nCols.shift();
+                            aps.noteColor = noteColByBase[aps.base.id];
+                        } else {
+                            aps.noteColor = "ffffff";
+                        }
+                    }
 				}
 				if (aps.isAPS)
 				{
