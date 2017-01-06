@@ -793,7 +793,7 @@ function wrapper () { // wrapper for injection
 	};
 	alchemyAPS.prototype.setSources = function(aps)
 	{
-		// as alchemist, current planet is a sink
+		// as alchemist, current planet is a sink and source
 		this.sources = [{ x: aps.ship.x, y: aps.ship.y , distance: 0, deficiency: 0}];
 	};
 	alchemyAPS.prototype.isSource = function(planet)
@@ -809,44 +809,13 @@ function wrapper () { // wrapper for injection
 		if (this.sinks.length === 0) this.setSinks(aps);
 		// by planet.id sorted sources (two piles -high/low value- by distance)
 		if (this.sources.length === 0) this.setSources(aps);
-		//
-		if (this.isSource(aps.planet))
-		{
-			// if we are at source, set sinks as potential destinations
-			console.log("...for expander at source...");
-			// aps.potDest = this.sinks;
-		} else
-		{
-			// set sources as potential destinations, if we are at a sink
-			console.log("...for expander at an unowned planet...");
-			// aps.potDest = this.sources;
-		}
+
 		if (aps.potDest.length === 0)
 		{
 			console.log("setPotentialDestinations: no destinations available...");
 		} else
 		{
 			console.log(aps.potDest);
-		}
-	};
-	alchemyAPS.prototype.updateMission = function(aps)
-	{
-		if (aps.potDest.length > 0) // we are at a planet and have potential destinations set
-		{
-			// evaluate mission destinations & select Target
-			aps.potDest = aps.evaluateMissionDestinations();
-			//console.log("Potential target: ");
-			//console.log(aps.potDest[0]);
-			//console.log(aps.potDest);
-			this.selectMissionDestination(aps);
-			// load cargo if at source
-			// this.handleCargo(aps); // load specific amount...
-		} else
-		{
-			console.log("Alchemist stays...");
-			this.updateFC(aps);
-			this.handleCargo(aps); // load specific amount...
-			// toDo: check for danger
 		}
 	};
 	alchemyAPS.prototype.updateFC = function(aps)
@@ -890,16 +859,6 @@ function wrapper () { // wrapper for injection
 			{
 				// stay indevinently, send SOS ;)
 			}
-		}
-	};
-	alchemyAPS.prototype.selectMissionDestination = function(aps)
-	{
-		if (aps.potDest.length > 0)
-		{
-			// set Target (and if not set yet, destination)
-			aps.setShipTarget(aps.potDest[0].x, aps.potDest[0].y);
-			// set full warp
-			aps.setWarp();
 		}
 	};
 	alchemyAPS.prototype.handleCargo = function (aps)
@@ -1025,24 +984,6 @@ function wrapper () { // wrapper for injection
 			console.log(aps.potDest);
 		}
 	};
-	expanderAPS.prototype.updateMission = function(aps)
-	{
-		if (aps.potDest.length > 0) // we are at a planet and have potential destinations set
-		{
-			// evaluate mission destinations & select Target
-			aps.potDest = aps.evaluateMissionDestinations();
-			console.log("Potential target: ");
-			console.log(aps.potDest[0]);
-			//console.log(aps.potDest);
-			this.selectMissionDestination(aps);
-			// load cargo if at source
-			this.handleCargo(aps); // load specific amount...
-		} else
-		{
-			console.log("Expander is on route...");
-			// toDo: check for danger
-		}
-	};
 	expanderAPS.prototype.confirmMission = function(aps)
 	{
 		if (aps.potDest === 0) // we are not at our destination
@@ -1068,16 +1009,6 @@ function wrapper () { // wrapper for injection
 			{
 				// stay indevinently, send SOS ;)
 			}
-		}
-	};
-	expanderAPS.prototype.selectMissionDestination = function(aps)
-	{
-		if (aps.potDest.length > 0)
-		{
-			// set Target (and if not set yet, destination)
-			aps.setShipTarget(aps.potDest[0].x, aps.potDest[0].y);
-			// set full warp
-			aps.setWarp();
 		}
 	};
 	expanderAPS.prototype.handleCargo = function (aps)
@@ -1234,28 +1165,6 @@ function wrapper () { // wrapper for injection
 			console.log(aps.potDest);
 		}
 	};
-	collectorAPS.prototype.updateMission = function(aps)
-	{
-		if (aps.potDest.length > 0) // we are at a planet with our primary base
-		{
-			if (aps.atBase) // = sink
-			{
-				console.log("Collector is at base...");
-				aps.potDest = aps.evaluateMissionDestinations();
-			} else
-			{
-				console.log("Collector is at source...");
-				console.log(aps.potDest);
-				// aps.potDest = [{x: aps.base.x, y: aps.base.y }];
-			}
-			this.selectMissionDestination(aps);
-			this.handleCargo(aps);
-		} else
-		{
-			console.log("Collector is on route...");
-			// toDo: check for danger
-		}
-	};
 	collectorAPS.prototype.confirmMission = function(aps)
 	{
 		if (aps.potDest === 0) // we are not at our destination
@@ -1281,16 +1190,6 @@ function wrapper () { // wrapper for injection
 			{
 				// stay indevinently, send SOS ;)
 			}
-		}
-	};
-	collectorAPS.prototype.selectMissionDestination = function(aps)
-	{
-		if (aps.potDest.length > 0)
-		{
-			// set Target (and if not set yet, destination)
-			aps.setShipTarget(aps.potDest[0].x, aps.potDest[0].y);
-			// set full warp
-			aps.setWarp();
 		}
 	};
 	collectorAPS.prototype.handleCargo = function (aps)
@@ -1515,43 +1414,6 @@ function wrapper () { // wrapper for injection
 			console.log("setPotentialDestinations: no destinations available...");
 		}
 	};
-	distributorAPS.prototype.updateMission = function(aps)
-	{
-		if (aps.potDest.length > 0) // we are at a planet and have potential destinations set
-		{
-			// is the current planet a source or a sink?
-			console.log("Distributor is at a planet...");
-			/*
-			var isSource = this.isSource(aps.planet);
-			if (isSource)
-			{
-				// we are at a source, set sinks (which should be sorted by distance) as potDest
-				console.log("...which is a source...");
-				//console.log(this.sources);
-				console.log(this.sinks);
-				aps.potDest = this.sinks;
-			} else
-			{
-				// we are at a sink or a neutral place, look for sources
-				console.log("...which is a sink or a neutral planet...");
-				//console.log(this.sinks);
-				console.log(this.sources);
-				aps.potDest = this.sources;
-			} */
-			// evaluate mission destinations & select Target
-			aps.potDest = aps.evaluateMissionDestinations();
-			console.log("Potential target: ");
-			console.log(aps.potDest[0]);
-			//console.log(aps.potDest);
-			this.selectMissionDestination(aps);
-			// load cargo if at source
-			this.handleCargo(aps); // load specific amount...
-		} else
-		{
-			console.log("Distributor is on route...");
-			// toDo: check for danger
-		}
-	};
 	distributorAPS.prototype.confirmMission = function(aps)
 	{
 		if (aps.destination) // destination is set
@@ -1589,16 +1451,12 @@ function wrapper () { // wrapper for injection
 		if (aps.planet)
 		{
 			var transCargo = 0;
+            aps.unloadCargo(); // unload cargo
 			if (this.isSource(aps.planet))
 			{
-				// unload cargo
-				aps.unloadCargo();
-				// load cargo
-				transCargo = this.loadCargo(aps);
+				transCargo = this.loadCargo(aps); // load cargo
 			} else if (this.isSink(aps.planet))
 			{
-				// unload cargo
-				aps.unloadCargo();
 				if (this.ooiPriority == "neu") aps.unloadFuel();
 			}
 			console.log("Cargo summary: " + transCargo);
@@ -1618,16 +1476,6 @@ function wrapper () { // wrapper for injection
 		}
 		console.log("Loaded (" + this.ooiPriority + "): " + transCargo + "/" + deficiency);
 		return (transCargo - deficiency);
-	};
-	distributorAPS.prototype.selectMissionDestination = function(aps)
-	{
-		if (aps.potDest.length > 0)
-		{
-			// set Target (and if not set yet, destination)
-			aps.setShipTarget(aps.potDest[0].x, aps.potDest[0].y);
-			// set full warp
-			aps.setWarp();
-		}
 	};
 	/*
      *
@@ -1833,21 +1681,50 @@ function wrapper () { // wrapper for injection
 			}
 		}
 	};
+    /*
+     * By having the information of how many APS are operating within the same area
+     * we can set the scope range of those collectors: the more, the greater the scope range (area with potential destinations)
+     * By having the information of how many APS are operating within the same area
+     * we can filter new potential mission destinations to avoid "clustering" of APS
+     */
 	APS.prototype.getAPSinRange = function(range)
     {
-        var lStorage = autopilot.getLocalStorage();
+        var center = {};
+        if (this.shipFunction == "col")
+        {
+            center = { x: this.base.x, y: this.base.y };
+        } else
+        {
+            center = { x: this.ship.x, y: this.ship.y };
+        }
+        var lStorage = autopilot.loadGameData();
         if (lStorage)
         {
+            var frnnPositions = [];
             var pids = [];
+            var sids = [];
             for(var i = 0; i < lStorage.length; i++)
             {
-                if (lStorage[i].shipFunction == this.ship.primaryFunction)
+                // for collectors we need all APS operating from the same base
+                if (this.shipFunction == "col" && lStorage[i].shipFunction == this.primaryFunction && lStorage[i].base == this.base)
                 {
-                    pids.push(lStorage[i].base);
+                    if (lStorage[i].ooiPriority == "all" || this.objectOfInterest == lStorage[i].ooiPriority)
+                    {
+                        pids.push(lStorage[i].base);
+                    }
+                } else
+                {
+                    sids.push(lStorage[i].sid);
                 }
             }
-            var frnnPositions = this.getPositions4Planets(pids);
-            return this.getTargetsInRange(frnnPositions, this.base.x, this.base.y, range);
+            if (pids.length > 0)
+            {
+                frnnPositions = this.getPositions4Planets(pids); // base IDs -> planet coordinates
+            } else if (sids.length > 0)
+            {
+                frnnPositions = this.getPositions4Ships(sids); // ship IDs -> ship coordinates
+            }
+            return this.getTargetsInRange(frnnPositions, center.x, center.y, range);
         }
     };
 	APS.prototype.getETA = function(tx, ty)
@@ -1918,6 +1795,16 @@ function wrapper () { // wrapper for injection
         if (closestPlanets.length < 1) return false; // if there are no planets within 3 lj, we are not in warp well
         // <= 3 lj distance between planet and ship -> within warp well
         return true;
+    };
+    APS.prototype.getPositions4Ships = function(sids)
+    {
+        var frnnPositions = [];
+        for(var i = 0; i < sids.length; i++)
+        {
+            var s = vgap.getShip(sids[i]);
+            frnnPositions.push( { x: s.x , y: s.y } );
+        }
+        return frnnPositions;
     };
     APS.prototype.getPositions4Planets = function(pids)
     {
@@ -2198,10 +2085,29 @@ function wrapper () { // wrapper for injection
 		}
 		return filteredDest;
 	};
-	APS.prototype.updateMissionControl = function()
-	{
-		this.functionModule.updateMission(this);
-	};
+    APS.prototype.setMissionDestination = function()
+    {
+        // this is only called when APS has no destination set
+        this.evaluateMissionDestinations();
+        if (this.potDest.length > 0)
+        {
+            this.setShipTarget(this.potDest[0].x, this.potDest[0].y);
+            this.setWarp();
+            if (this.planet) this.functionModule.handleCargo(this); // load specific amount...
+        } else
+        {
+            if (this.shipFunction == "alc")
+            {
+                this.functionModule.updateFC(this);
+                if (this.planet) this.functionModule.handleCargo(this); // load specific amount...
+                console.log("APS alchemy cargo handling...");
+            } else
+            {
+                console.log("APS is on route...");
+            }
+
+        }
+    };
 	APS.prototype.confirmMission = function()
 	{
 		this.functionModule.confirmMission(this);
@@ -2859,6 +2765,7 @@ function wrapper () { // wrapper for injection
      */
 	var autopilot = {
 		storage: {},
+        storageId: false,
 		frnnPlanets: [],
 		frnnOwnPlanets: [],
 		frnnEnemyMinefields: [],
@@ -2884,6 +2791,7 @@ function wrapper () { // wrapper for injection
 			t8: [0,100,400,900,1600,2500,3600,5000,7000,42900],
 			t9: [0,100,400,900,1600,2500,3600,4900,6400,8100]
 		},
+        isChromeBrowser: false,
 		populateFrnnCollections: function()
 		{
 			autopilot.populateFrnnPlanets();
@@ -3260,26 +3168,6 @@ function wrapper () { // wrapper for injection
 		{
 			return (current.shipFunction != future.shipFunction || current.ooiPriority != future.ooiPriority);
 		},
-		isInStorage: function(shipId)
-		{
-			var storeId = "nuPilot" + vgap.game.createdby + vgap.game.id;
-			var storedGameData = JSON.parse(localStorage.getItem(storeId));
-			if (storedGameData === null) // no storage setup yet
-			{
-				return false;
-			} else
-			{
-				// storage available...
-				for(var i = 0; i < storedGameData.length; i++)
-				{
-					// ...look for entry of the current APS
-					if (storedGameData[i].sid == shipId)
-					{
-						return storedGameData[i];
-					}
-				}
-			}
-		},
 		clearShipTarget: function(shipId)
 		{
 			var ship = vgap.getShip(shipId);
@@ -3294,11 +3182,37 @@ function wrapper () { // wrapper for injection
 				ship.note.body = " ";
 			}
 		},
-        getLocalStorage: function()
+        isInStorage: function(shipId)
         {
-            // each game has a different storage
-            var storeId = "nuPilot" + vgap.game.createdby + vgap.game.id;
-            var storedGameData = JSON.parse(localStorage.getItem(storeId));
+            var storedGameData = autopilot.loadGameData();
+            if (storedGameData === null) // no storage setup yet
+            {
+                return false;
+            } else
+            {
+                // storage available...
+                for(var i = 0; i < storedGameData.length; i++)
+                {
+                    // ...look for entry of the current APS
+                    if (storedGameData[i].sid == shipId)
+                    {
+                        return storedGameData[i];
+                    }
+                }
+            }
+        },
+        loadGameData: function()
+        {
+            var storedGameData = null;
+            //if (autopilot.isChromeBrowser)
+            //{
+            //storedGameData = JSON.parse(localStorage.getItem(autopilot.storageId));
+            //    storedGameData = JSON.parse(chrome.storage.sync.get(autopilot.storageId));
+            //}
+            if (storedGameData === null)
+            {
+                storedGameData = JSON.parse(localStorage.getItem(autopilot.storageId));
+            }
             if (storedGameData === null) // no storage setup yet
             {
                 return false;
@@ -3309,11 +3223,8 @@ function wrapper () { // wrapper for injection
 		syncLocalStorage: function(data, update)
 		{
 			if (typeof update == "undefined") update = false; // toDo: redundant?
-            if (vgap.game.createdby == "none") alert("login!");
-            // each game has a different storage
-            var storeId = "nuPilot" + vgap.game.createdby + vgap.game.id;
 			// load data
-			var storedGameData = autopilot.getLocalStorage();
+			var storedGameData = autopilot.loadGameData();
 			if (!storedGameData) // no storage setup yet
 			{
 				if (data.ooiPriority == "END") return false; // if turned off 
@@ -3325,7 +3236,7 @@ function wrapper () { // wrapper for injection
                 if (typeof data.idle == "undefined") data.idle = false;
 				storedGameData.push(data);
 				// save data
-				localStorage.setItem(storeId, JSON.stringify(storedGameData));
+                autopilot.saveGameData(storedGameData);
 				//
 				return data;
 			} else
@@ -3363,7 +3274,7 @@ function wrapper () { // wrapper for injection
                             if (data.idle && storedGameData[i].idle != data.idle) storedGameData[i].idle = data.idle;
 							if (typeof data.destination != "undefined") storedGameData[i].destination = data.destination;
 						}
-						localStorage.setItem(storeId, JSON.stringify(storedGameData));
+                        autopilot.saveGameData(storedGameData);
 						return storedGameData[i];
 					}
 				}
@@ -3375,10 +3286,43 @@ function wrapper () { // wrapper for injection
 				if (typeof data.newOoiPriority == "undefined") data.newOoiPriority = false;
                 if (typeof data.idle == "undefined") data.idle = false;
 				storedGameData.push(data);
-				localStorage.setItem(storeId, JSON.stringify(storedGameData));
+                autopilot.saveGameData(storedGameData);
 				return data;
 			}
 		},
+        saveGameData: function(gameData)
+        {
+            //if (autopilot.isChromeBrowser)
+            //{
+            //    var storageObject = {};
+            //    storageObject[autopilot.storageId] = JSON.stringify(gameData);
+            //    storedGameData = JSON.parse(chrome.storage.sync.set(storageObject));
+            //} else
+            //{
+            localStorage.setItem(autopilot.storageId, JSON.stringify(gameData));
+            //}
+        },
+        setupStorage: function()
+        {
+            var isChromium = window.chrome,
+                winNav = window.navigator,
+                vendorName = winNav.vendor,
+                isOpera = winNav.userAgent.indexOf("OPR") > -1,
+                isIEedge = winNav.userAgent.indexOf("Edge") > -1,
+                isIOSChrome = winNav.userAgent.match("CriOS");
+
+            if(isIOSChrome){
+                // is Google Chrome on IOS
+                autopilot.isChromeBrowser = true;
+            } else if(isChromium !== null && isChromium !== undefined && vendorName === "Google Inc." && isOpera == false && isIEedge == false) {
+                // is Google Chrome
+                autopilot.isChromeBrowser = true;
+            } else {
+                // not Google Chrome
+            }
+            if (vgap.game.createdby == "none") alert("login!");
+            autopilot.storageId = "nuPilot" + vgap.game.createdby + vgap.game.id;
+        },
         updateAPS: function(shipId, cfgData)
         {
             console.log("Updating APS " + shipId);
@@ -3398,7 +3342,7 @@ function wrapper () { // wrapper for injection
 					console.error("Set potential destinations for APS " + aps.ship.id);
 					aps.functionModule.setPotentialDestinations(aps);
 				}
-				aps.updateMissionControl();
+				aps.setMissionDestination();
 				aps.confirmMission();
 				aps.updateNote();
 			} else
@@ -3411,7 +3355,8 @@ function wrapper () { // wrapper for injection
 			 * an older turn through time machine
 			 */
 		processload: function() {
-			var nCols = ["ff3399", "6666ff", "ffc299", "66b3ff", "ff99ff", "6699ff"];
+            autopilot.setupStorage();
+            var nCols = ["ff3399", "6666ff", "ffc299", "66b3ff", "ff99ff", "6699ff"];
 			if (typeof(localStorage) !== "undefined") {
 				//console.log(localStorage); // Code for localStorage/sessionStorage.
 			} else {
@@ -3420,6 +3365,9 @@ function wrapper () { // wrapper for injection
 			// toDo: return if an old turn is loaded?
 			autopilot.populateFrnnCollections();
 			console.log(vgap);
+            //
+            // APS - Initial setup...
+            //
 			var noteColByBase = {}; // color of note text
 			var apsControl = [];
 			vgap.myships.forEach(function(ship) {
@@ -3449,8 +3397,13 @@ function wrapper () { // wrapper for injection
 					apsControl.push(aps);
 				}
 			});
-			// ships that arrived at destination have been unloaded...
+            //
+            // APS that arrived at destination have been unloaded...
+            //
 			autopilot.collectSourceSinkData();
+            //
+            // APS without mission destination need to determine potential destinations
+            //
 			apsControl.forEach(function(shipcontrol) {
 				if (shipcontrol.hasToSetPotDes)
 				{
@@ -3458,25 +3411,18 @@ function wrapper () { // wrapper for injection
 					shipcontrol.functionModule.setPotentialDestinations(shipcontrol);
 				}
 			});
-			//
-			// after we have initialized the APS,
-			//   - we have potential destinations or already have our next target logged in...
-			//	 - we now need to finalize everything:
-			//	   - log in destination conidering additional info from mission control
-			//	   - load / unload
-			//	   - check fuel and warp... go
-			//
-			//  toDo: move all loading unloadig in finale round
+            //
+            // APS with potential mission destinations now evaluate the and pick target(s)
+            //
 			apsControl.forEach(function(shipcontrol) {
-				console.error("Updating mission of APS " + shipcontrol.ship.id);
-				// setting up a brief mission list for ship-ship coordination
-				//
-				shipcontrol.updateMissionControl();
-				//
-				shipcontrol.confirmMission();
-				shipcontrol.updateNote();
-				//console.log(autopilot.apsMissions);
-				// collect info and evaluate optimization possibiities...
+                if (shipcontrol.potDest.length > 0)
+                {
+                    console.error("Setting mission destination of APS " + shipcontrol.ship.id);
+                    shipcontrol.setMissionDestination();
+                }
+                //
+                shipcontrol.confirmMission();
+                shipcontrol.updateNote();
 			});
 			apsControl.forEach(function(shipcontrol)
 			{
@@ -3486,9 +3432,14 @@ function wrapper () { // wrapper for injection
                     console.error("Retry idle ship " + shipcontrol.ship.id);
                     if (!shipcontrol.destination)
                     {
+                        console.error("Set potential destinations for APS " + shipcontrol.ship.id);
                         shipcontrol.functionModule.setPotentialDestinations(shipcontrol);
+                        if (shipcontrol.potDest.length > 0)
+                        {
+                            console.error("Setting mission destination of APS " + shipcontrol.ship.id);
+                            shipcontrol.setMissionDestination();
+                        }
                     }
-                    shipcontrol.updateMissionControl();
                     shipcontrol.confirmMission();
                     shipcontrol.updateNote();
                 }
