@@ -2555,85 +2555,71 @@ function wrapper () { // wrapper for injection
 	/*
 	 * set next stop to destination x, y
 	 */
-	APS.prototype.setShipTarget = function(x, y)
-	{
-		if (!this.destination)
-		{
-			var dest = vgap.planetAt(x, y);
-			if (dest)
-			{
-				console.warn("Setting new APS DESTINATION!");
-				this.setShipDestination(x, y);
-			} else
-			{
+	APS.prototype.setShipTarget = function(x, y) {
+        if (!this.destination) {
+            var dest = vgap.planetAt(x, y);
+            if (dest) {
+                console.warn("Setting new APS DESTINATION!");
+                this.setShipDestination(x, y);
+            } else {
                 console.warn("Destination is not a planet!");
-				return;
-			}
-		} else
-		{
-			console.warn("Destination of APS already set: " + this.destination.name);
-		}
-		var destinationPlanet = vgap.planetAt(x, y);
-		console.log("Searching target on the way to " + destinationPlanet.name + " (" + destinationPlanet.id + ")...");
-		var adjustment = 0;
-		var turnTargets = this.getTurnTargets(this.ship, destinationPlanet, adjustment);
-		// distance from current location to destination planet
-		var curPosDistance = Math.floor(this.getDistance({x: this.ship.x , y: this.ship.y}, {x: x , y: y}));
-		//
-		console.log("Turntargets: " + adjustment);
+                return;
+            }
+        } else {
+            console.warn("Destination of APS already set: " + this.destination.name);
+        }
+        var destinationPlanet = vgap.planetAt(x, y);
+        console.log("Searching target on the way to " + destinationPlanet.name + " (" + destinationPlanet.id + ")...");
+        var adjustment = 0;
+        var turnTargets = this.getTurnTargets(this.ship, destinationPlanet, adjustment);
+        // distance from current location to destination planet
+        var curPosDistance = Math.floor(this.getDistance({x: this.ship.x, y: this.ship.y}, {x: x, y: y}));
+        //
+        console.log("Turntargets: " + adjustment);
         console.log(turnTargets);
-		//console.log(turnTargets);
-		//
-		while(turnTargets.length === 0 || turnTargets[0].distance >= (curPosDistance * 0.9)) // only use targets that are (considerably? 10 %?) closer to the destination than the current position
-		{
-			adjustment += 10;
-			if (adjustment > 500) break;
-			turnTargets = this.getTurnTargets(this.ship, destinationPlanet, adjustment);
-			console.log("...found " + turnTargets.length + " turn-targets within a " + (this.simpleRange + adjustment) + " ly radius...");
-		}
-		if (turnTargets.length > 0)
-		{
+        //console.log(turnTargets);
+        //
+        while (turnTargets.length === 0 || turnTargets[0].distance >= (curPosDistance * 0.9)) // only use targets that are (considerably? 10 %?) closer to the destination than the current position
+        {
+            adjustment += 10;
+            if (adjustment > 500) break;
+            turnTargets = this.getTurnTargets(this.ship, destinationPlanet, adjustment);
+            console.log("...found " + turnTargets.length + " turn-targets within a " + (this.simpleRange + adjustment) + " ly radius...");
+        }
+        if (turnTargets.length > 0) {
             var tP = vgap.planetAt(turnTargets[0].x, turnTargets[0].y);
             if (this.isSaveShipTarget(tP))
                 this.ship.targetx = tP.x;
-                this.ship.targety = tP.y;
-			} else
-			{
-				// toDo... if danger is closing in on current position... flee
-				//
-				if (turnTargets.length > 1)
-				{
-                    tP = vgap.planetAt(turnTargets[1].x, turnTargets[1].y);
-					console.log("Current target is unsave... try one alternative...");
-					if (this.isSaveShipTarget(tP))
-					{
-						this.ship.targetx = tP.x;
-						this.ship.targety = tP.y;
-					} else
-					{
-						console.log("Primary and alternative targets are unsave...");
-						if (this.isInWarpWell())
-                        {
-                            console.log("We are in warp well...");
-                            // toDo: do we have to move? are there enemy ships close by?
-                        } else
-                        {
-                            console.log("Moving into warp well...");
-                            var coords = this.getRandomWarpWellEntryPosition();
-                            this.ship.targetx = coords.x;
-                            this.ship.targety = coords.y;
-                        }
-					}
-				} else
-				{
-				    // toDo: no turntargets... should be almost impossible... if player has only 1 planet left?
-					console.log("No turn targets... stay at current position...");
-					this.ship.targetx = this.ship.x;
-					this.ship.targety = this.ship.y;
-				}
-			}
-		}
-	};
+            this.ship.targety = tP.y;
+        } else {
+            // toDo... if danger is closing in on current position... flee
+            //
+            if (turnTargets.length > 1) {
+                tP = vgap.planetAt(turnTargets[1].x, turnTargets[1].y);
+                console.log("Current target is unsave... try one alternative...");
+                if (this.isSaveShipTarget(tP)) {
+                    this.ship.targetx = tP.x;
+                    this.ship.targety = tP.y;
+                } else {
+                    console.log("Primary and alternative targets are unsave...");
+                    if (this.isInWarpWell()) {
+                        console.log("We are in warp well...");
+                        // toDo: do we have to move? are there enemy ships close by?
+                    } else {
+                        console.log("Moving into warp well...");
+                        var coords = this.getRandomWarpWellEntryPosition();
+                        this.ship.targetx = coords.x;
+                        this.ship.targety = coords.y;
+                    }
+                }
+            } else {
+                // toDo: no turntargets... should be almost impossible... if player has only 1 planet left?
+                console.log("No turn targets... stay at current position...");
+                this.ship.targetx = this.ship.x;
+                this.ship.targety = this.ship.y;
+            }
+        }
+    };
 	APS.prototype.updateStoredData = function()
     {
         this.storedData = {
@@ -3446,78 +3432,78 @@ function wrapper () { // wrapper for injection
             });
 		},
 		/*
-			 * loaddashboard: executed to rebuild the dashboard content after a turn is loaded
-			 */
+         * loaddashboard: executed to rebuild the dashboard content after a turn is loaded
+         */
 		loaddashboard: function() {
 			//console.log("LoadDashboard: plugin called.");
 		},
 
 		/*
-			 * showdashboard: executed when switching from starmap to dashboard
-			 */
+         * showdashboard: executed when switching from starmap to dashboard
+         */
 		showdashboard: function() {
 			//console.log("ShowDashboard: plugin called.");
 		},
 		/*
-			 * showsummary: executed when returning to the main screen of the dashboard
-			 */
+         * showsummary: executed when returning to the main screen of the dashboard
+         */
 		showsummary: function() {
 			//console.log("ShowSummary: plugin called.");
 		},
 		/*
-			 * loadmap: executed after the first turn has been loaded to create the map
-			 * as far as I can tell not executed again when using time machine
-			 */
+         * loadmap: executed after the first turn has been loaded to create the map
+         * as far as I can tell not executed again when using time machine
+         */
 		loadmap: function() {
 			//console.log("LoadMap: plugin called.");
 		},
 		/*
-			 * showmap: executed when switching from dashboard to starmap
-			 */
+         * showmap: executed when switching from dashboard to starmap
+         */
 		showmap: function() {
 			//console.log("ShowMap: plugin called.");
 		},
 		/*
-			 * draw: executed on any click or drag on the starmap
-			 */
+         * draw: executed on any click or drag on the starmap
+         */
 		draw: function() {
 			//console.log("Draw: plugin called.");
 		},
 		/*
-			 * loadplanet: executed when a planet is selected on dashboard or starmap
-		 	 *
-			 * Inside the function "load" of vgapPlanetScreen (vgapPlanetScreen.prototype.load) the normal planet screen
-			 * is set up. You can find the function in "nu.js" if you search for 'vgap.callPlugins("loadplanet");'.
-			 *
-			 * Things accessed inside this function several variables can be accessed. Elements accessed as "this.X"
-			 * can be accessed here as "vgap.planetScreen.X".
-			 */
+         * loadplanet: executed when a planet is selected on dashboard or starmap
+         *
+         * Inside the function "load" of vgapPlanetScreen (vgapPlanetScreen.prototype.load) the normal planet screen
+         * is set up. You can find the function in "nu.js" if you search for 'vgap.callPlugins("loadplanet");'.
+         *
+         * Things accessed inside this function several variables can be accessed. Elements accessed as "this.X"
+         * can be accessed here as "vgap.planetScreen.X".
+         */
 		loadplanet: function() {
 			//console.log("LoadPlanet: plugin called.");
 			//console.log("Planet id: " + vgap.planetScreen.planet.id);
 		},
 		/*
-			 * loadstarbase: executed when a starbase is selected on dashboard or starmap
-             *
-			 * Inside the function "load" of vgapStarbaseScreen (vgapStarbaseScreen.prototype.load) the normal starbase screen
-			 * is set up. You can find the function in "nu.js" if you search for 'vgap.callPlugins("loadstarbase");'.
-			 *
-			 * Things accessed inside this function several variables can be accessed. Elements accessed as "this.X"
-			 * can be accessed here as "vgap.starbaseScreen.X".
-			 */
+         * loadstarbase: executed when a starbase is selected on dashboard or starmap
+         *
+         * Inside the function "load" of vgapStarbaseScreen (vgapStarbaseScreen.prototype.load) the normal starbase screen
+         * is set up. You can find the function in "nu.js" if you search for 'vgap.callPlugins("loadstarbase");'.
+         *
+         * Things accessed inside this function several variables can be accessed. Elements accessed as "this.X"
+         * can be accessed here as "vgap.starbaseScreen.X".
+         */
 		loadstarbase: function() {
 			//console.log("LoadStarbase: plugin called.");
 			//console.log("Starbase id: " + vgap.starbaseScreen.starbase.id + " on planet id: " + vgap.starbaseScreen.planet.id);
 		},
 
 		/*
-			 * loadship: executed when a planet is selected on dashboard or starmap
-			 * Inside the function "load" of vgapShipScreen (vgapShipScreen.prototype.load) the normal ship screen
-			 * is set up. You can find the function in "nu.js" if you search for 'vgap.callPlugins("loadship");'.
-			 *
-			 * Things accessed inside this function several variables can be accessed. Elements accessed as "this.X"
-			 * can be accessed here as "vgap.shipScreen.X".
-			 */
+         * loadship: executed when a planet is selected on dashboard or starmap
+         * Inside the function "load" of vgapShipScreen (vgapShipScreen.prototype.load) the normal ship screen
+         * is set up. You can find the function in "nu.js" if you search for 'vgap.callPlugins("loadship");'.
+         *
+         * Things accessed inside this function several variables can be accessed. Elements accessed as "this.X"
+         * can be accessed here as "vgap.shipScreen.X".
+         */
 		loadship: function() {
 			//console.log("LoadShip: plugin called.");
 			//console.log("Ship id: " + vgap.shipScreen.ship.id);
