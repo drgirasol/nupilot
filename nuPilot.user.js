@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable semi-intelligent auto-pilots
-// @version       0.06.02
+// @version       0.06.07
 // @date          2017-01-06
 // @author        drgirasol
 // @include       http://planets.nu/*
@@ -30,7 +30,6 @@ function wrapper () { // wrapper for injection
 	 *  reserved methods, "vgap.plugins["nameOfMyPlugin"].my_variable" has to be
 	 *  used instead of "this.my_variable".
 	 */
-	//
 	// add APC button to ShipOrders Section
 	vgapShipScreen.prototype.load = function(c)
 	{
@@ -942,7 +941,7 @@ function wrapper () { // wrapper for injection
 			this.sources[i].x = sourcePlanet.x;
 			this.sources[i].y = sourcePlanet.y;
 		}
-		// priorities by degree of value (split)... and sort splits by distance
+		// priorities by degree of value (split)... and sort splits by value
 		this.sources = aps.getDevidedCollection(this.sources, "value", this.devideThresh, "value", "desc");
 		console.log(this.sources);
 	};
@@ -984,6 +983,10 @@ function wrapper () { // wrapper for injection
 			console.log(aps.potDest);
 		}
 	};
+    expanderAPS.prototype.evaluateMissionDestinations = function(aps)
+    {
+        return aps.potDest;
+    };
 	expanderAPS.prototype.confirmMission = function(aps)
 	{
 		if (aps.potDest === 0) // we are not at our destination
@@ -1165,6 +1168,17 @@ function wrapper () { // wrapper for injection
 			console.log(aps.potDest);
 		}
 	};
+    collectorAPS.prototype.evaluateMissionDestinations = function(aps)
+    {
+        var filteredDest = [];
+        console.log("...filtering collector destinations: " + aps.potDest.length);
+        for (var i = 0; i < aps.potDest.length; i++) {
+            // if potential destination is a base of another collector APS that is collecting the same resource(s)
+            if (aps.isAPSbase(aps.potDest[i].pid)) continue;
+            filteredDest.push(aps.potDest);
+        }
+        return filteredDest;
+    };
 	collectorAPS.prototype.confirmMission = function(aps)
 	{
 		if (aps.potDest === 0) // we are not at our destination
@@ -1414,6 +1428,10 @@ function wrapper () { // wrapper for injection
 			console.log("setPotentialDestinations: no destinations available...");
 		}
 	};
+    distributorAPS.prototype.evaluateMissionDestinations = function(aps)
+    {
+        return aps.potDest;
+    };
 	distributorAPS.prototype.confirmMission = function(aps)
 	{
 		if (aps.destination) // destination is set
@@ -1470,8 +1488,21 @@ function wrapper () { // wrapper for injection
 		{
 			var object = aps.moveables[this.ooiPriority];
 			var available = autopilot.getSumAvailableObjects(aps.planet, object);
+            console.log("There is " + available + " " + this.ooiPriority + " available");
 			if (available < 0) available = 0;
-			if (deficiency > available) deficiency = available;
+			if (deficiency > available)
+            {
+                deficiency = available;
+            } else
+            {
+                if (this.ooiPriority == "neu")
+                {
+                    deficiency = aps.hull.fueltank;
+                } else
+                {
+                    // deficiency = aps.hull.cargo;
+                }
+            }
 			transCargo = aps.loadObject(object, aps.planet, deficiency);
 		}
 		console.log("Loaded (" + this.ooiPriority + "): " + transCargo + "/" + deficiency);
@@ -1524,7 +1555,8 @@ function wrapper () { // wrapper for injection
         this.destination = false; // destination -> planet object
         this.atDestination = false; // bool
 		//
-        this.storedData = false;
+        this.storedData = false; // stored data of APS
+        this.apcBaseIds = [];
 		this.primaryFunction = false;
 		this.objectOfInterest = false;
 		this.functionModule = {};
@@ -1555,6 +1587,7 @@ function wrapper () { // wrapper for injection
 			if (apsConfig)
 			{
 				this.isAPS = true;
+				this.initAPScontrol();
 				this.initializeBoardComputer(apsConfig);
 			} else
 			{
@@ -1589,6 +1622,16 @@ function wrapper () { // wrapper for injection
 			this.isAPS = false;
 		}
 	};
+	APS.prototype.initAPScontrol = function()
+    {
+        var apsData = autopilot.loadGameData();
+        for (var i = 0; i < apsData.length; i++)
+        {
+            this.apcBaseIds.push(apsData[i].base);
+        }
+        console.log("APCbaseIds");
+        console.log(this.apcBaseIds);
+    };
 	APS.prototype.initializeBoardComputer = function(configuration)
 	{
 		console.error("Initializing flight computer of APC " + this.ship.id);
@@ -1795,6 +1838,11 @@ function wrapper () { // wrapper for injection
         if (closestPlanets.length < 1) return false; // if there are no planets within 3 lj, we are not in warp well
         // <= 3 lj distance between planet and ship -> within warp well
         return true;
+    };
+    APS.prototype.isAPSbase = function(pid)
+    {
+        if (this.apcBaseIds.indexOf(pid) > -1) return true;
+        return false;
     };
     APS.prototype.getPositions4Ships = function(sids)
     {
@@ -2025,7 +2073,9 @@ function wrapper () { // wrapper for injection
 	 */
 	APS.prototype.evaluateMissionDestinations = function()
 	{
-		// pre filter destinations (e.g. remove destinations located in problematic zones)
+		// function module specific filtering of potential destinations
+        this.functionModule.evaluateMissionDestinations(this);
+        // pre filter destinations (e.g. remove destinations located in problematic zones)
 		var filteredDest = [];
 		var avoidDest = [];
 		console.log("prefiltering destinations: " + this.potDest.length);
@@ -2033,11 +2083,10 @@ function wrapper () { // wrapper for injection
 		{
 			var potPlanet = vgap.getPlanet(this.potDest[i].pid);
 			var hasBase = vgap.getStarbase(this.potDest[i].pid);
-			if (this.planet && potPlanet.id == this.planet.id) continue;
-			// don't use prospected base planets
-			if (potPlanet.note && potPlanet.note.body.match(/nup:base/))
+			if (this.planet && potPlanet.id == this.planet.id) continue; // toDo: current planet can't be a mission destination ?
+			if (potPlanet.note && potPlanet.note.body.match(/nup:base/)) // don't use prospected starbase planets
 			{
-				console.log("...removing destinations: " + potPlanet.id + " - a base will be built here!");
+				console.log("...removing destinations: " + potPlanet.id + " - a starbase will be built here!");
 				continue;
 			}
 			// if destination has a starbases but is not the APS' base
@@ -2114,10 +2163,8 @@ function wrapper () { // wrapper for injection
 	};
 	APS.prototype.getMissionConflict = function(potPlanet)
 	{
-		//
 		// Check if potential destination is in the APS control list
-		var storeId = "nuPilot" + vgap.game.createdby + vgap.game.id;
-		var storedGameData = JSON.parse(localStorage.getItem(storeId));
+		var storedGameData = autopilot.loadGameData();
 		if (storedGameData === null)
 		{
 			// no storage setup yet
@@ -2130,7 +2177,7 @@ function wrapper () { // wrapper for injection
 				var curShip = vgap.getShip(storedGameData[i].sid);
 				if (curShip)
 				{
-					// location of current storage APS
+					// current location of storage APS
 					var curShipPlanet = vgap.planetAt(curShip.x, curShip.y);
 					// if location is potential target of current APS and has the same primary function as storage APS
 					if (curShipPlanet && curShipPlanet.id == potPlanet.id && this.primaryFunction == storedGameData[i].shipFunction)
@@ -2376,11 +2423,12 @@ function wrapper () { // wrapper for injection
 	// interaction specifics
 	APS.prototype.checkFuel = function()
 	{
-		if (this.planet && this.planet.ownerid == vgap.player.id)
+		if (this.planet)
 		{
 			this.setWarp(); // set most efficient warp factor for fuel consumption estimation
 			var fuel = Math.floor(this.getFuelConsumptionEstimate() * 1.5); // use more, so there will be enough for return trip
-			var loadedFuel = this.loadObject("neutronium", this.planet, fuel);
+			if (fuel <= parseInt(this.ship.neutronium)) return true; // if there is enough, we don't need to load fuel
+            var loadedFuel = this.loadObject("neutronium", this.planet, fuel);
 			console.log("We have " + loadedFuel + " neutronium aboard and need " + fuel);
 			if (loadedFuel >= fuel)
 			{
@@ -2959,11 +3007,11 @@ function wrapper () { // wrapper for injection
 			}
 			if (planet.nativeclans > 0 && freeClans > natFreeClans)
 			{
-				console.log("Planet " + planet.id + " free clans: " + natFreeClans);
+				//console.log("Planet " + planet.id + " free clans: " + natFreeClans);
 				return natFreeClans;
 			} else
 			{
-				console.log("Planet " + planet.id + " free clans: " + freeClans);
+				//console.log("Planet " + planet.id + " free clans: " + freeClans);
 				return freeClans;
 			}
 		},
@@ -3306,15 +3354,24 @@ function wrapper () { // wrapper for injection
             } else {
                 // not Google Chrome
             }
-            if (vgap.game.createdby == "none") alert("login!");
-            autopilot.storageId = "nuPilot" + vgap.game.createdby + vgap.game.id;
+
+            var createdBy = "";
+            if (vgap.game.createdby == "none")
+            {
+                createdBy = "default";
+            } else
+            {
+                createdBy = vgap.game.createdby
+            }
+
+            autopilot.storageId = "nuPilot" + createdBy + vgap.game.id;
         },
         updateAPS: function(shipId, cfgData)
         {
             console.log("Updating APS " + shipId);
             var ship = vgap.getShip(shipId);
             autopilot.syncLocalStorage(cfgData);
-            ship.note.body += "(*)";
+            if (ship.note) ship.note.body += "(*)";
         },
 		setupAPS: function(shipId, cfgData)
 		{
