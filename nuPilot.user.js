@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable semi-intelligent auto-pilots
-// @version       0.06 (02)
+// @version       0.06.02
 // @date          2017-01-06
 // @author        drgirasol
 // @include       http://planets.nu/*
