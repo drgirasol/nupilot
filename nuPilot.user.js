@@ -764,7 +764,7 @@ function wrapper () { // wrapper for injection
 		return inRange;
 	};
 		/*
-	 * Autopilot - Expansion Module
+	 * Autopilot - Alchemy Module
 	 */
 	function alchemyAPS(aps)
 	{
