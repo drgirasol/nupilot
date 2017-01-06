@@ -1671,9 +1671,10 @@ function wrapper () { // wrapper for injection
 
 		this.planet = false; // current planet (if at any)
 		this.base = false; // base -> planet object
-		this.atBase = false;
-		this.destination = false; // destination -> planet object
-		this.atDestination = false;
+        this.atBase = false; // bool
+        this.inWarpWell = false; // bool
+        this.destination = false; // destination -> planet object
+        this.atDestination = false; // bool
 		//
         this.storedData = false;
 		this.primaryFunction = false;
@@ -1758,9 +1759,11 @@ function wrapper () { // wrapper for injection
 		//
 		// current position
 		//
-		this.planet = vgap.planetAt(this.ship.x, this.ship.y);
-		if (this.planet && this.planet.ownerid != vgap.player.id && cfgFunction != "exp") this.planet = false; // we don't want to interact (yet) with planets not owned by us
-		//
+        this.planet = vgap.planetAt(this.ship.x, this.ship.y); // note: planetAt returns planet, even if the exact position is in warp well!
+        this.inWarpWell = this.isInWarpWell({ x: this.ship.x,y: this.ship.y });
+        if (this.inWarpWell) this.planet = false;
+        if (this.planet && this.planet.ownerid != vgap.player.id && cfgFunction != "exp") this.planet = false; // we don't want to interact (yet) with planets not owned by us
+        //
 		var cfgBase = parseInt(configuration[1]); // base planet id
 		this.base = vgap.getPlanet(cfgBase);
 		if (this.planet && this.planet.id == this.base.id) this.atBase = true; // are we at our base of operation
@@ -1800,9 +1803,9 @@ function wrapper () { // wrapper for injection
 					storageData.ooiPriority = storageData.newOoiPriority;
 					storageData.newOoiPriority = false;
 				}
-				autopilot.syncLocalStorage(storageData);
+				this.storedData = autopilot.syncLocalStorage(storageData);
 				this.hasToSetPotDes = true;
-				//this.functionModule.setPotentialDestinations(this);
+                console.log("APS scheduled for potential destination determination.");
 			} else
 			{
 				// planet is not the destination
@@ -1815,23 +1818,18 @@ function wrapper () { // wrapper for injection
 			{
 				console.log("...at planet with no destination set.");
 				this.hasToSetPotDes = true;
-				//this.functionModule.setPotentialDestinations(this);
 			} else
 			{
-				if (storageData.destination) {
-					console.log("...in space with destination (" + storageData.destination + ") set.");
-				} else
-				{
-					console.log("...in space with no destination set.");
-					if (this.ship.targetx != this.ship.x || this.ship.targety != this.ship.y) 
-					{
-						this.hasToSetPotDes = false;
-					} else
-					{
-						this.hasToSetPotDes = true;
-					}
-					//this.functionModule.setPotentialDestinations(this);
-				}
+                if (storageData.destination)
+                {
+                    this.destination = vgap.getPlanet(storageData.destination);
+                    console.log("...in space / warp well with destination (" + storageData.destination + ") set.");
+                    this.setShipTarget(this.destination.x, this.destination.y);
+                } else
+                {
+                    console.log("...in space / warp well with no destination set.");
+                    this.hasToSetPotDes = true;
+                }
 			}
 		}
 	};
@@ -2390,7 +2388,7 @@ function wrapper () { // wrapper for injection
 			var tt = turnTargets[i];
 			// distance between potential next stop and the destination
 			//  - in case the potential next stop is the destination, distance is 0
-            turnTargets[i].distance = this.getDistance({x: tt.x , y: tt.y}, {x: destination.x , y: destination.y});
+            turnTargets[i].distance = Math.floor(this.getDistance({x: tt.x , y: tt.y}, {x: destination.x , y: destination.y}));
             var ttPlanet = vgap.planetAt(tt.x , tt.y);
             turnTargets[i].pid = ttPlanet.id;
 		}
@@ -2404,27 +2402,27 @@ function wrapper () { // wrapper for injection
 			});
 		return turnTargets;
 	};
-    APS.prototype.isSaveShipTarget = function(x, y, pid)
+    APS.prototype.isSaveShipTarget = function(planet)
     {
-        return this.isSavePosition({ x: x, y: y , pid: pid});
+        return this.isSavePosition(planet);
     };
-    APS.prototype.isSavePosition = function(pos)
+    APS.prototype.isSavePosition = function(planet)
     {
         // don't visit planets in or close to minefields
         // toDo: planets in radiation zones, if you don't have special shielding
-        if (this.objectInsideMineField(pos))
+        if (this.objectInsideMineField(planet))
         {
             console.log("...position is inside / close to minefield!");
             return false;
         }
         // don't visit planets close to enemy planets or ships
         // except planets that are base planets and planets protected by friendly minefield
-        if (this.objectInRangeOfEnemy(pos) && !this.objectInsideMineField(pos,true,true))
+        if (this.objectInRangeOfEnemy(planet) && !this.objectInsideMineField(planet,true,true))
         {
             return false;
         }
         var ionStormId = false;
-        if ((ionStormId = this.objectInsideIonStorm(pos)))
+        if ((ionStormId = this.objectInsideIonStorm(planet)))
         {
             if (this.isDangerousIonStorm(ionStormId))
             {
@@ -2447,9 +2445,9 @@ function wrapper () { // wrapper for injection
             curDistToEnemy = this.getDistance({x: eP[i].x, y: eP[i].y}, {x: object.x, y: object.y});
             // prevent ships from getting to close to enemy planets while traveling to destination
             // ignore when object is the base planet
-            if (curDistToEnemy < this.functionModule.enemySafetyZone && object.pid != this.base.id)
+            if (curDistToEnemy < this.functionModule.enemySafetyZone && object.id != this.base.id)
             {
-                console.log("...position (" + object.pid + ":" + object.x + "x" + object.y + ") is in range of enemy planet!");
+                console.log("...position (" + object.id + ":" + object.x + "x" + object.y + ") is in range of enemy planet!");
                 return true;
             }
         }
@@ -2689,21 +2687,22 @@ function wrapper () { // wrapper for injection
 		}
 		if (turnTargets.length > 0)
 		{
-			if (this.isSaveShipTarget(turnTargets[0].x, turnTargets[0].y, turnTargets[0].pid))
-			{
-				this.ship.targetx = turnTargets[0].x;
-				this.ship.targety = turnTargets[0].y;
+            var tP = vgap.planetAt(turnTargets[0].x, turnTargets[0].y);
+            if (this.isSaveShipTarget(tP))
+                this.ship.targetx = tP.x;
+                this.ship.targety = tP.y;
 			} else
 			{
 				// toDo... if danger is closing in on current position... flee
 				//
 				if (turnTargets.length > 1)
 				{
+                    tP = vgap.planetAt(turnTargets[1].x, turnTargets[1].y);
 					console.log("Current target is unsave... try one alternative...");
-					if (this.isSaveShipTarget(turnTargets[1].x, turnTargets[1].y, turnTargets[1].pid))
+					if (this.isSaveShipTarget(tP))
 					{
-						this.ship.targetx = turnTargets[1].x;
-						this.ship.targety = turnTargets[1].y;
+						this.ship.targetx = tP.x;
+						this.ship.targety = tP.y;
 					} else
 					{
 						console.log("Primary and alternative targets are unsave...");
@@ -3310,6 +3309,7 @@ function wrapper () { // wrapper for injection
 		syncLocalStorage: function(data, update)
 		{
 			if (typeof update == "undefined") update = false; // toDo: redundant?
+            if (vgap.game.createdby == "none") alert("login!");
             // each game has a different storage
             var storeId = "nuPilot" + vgap.game.createdby + vgap.game.id;
 			// load data
