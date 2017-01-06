@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable semi-intelligent auto-pilots
-// @version       0.05 (55)
-// @date          2017-01-02
+// @version       0.06 (02)
+// @date          2017-01-06
 // @author        drgirasol
 // @include       http://planets.nu/*
 // @include       http://play.planets.nu/*
@@ -1337,7 +1337,7 @@ function wrapper () { // wrapper for injection
 			} else if (this.ooiPriority == "dur")
 			{
 				loadingSequence = ["duranium"];
-				baseSequence = [ { res: "mol", value: parseInt(aps.planet.molybdenum) }, { res: "tri", value: parseInt(aps.planet.tritantium) } ];
+				baseSequence = [ { res: "mol", value: parseInt(aps.planet.molybdenum) }, { res: "tri", value: parseInt(aps.planet.tritanium) } ];
 			} else if (this.ooiPriority == "tri")
 			{
 				loadingSequence = ["tritanium"];
@@ -1348,9 +1348,9 @@ function wrapper () { // wrapper for injection
 				baseSequence = [ { res: "tri", value: parseInt(aps.planet.tritanium) }, { res: "dur", value: parseInt(aps.planet.duranium) } ];
 			}
 			// determine the (remaining) loading sequence by what is needed at base (sink)
-			baseSequence = aps.sortCollection(baseSequence, "value", "desc");
+			baseSequence = aps.sortCollection(baseSequence, "value");
 			baseSequence.forEach(function(seq){ loadingSequence.push(aps.moveables[seq.res]); });
-			console.log(loadingSequence);
+			//console.log(loadingSequence);
 			//
 			// loading
 			//
