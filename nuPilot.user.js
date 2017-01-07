@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable semi-intelligent auto-pilots
-// @version       0.06.07
-// @date          2017-01-06
+// @version       0.06.16
+// @date          2017-01-07
 // @author        drgirasol
 // @include       http://planets.nu/*
 // @include       http://play.planets.nu/*
@@ -817,6 +817,10 @@ function wrapper () { // wrapper for injection
 			console.log(aps.potDest);
 		}
 	};
+    alchemyAPS.prototype.evaluateMissionDestinations = function(aps)
+    {
+        // aps.potDest = aps.potDest;
+    };
 	alchemyAPS.prototype.updateFC = function(aps)
 	{
 		if (this.ooiPriority == "all")
@@ -985,7 +989,7 @@ function wrapper () { // wrapper for injection
 	};
     expanderAPS.prototype.evaluateMissionDestinations = function(aps)
     {
-        return aps.potDest;
+        // aps.potDest = aps.potDest;
     };
 	expanderAPS.prototype.confirmMission = function(aps)
 	{
@@ -1172,12 +1176,32 @@ function wrapper () { // wrapper for injection
     {
         var filteredDest = [];
         console.log("...filtering collector destinations: " + aps.potDest.length);
-        for (var i = 0; i < aps.potDest.length; i++) {
-            // if potential destination is a base of another collector APS that is collecting the same resource(s)
-            if (aps.isAPSbase(aps.potDest[i].pid)) continue;
-            filteredDest.push(aps.potDest);
+        for (var i = 0; i < aps.potDest.length; i++)
+        {
+            var pp = aps.potDest[i];
+            // if potential destination is an APS base
+            if (aps.isAPSbase(pp.pid))
+            {
+                console.log("...potential destination is APS base");
+                if (aps.baseHasSameAPStype(pp.pid, "col", this.ooiPriority))
+                {
+                    console.log("...removing destination " + pp.pid + " due to collector mission conflict");
+                    continue;
+                }
+            }
+            // only use destinations that offer enough minerals
+            if (this.ooiPriority != "mcs")
+            {
+                var futRes = aps.getFutureSurfaceResources(pp, aps.getETA(pp.x, pp.y));
+                var minimal = Math.floor(parseInt(aps.hull.cargo) * this.minimalCargoRatioToGo);
+                if (futRes.buildRes < minimal) {
+                    console.log("...removing destinations: " + pp.id + " due to lack of resources (" + futRes.buildRes + " / " + minimal + ")!");
+                    continue;
+                }
+            }
+            filteredDest.push(pp);
         }
-        return filteredDest;
+        aps.potDest = filteredDest;
     };
 	collectorAPS.prototype.confirmMission = function(aps)
 	{
@@ -1430,7 +1454,18 @@ function wrapper () { // wrapper for injection
 	};
     distributorAPS.prototype.evaluateMissionDestinations = function(aps)
     {
-        return aps.potDest;
+        var potDestAreSources = false;
+        var filteredDest = [];
+        console.log("...filtering distributor destinations: " + aps.potDest.length);
+        if (this.isSource(aps.potDest[0].pid)) potDestAreSources = true;
+        for (var i = 0; i < aps.potDest.length; i++)
+        {
+            // if potDest are sources, remove bases of other APS
+            if (potDestAreSources && aps.isAPSbase(aps.potDest[i].pid)) continue;
+            filteredDest.push(aps.potDest[i]);
+            // if potDest are sinks, we do not filter at this point
+        }
+        aps.potDest = filteredDest;
     };
 	distributorAPS.prototype.confirmMission = function(aps)
 	{
@@ -1509,6 +1544,43 @@ function wrapper () { // wrapper for injection
 		return (transCargo - deficiency);
 	};
 	/*
+	 *  Container for local storage data entries
+	 */
+	function APSdata(data)
+    {
+        this.sid = data.sid;
+        this.base = data.base;
+        this.shipFunction = data.shipFunction;
+        this.ooiPriority = data.ooiPriority;
+        this.destination = data.destination;
+        this.newFunction = data.newFunction;
+        this.newOoiPriority = data.ooiPriority;
+        this.idle = data.idle;
+
+        // set defaults (not already set in data)
+        if (typeof this.destination == "undefined") this.destination = false;
+        if (typeof this.newFunction == "undefined") this.newFunction = false;
+        if (typeof this.newOoiPriority == "undefined") this.newOoiPriority = false;
+        if (typeof this.idle == "undefined") this.idle = false;
+    }
+    APSdata.prototype.getData = function()
+    {
+        // mandatory fields
+        if (typeof this.sid == "undefined") return false;
+        if (typeof this.base == "undefined") return false;
+        if (typeof this.shipFunction == "undefined") return false;
+        return {
+            sid: this.sid,
+            base: this.base,
+            shipFunction: this.shipFunction,
+            ooiPriority: this.ooiPriority,
+            destination: this.destination,
+            newFunction: this.newFunction,
+            newOoiPriority: this.newOoiPriority,
+            idle: this.idle
+        };
+    };
+	/*
      *
      *  Auto Pilot Ship (APS) Object
      *
@@ -1557,6 +1629,9 @@ function wrapper () { // wrapper for injection
 		//
         this.storedData = false; // stored data of APS
         this.apcBaseIds = [];
+        this.apcDestinations = [];
+        this.apcByBase = {};
+        this.apcByShip = {};
 		this.primaryFunction = false;
 		this.objectOfInterest = false;
 		this.functionModule = {};
@@ -1627,10 +1702,29 @@ function wrapper () { // wrapper for injection
         var apsData = autopilot.loadGameData();
         for (var i = 0; i < apsData.length; i++)
         {
-            this.apcBaseIds.push(apsData[i].base);
+            if (apsData[i].sid != this.ship.id)
+            {
+                this.apcBaseIds.push(apsData[i].base);
+                if (apsData[i].destination) this.apcDestinations.push(apsData[i].destination);
+                //
+                if (typeof this.apcByBase[apsData[i].base] == "undefined") this.apcByBase[apsData[i].base] = [];
+                this.apcByBase[apsData[i].base].push({
+                    sid: apsData[i].sid,
+                    destination: apsData[i].destination,
+                    shipFunction: apsData[i].shipFunction,
+                    ooiPriority: apsData[i].ooiPriority
+                });
+                if (typeof this.apcByShip[apsData[i].sid] == "undefined") this.apcByShip[apsData[i].sid] = [];
+                this.apcByShip[apsData[i].sid].push({
+                    base: apsData[i].base,
+                    destination: apsData[i].destination,
+                    shipFunction: apsData[i].shipFunction,
+                    ooiPriority: apsData[i].ooiPriority
+                });
+            }
         }
-        console.log("APCbaseIds");
-        console.log(this.apcBaseIds);
+        console.log("APC By Base");
+        console.log(this.apcByBase);
     };
 	APS.prototype.initializeBoardComputer = function(configuration)
 	{
@@ -1842,6 +1936,24 @@ function wrapper () { // wrapper for injection
     APS.prototype.isAPSbase = function(pid)
     {
         if (this.apcBaseIds.indexOf(pid) > -1) return true;
+        return false;
+    };
+    APS.prototype.baseHasSameAPStype = function(pid, sf, ooi)
+    {
+        for (var i = 0; i < this.apcByBase[pid].length; i++)
+        {
+            console.log("APS " + this.ship.id + " is " + sf + " (" + ooi + ")");
+            console.log("Ship " + this.apcByBase[pid][i].sid + " of base " + pid + " is " + this.apcByBase[pid][i].shipFunction + " (" + this.apcByBase[pid][i].ooiPriority + ")");
+            if (this.apcByBase[pid][i].ooiPriority == "all" && this.apcByBase[pid][i].shipFunction == sf)
+            {
+                return true;
+            } else {
+                if (this.apcByBase[pid][i].shipFunction == sf && this.apcByBase[pid][i].ooiPriority == ooi)
+                {
+                    return true;
+                }
+            }
+        }
         return false;
     };
     APS.prototype.getPositions4Ships = function(sids)
@@ -2075,10 +2187,10 @@ function wrapper () { // wrapper for injection
 	{
 		// function module specific filtering of potential destinations
         this.functionModule.evaluateMissionDestinations(this);
-        // pre filter destinations (e.g. remove destinations located in problematic zones)
+        // gerneral filtering of potential destinations (e.g. remove destinations located in problematic zones)
 		var filteredDest = [];
 		var avoidDest = [];
-		console.log("prefiltering destinations: " + this.potDest.length);
+		console.log("...filtering destinations: " + this.potDest.length);
 		for (var i = 0; i < this.potDest.length; i++)
 		{
 			var potPlanet = vgap.getPlanet(this.potDest[i].pid);
@@ -2088,29 +2200,6 @@ function wrapper () { // wrapper for injection
 			{
 				console.log("...removing destinations: " + potPlanet.id + " - a starbase will be built here!");
 				continue;
-			}
-			// if destination has a starbases but is not the APS' base
-			if (hasBase && hasBase.planetid != this.base.id)
-			{
-				// reject potential destination unless APS is distributing clans
-				if (this.primaryFunction != "dis" && this.objectOfInterest != "cla")
-				{
-					console.log("...removing destinations: " + potPlanet.id + " because it is a base of operations!");
-					continue;
-				}
-			}
-			// this should/may be moved to the potential destination selection process
-			// only use destinations that offer enough minerals
-			if (this.functionModule.ooiPriority != "mcs" && this.primaryFunction == "col")
-			{
-				// too little resources available
-				var futRes = this.getFutureSurfaceResources(potPlanet, this.getETA(potPlanet.x, potPlanet.y));
-				var minimal = Math.floor(parseInt(this.hull.cargo) * this.functionModule.minimalCargoRatioToGo);
-				//console.log("Resources on potential target (in " + this.getETA(potPlanet.x, potPlanet.y) + " turns): " + futRes.buildRes);
-				if (futRes.buildRes < minimal) {
-					console.log("...removing destinations: " + potPlanet.id + " due to lack of resources (" + futRes.buildRes + " / " + minimal + ")!");
-					continue;
-				}
 			}
 			if (this.getMissionConflict(potPlanet))
 			{
@@ -2603,7 +2692,8 @@ function wrapper () { // wrapper for injection
 	/*
 	 * set next stop to destination x, y
 	 */
-	APS.prototype.setShipTarget = function(x, y) {
+	APS.prototype.setShipTarget = function(x, y)
+    {
         if (!this.destination) {
             var dest = vgap.planetAt(x, y);
             if (dest) {
@@ -3235,50 +3325,42 @@ function wrapper () { // wrapper for injection
                 }
             }
         },
-        loadGameData: function()
+        loadGameData: function(data)
         {
-            var storedGameData = null;
-            //if (autopilot.isChromeBrowser)
-            //{
-            //storedGameData = JSON.parse(localStorage.getItem(autopilot.storageId));
-            //    storedGameData = JSON.parse(chrome.storage.sync.get(autopilot.storageId));
-            //}
-            if (storedGameData === null)
-            {
-                storedGameData = JSON.parse(localStorage.getItem(autopilot.storageId));
-            }
+            var storedGameData = JSON.parse(localStorage.getItem(autopilot.storageId));
             if (storedGameData === null) // no storage setup yet
             {
-                return false;
+                if (typeof data == "undefined") return false;
+                var gdo = new APSdata(data);
+                var gameData = gdo.getData();
+                if (gameData)
+                {
+                    storedGameData = [];
+                    storedGameData.push(gameData);
+                    autopilot.saveGameData(storedGameData);
+                    return storedGameData;
+                } else
+                {
+                    return false;
+                }
             } else {
                 return storedGameData;
             }
         },
-		syncLocalStorage: function(data, update)
+		syncLocalStorage: function(data)
 		{
-			if (typeof update == "undefined") update = false; // toDo: redundant?
 			// load data
-			var storedGameData = autopilot.loadGameData();
-			if (!storedGameData) // no storage setup yet
+			var storedGameData = autopilot.loadGameData(data);
+			if (!storedGameData) // error
 			{
-				if (data.ooiPriority == "END") return false; // if turned off 
-				storedGameData = [];
-				// set defaults (not set in inital data)
-				if (typeof data.destination == "undefined") data.destination = false;
-				if (typeof data.newFunction == "undefined") data.newFunction = false;
-				if (typeof data.newOoiPriority == "undefined") data.newOoiPriority = false;
-                if (typeof data.idle == "undefined") data.idle = false;
-				storedGameData.push(data);
-				// save data
-                autopilot.saveGameData(storedGameData);
-				//
-				return data;
+			    console.error("Mandatory field empty!");
+				return false;
 			} else
 			{
 				// storage available...
 				for(var i = 0; i < storedGameData.length; i++)
 				{
-					// ...look for entry of the current APS
+					// ...look for entry of this APS
 					if (storedGameData[i].sid == data.sid)
 					{
 						// if turned off
@@ -3286,7 +3368,7 @@ function wrapper () { // wrapper for injection
 						{
 							storedGameData.splice(i, 1); // delete entry
 							autopilot.clearShipTarget(data.sid);
-							autopilot.clearShipNote(data.sid); // toDO: not working
+							autopilot.clearShipNote(data.sid);
 						} else
 						{
 							// if ship function or priority has been changed...
@@ -3312,29 +3394,18 @@ function wrapper () { // wrapper for injection
 						return storedGameData[i];
 					}
 				}
-				// no data for specific APS available
+				// no stored data for this APS available
 				//
-				// set defaults (not set in inital data)
-				if (typeof data.destination == "undefined") data.destination = false;
-				if (typeof data.newFunction == "undefined") data.newFunction = false;
-				if (typeof data.newOoiPriority == "undefined") data.newOoiPriority = false;
-                if (typeof data.idle == "undefined") data.idle = false;
-				storedGameData.push(data);
+                var gdo = new APSdata(data);
+                var gameData = gdo.getData();
+				storedGameData.push(gameData);
                 autopilot.saveGameData(storedGameData);
 				return data;
 			}
 		},
         saveGameData: function(gameData)
         {
-            //if (autopilot.isChromeBrowser)
-            //{
-            //    var storageObject = {};
-            //    storageObject[autopilot.storageId] = JSON.stringify(gameData);
-            //    storedGameData = JSON.parse(chrome.storage.sync.set(storageObject));
-            //} else
-            //{
             localStorage.setItem(autopilot.storageId, JSON.stringify(gameData));
-            //}
         },
         setupStorage: function()
         {
@@ -3394,9 +3465,9 @@ function wrapper () { // wrapper for injection
 			}
 		},
 		/*
-			 * processload: executed whenever a turn is loaded: either the current turn or
-			 * an older turn through time machine
-			 */
+         * processload: executed whenever a turn is loaded: either the current turn or
+         * an older turn through time machine
+         */
 		processload: function() {
             autopilot.setupStorage();
             var nCols = ["ff3399", "6666ff", "ffc299", "66b3ff", "ff99ff", "6699ff"];
