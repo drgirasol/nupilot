@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable semi-intelligent auto-pilots
-// @version       0.06.20
+// @version       0.06.23
 // @date          2017-01-08
 // @author        drgirasol
 // @include       http://planets.nu/*
@@ -1179,10 +1179,11 @@ function wrapper () { // wrapper for injection
         for (var i = 0; i < aps.potDest.length; i++)
         {
             var pp = aps.potDest[i];
-            // if potential destination is an APS base
-            if (aps.isAPSbase(pp.pid))
+            // if potential destination is not our base but the base of another APS
+            if (pp.pid != aps.base.id && aps.isAPSbase(pp.pid))
             {
                 console.log("...potential destination is APS base");
+                // the base is employing APS of the same type (collector with priority x)
                 if (aps.baseHasSameAPStype(pp.pid, "col", this.ooiPriority))
                 {
                     console.log("...removing destination " + pp.pid + " due to collector mission conflict");
@@ -2116,7 +2117,6 @@ function wrapper () { // wrapper for injection
 		for (var i = 0; i < this.potDest.length; i++)
 		{
 			var potPlanet = vgap.getPlanet(this.potDest[i].pid);
-			var hasBase = vgap.getStarbase(this.potDest[i].pid);
 			if (this.planet && potPlanet.id == this.planet.id) continue; // toDo: current planet can't be a mission destination ?
 			if (potPlanet.note && potPlanet.note.body.match(/nup:base/)) // don't use prospected starbase planets
 			{
@@ -2174,6 +2174,7 @@ function wrapper () { // wrapper for injection
 	};
 	APS.prototype.getMissionConflict = function(potPlanet)
 	{
+	    // todo: module specific handling
 		// Check if potential destination is in the APS control list
 		var storedGameData = autopilot.loadGameData();
 		if (storedGameData === null)
@@ -2203,7 +2204,7 @@ function wrapper () { // wrapper for injection
 				}
 				//var mDestination = vgap.getPlanet(mission[j].pid);
 				if (storedGameData[i].sid == this.ship.id) continue; // skip data from current APS
-				if (storedGameData[i].destination == potPlanet.id)
+				if (potPlanet.id != this.base.id && storedGameData[i].destination == potPlanet.id)
 				{
 					console.warn("Potential destination is already mission destination of another APS!");
 					if (storedGameData[i].shipFunction == this.primaryFunction && storedGameData[i].ooiPriority == this.objectOfInterest)
