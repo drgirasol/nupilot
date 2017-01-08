@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable semi-intelligent auto-pilots
-// @version       0.06.16
-// @date          2017-01-07
+// @version       0.06.20
+// @date          2017-01-08
 // @author        drgirasol
 // @include       http://planets.nu/*
 // @include       http://play.planets.nu/*
@@ -1723,8 +1723,8 @@ function wrapper () { // wrapper for injection
                 });
             }
         }
-        console.log("APC By Base");
-        console.log(this.apcByBase);
+        //console.log("APC By Base");
+        //console.log(this.apcByBase);
     };
 	APS.prototype.initializeBoardComputer = function(configuration)
 	{
@@ -1962,7 +1962,7 @@ function wrapper () { // wrapper for injection
         for(var i = 0; i < sids.length; i++)
         {
             var s = vgap.getShip(sids[i]);
-            frnnPositions.push( { x: s.x , y: s.y } );
+            if (s) frnnPositions.push( { x: s.x , y: s.y } );
         }
         return frnnPositions;
     };
@@ -1989,16 +1989,6 @@ function wrapper () { // wrapper for injection
 		else if (iStorm.voltage >= 100 && iStorm.voltage < 150) { return "strong" }
 		else if (iStorm.voltage >= 150 && iStorm.voltage < 200) { return "dangerous" }
 		else if (iStorm.voltage >= 200) { return "very dangerous" }
-		return false;
-	};
-	APS.prototype.shipHasWeapons = function(ship)
-	{
-		var shipHull = vgap.getHull(ship.hullid);
-		// toDo: the ability to rob the ship, is a weapon. So any privateer ship returns true...
-		if (shipHull.beams > 0 || shipHull.fighterbays > 0 || shipHull.launchers > 0)
-		{
-			return true;
-		}
 		return false;
 	};
 	APS.prototype.sortCollection = function(collection, order, direction)
@@ -2048,20 +2038,6 @@ function wrapper () { // wrapper for injection
 		//console.log("Estimated minimal consumption to target: " + actualConsumption);
 		return actualConsumption;
 	};
-	APS.prototype.getFuelConsumptionEstimate = function(cargo)
-	{
-		// estimation how much fuel we would need
-		// if cargo is set, use those numbers, if not, use the actual cargo
-		var optimalConsumption = this.getOptimalFuelConsumptionEstimate(cargo);
-		if (this.functionModule.energyMode == "max") return this.hull.fueltank; // does not need estimate, we will use complete fuel capacity
-		if (this.functionModule.energyMode == "moderate") return Math.floor(optimalConsumption * 1.2); // we will use 120 % of optimal consumption
-		if (optimalConsumption < 1) {
-			return 1;
-		} else
-		{
-			return optimalConsumption;
-		}
-	};
 	APS.prototype.getFutureSurfaceResources = function(planet, turns)
 	{
 		if (typeof turns == "undefined") turns = 1;
@@ -2107,18 +2083,6 @@ function wrapper () { // wrapper for injection
 			buildRes: (actDur + actTri + actMol)
 		};
 	};
-	APS.prototype.setWarp = function(warp)
-	{
-		this.ship.warp = 0;
-		if (typeof warp == "undefined") this.ship.warp = this.ship.engineid;
-		if (warp > 0 && warp < 10) this.ship.warp = warp;
-        // reduce speed to warp 4, if we are currently inside a minefield
-        if (this.objectInsideMineField( {x: this.ship.x, y: this.ship.y}, false, true ) && this.ship.engineid > 4) this.ship.warp = 4;
-		// set warp 1 if we are moving into or inside warp well
-        if (this.isInWarpWell({x: this.ship.targetx, y: this.ship.targety})) this.ship.warp = 1;
-		// update fuelFactor
-		this.fFactor = this.fuelFactor["t" + this.ship.engineid][this.ship.warp];
-	};
 	APS.prototype.getMiningOutput = function(res, turns)
 	{
 		var resdensity = "density" + res;
@@ -2137,48 +2101,6 @@ function wrapper () { // wrapper for injection
 	APS.prototype.getDistance = function(p1, p2)
 	{
 		return Math.sqrt((Math.pow((parseInt(p1.x) - parseInt(p2.x)),2) + Math.pow((parseInt(p1.y) - parseInt(p2.y)),2)));
-	};
-	APS.prototype.getHullCargoMass = function(cargo)
-	{
-		var hullCargoMass = this.hull.mass;
-		var maxHullCargoMass = this.hull.mass + this.hull.cargo;
-		if (typeof cargo !== "undefined" && cargo.length > 0)
-		{
-			cargo.forEach(function(comp) { hullCargoMass += parseInt(comp); });
-			if (hullCargoMass > maxHullCargoMass) hullCargoMass = maxHullCargoMass;
-		} else
-		{
-			var components = [
-				this.ship.duranium,
-				this.ship.tritanium,
-				this.ship.molybdenum,
-				this.ship.supplies,
-				this.ship.ammo, // torpedos or fighters
-				this.ship.clans
-			];
-			components.forEach(function(comp) { hullCargoMass += parseInt(comp); });
-		}
-		//console.log("APS hull cargo mass: " + hullCargoMass);
-		return hullCargoMass;
-	};
-	APS.prototype.getFuelCapacity = function()
-	{
-		return (parseInt(this.hull.fueltank) - parseInt(this.ship.neutronium));
-	};
-	APS.prototype.getCargoCapacity = function()
-	{
-		var cargoCapacity = this.hull.cargo;
-		var components = [
-			this.ship.duranium,
-			this.ship.tritanium,
-			this.ship.molybdenum,
-			this.ship.supplies,
-			this.ship.ammo, // torpedos or fighters
-			this.ship.clans
-		];
-		components.forEach(function(comp) { cargoCapacity -= parseInt(comp); });
-		//console.log("APS cargo capacity: " + cargoCapacity);
-		return cargoCapacity;
 	};
 	/*
 	 *  mission specifics
@@ -2722,13 +2644,15 @@ function wrapper () { // wrapper for injection
             adjustment += 10;
             if (adjustment > 500) break;
             turnTargets = this.getTurnTargets(this.ship, destinationPlanet, adjustment);
-            console.log("...found " + turnTargets.length + " turn-targets within a " + (this.simpleRange + adjustment) + " ly radius...");
+            //console.log("...found " + turnTargets.length + " turn-targets within a " + (this.simpleRange + adjustment) + " ly radius...");
         }
         if (turnTargets.length > 0) {
             var tP = vgap.planetAt(turnTargets[0].x, turnTargets[0].y);
             if (this.isSaveShipTarget(tP))
+            {
                 this.ship.targetx = tP.x;
-            this.ship.targety = tP.y;
+                this.ship.targety = tP.y;
+            }
         } else {
             // toDo... if danger is closing in on current position... flee
             //
@@ -2820,6 +2744,72 @@ function wrapper () { // wrapper for injection
         }
     };
 	// Ship specifics
+    APS.prototype.getHullCargoMass = function(cargo)
+    {
+        var hullCargoMass = this.hull.mass;
+        var maxHullCargoMass = this.hull.mass + this.hull.cargo;
+        if (typeof cargo !== "undefined" && cargo.length > 0)
+        {
+            cargo.forEach(function(comp) { hullCargoMass += parseInt(comp); });
+            if (hullCargoMass > maxHullCargoMass) hullCargoMass = maxHullCargoMass;
+        } else
+        {
+            var components = [
+                this.ship.duranium,
+                this.ship.tritanium,
+                this.ship.molybdenum,
+                this.ship.supplies,
+                this.ship.ammo, // torpedos or fighters
+                this.ship.clans
+            ];
+            components.forEach(function(comp) { hullCargoMass += parseInt(comp); });
+        }
+        //console.log("APS hull cargo mass: " + hullCargoMass);
+        return hullCargoMass;
+    };
+    APS.prototype.getFuelCapacity = function()
+    {
+        return (parseInt(this.hull.fueltank) - parseInt(this.ship.neutronium));
+    };
+    APS.prototype.getCargoCapacity = function()
+    {
+        var cargoCapacity = this.hull.cargo;
+        var components = [
+            this.ship.duranium,
+            this.ship.tritanium,
+            this.ship.molybdenum,
+            this.ship.supplies,
+            this.ship.ammo, // torpedos or fighters
+            this.ship.clans
+        ];
+        components.forEach(function(comp) { cargoCapacity -= parseInt(comp); });
+        //console.log("APS cargo capacity: " + cargoCapacity);
+        return cargoCapacity;
+    };
+    APS.prototype.getFuelConsumptionEstimate = function(cargo)
+    {
+        // estimation how much fuel we would need
+        // if cargo is set, use those numbers, if not, use the actual cargo
+        var optimalConsumption = this.getOptimalFuelConsumptionEstimate(cargo);
+        if (this.functionModule.energyMode == "max") return this.hull.fueltank; // does not need estimate, we will use complete fuel capacity
+        if (this.functionModule.energyMode == "moderate") return Math.floor(optimalConsumption * 1.2); // we will use 120 % of optimal consumption
+        if (optimalConsumption < 1) {
+            return 1;
+        } else
+        {
+            return optimalConsumption;
+        }
+    };
+    APS.prototype.shipHasWeapons = function(ship)
+    {
+        var shipHull = vgap.getHull(ship.hullid);
+        // toDo: the ability to rob the ship, is a weapon. So any privateer ship returns true...
+        if (shipHull.beams > 0 || shipHull.fighterbays > 0 || shipHull.launchers > 0)
+        {
+            return true;
+        }
+        return false;
+    };
 	APS.prototype.getShipMass = function(cargo)
 	{
 		var shipMass = 0;
@@ -2843,6 +2833,18 @@ function wrapper () { // wrapper for injection
 		components.forEach(function(comp) { shipMass += parseInt(comp); });
 		return shipMass;
 	};
+    APS.prototype.setWarp = function(warp)
+    {
+        this.ship.warp = 0;
+        if (typeof warp == "undefined") this.ship.warp = this.ship.engineid;
+        if (warp > 0 && warp < 10) this.ship.warp = warp;
+        // reduce speed to warp 4, if we are currently inside a minefield
+        if (this.objectInsideMineField( {x: this.ship.x, y: this.ship.y}, false, true ) && this.ship.engineid > 4) this.ship.warp = 4;
+        // set warp 1 if we are moving into or inside warp well
+        if (this.isInWarpWell({x: this.ship.targetx, y: this.ship.targety})) this.ship.warp = 1;
+        // update fuelFactor
+        this.fFactor = this.fuelFactor["t" + this.ship.engineid][this.ship.warp];
+    };
 	APS.prototype.setRange = function()
 	{
 		this.maxRange = this.getShipRange(false, [this.hull.mass, this.hull.cargo], this.hull.fueltank);
@@ -2916,6 +2918,7 @@ function wrapper () { // wrapper for injection
 			t9: [0,100,400,900,1600,2500,3600,4900,6400,8100]
 		},
         isChromeBrowser: false,
+        realTurn: false,
 		populateFrnnCollections: function()
 		{
 			autopilot.populateFrnnPlanets();
@@ -3037,6 +3040,26 @@ function wrapper () { // wrapper for injection
 			}
 			return freeClans;
 		},
+        scanReports: function()
+        {
+            // check messages for combat reports where APS might have been destroyed...
+            // this is necessary due to the recycling of shipIDs
+            vgap.messages.forEach(function (msg) {
+                if (msg.template == "shipdestroyed")
+                {
+                    if (msg.ownerid == vgap.player.id)
+                    {
+                        // if target is a APS, delete local storage entry
+                        var apsData = autopilot.isInStorage(msg.target);
+                        if (apsData)
+                        {
+                            apsData.ooiPriority = "END";
+                            autopilot.syncLocalStorage(apsData);
+                        }
+                    }
+                }
+            });
+        },
 		getFreeClans: function(planet)
 		{
 			var mines = planet.mines;
@@ -3324,6 +3347,7 @@ function wrapper () { // wrapper for injection
                     }
                 }
             }
+            return false;
         },
         loadGameData: function(data)
         {
@@ -3409,6 +3433,9 @@ function wrapper () { // wrapper for injection
         },
         setupStorage: function()
         {
+            if (typeof(localStorage) == "undefined") {
+                console.warn("Sorry! No Web Storage support..");
+            }
             var isChromium = window.chrome,
                 winNav = window.navigator,
                 vendorName = winNav.vendor,
@@ -3469,95 +3496,102 @@ function wrapper () { // wrapper for injection
          * an older turn through time machine
          */
 		processload: function() {
-            autopilot.setupStorage();
-            var nCols = ["ff3399", "6666ff", "ffc299", "66b3ff", "ff99ff", "6699ff"];
-			if (typeof(localStorage) !== "undefined") {
-				//console.log(localStorage); // Code for localStorage/sessionStorage.
-			} else {
-				console.warn("Sorry! No Web Storage support..");
-			}
-			// toDo: return if an old turn is loaded?
-			autopilot.populateFrnnCollections();
-			console.log(vgap);
-            //
-            // APS - Initial setup...
-            //
-			var noteColByBase = {}; // color of note text
-			var apsControl = [];
-			vgap.myships.forEach(function(ship) {
-				var aps = {};
-				var cfgData = autopilot.isInStorage(ship.id);
-				if (cfgData)
-				{
-					// if configuration is available in storage
-					aps = new APS(ship, cfgData);
-					if (noteColByBase[aps.base.id])
+            console.log(vgap);
+            console.log("realTurn = " + autopilot.realTurn + " / " + vgap.game.turn);
+            if (!autopilot.realTurn || autopilot.realTurn < vgap.game.turn)
+            {
+                autopilot.realTurn = vgap.game.turn;
+            }
+            console.log("realTurn = " + autopilot.realTurn + " / " + vgap.game.turn);
+            //console.log(vgap.game.turn);
+		    if (autopilot.realTurn == vgap.game.turn) // only act, when we are in the present
+            {
+                autopilot.setupStorage();
+                autopilot.scanReports();
+                // toDo: return if an old turn is loaded?
+                autopilot.populateFrnnCollections();
+                //
+                // APS - Initial setup...
+                //
+                var nCols = ["ff3399", "6666ff", "ffc299", "66b3ff", "ff99ff", "6699ff"];
+                var noteColByBase = {}; // color of note text
+                var apsControl = [];
+                vgap.myships.forEach(function(ship) {
+                    var aps = {};
+                    var cfgData = autopilot.isInStorage(ship.id);
+                    if (cfgData)
                     {
-                        aps.noteColor = noteColByBase[aps.base.id];
-                    } else
-                    {
-                        if (nCols.length > 0)
+                        // if configuration is available in storage
+                        aps = new APS(ship, cfgData);
+                        if (noteColByBase[aps.base.id])
                         {
-                            noteColByBase[aps.base.id] = nCols.shift();
                             aps.noteColor = noteColByBase[aps.base.id];
-                        } else {
-                            aps.noteColor = "ffffff";
+                        } else
+                        {
+                            if (nCols.length > 0)
+                            {
+                                noteColByBase[aps.base.id] = nCols.shift();
+                                aps.noteColor = noteColByBase[aps.base.id];
+                            } else {
+                                aps.noteColor = "ffffff";
+                            }
                         }
                     }
-				}
-				if (aps.isAPS)
-				{
-					// add APS to APS-list
-					apsControl.push(aps);
-				}
-			});
-            //
-            // APS that arrived at destination have been unloaded...
-            //
-			autopilot.collectSourceSinkData();
-            //
-            // APS without mission destination need to determine potential destinations
-            //
-			apsControl.forEach(function(shipcontrol) {
-				if (shipcontrol.hasToSetPotDes)
-				{
-					console.error("Set potential destinations for APS " + shipcontrol.ship.id);
-					shipcontrol.functionModule.setPotentialDestinations(shipcontrol);
-				}
-			});
-            //
-            // APS with potential mission destinations now evaluate the and pick target(s)
-            //
-			apsControl.forEach(function(shipcontrol) {
-                if (shipcontrol.potDest.length > 0)
-                {
-                    console.error("Setting mission destination of APS " + shipcontrol.ship.id);
-                    shipcontrol.setMissionDestination();
-                }
+                    if (aps.isAPS)
+                    {
+                        // add APS to APS-list
+                        apsControl.push(aps);
+                    }
+                });
                 //
-                shipcontrol.confirmMission();
-                shipcontrol.updateNote();
-			});
-			apsControl.forEach(function(shipcontrol)
-			{
-				// retry idle ships
-                if (shipcontrol.isIdle)
-                {
-                    console.error("Retry idle ship " + shipcontrol.ship.id);
-                    if (!shipcontrol.destination)
+                // APS that arrived at destination have been unloaded...
+                //
+                autopilot.collectSourceSinkData();
+                //
+                // APS without mission destination need to determine potential destinations
+                //
+                apsControl.forEach(function(shipcontrol) {
+                    if (shipcontrol.hasToSetPotDes)
                     {
                         console.error("Set potential destinations for APS " + shipcontrol.ship.id);
                         shipcontrol.functionModule.setPotentialDestinations(shipcontrol);
-                        if (shipcontrol.potDest.length > 0)
-                        {
-                            console.error("Setting mission destination of APS " + shipcontrol.ship.id);
-                            shipcontrol.setMissionDestination();
-                        }
                     }
+                });
+                //
+                // APS with potential mission destinations now evaluate the and pick target(s)
+                //
+                apsControl.forEach(function(shipcontrol) {
+                    if (shipcontrol.potDest.length > 0)
+                    {
+                        console.error("Setting mission destination of APS " + shipcontrol.ship.id);
+                        shipcontrol.setMissionDestination();
+                    }
+                    //
                     shipcontrol.confirmMission();
                     shipcontrol.updateNote();
-                }
-            });
+                });
+                apsControl.forEach(function(shipcontrol)
+                {
+                    // retry idle ships
+                    if (shipcontrol.isIdle)
+                    {
+                        console.error("Retry idle ship " + shipcontrol.ship.id);
+                        if (!shipcontrol.destination)
+                        {
+                            console.error("Set potential destinations for APS " + shipcontrol.ship.id);
+                            shipcontrol.functionModule.setPotentialDestinations(shipcontrol);
+                            if (shipcontrol.potDest.length > 0)
+                            {
+                                console.error("Setting mission destination of APS " + shipcontrol.ship.id);
+                                shipcontrol.setMissionDestination();
+                            }
+                        }
+                        shipcontrol.confirmMission();
+                        shipcontrol.updateNote();
+                    }
+                });
+            }
+            console.log(vgap.messages);
 		},
 		/*
          * loaddashboard: executed to rebuild the dashboard content after a turn is loaded
