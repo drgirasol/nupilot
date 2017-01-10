@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable semi-intelligent auto-pilots
-// @version       0.06.37
+// @version       0.06.41
 // @date          2017-01-08
 // @author        drgirasol
 // @include       http://planets.nu/*
@@ -1823,6 +1823,7 @@ function wrapper () { // wrapper for injection
         for (var i = 0; i < ionStorms.length; i++)
         {
             var curDistToIonStormCenter = Math.floor(this.getDistance({x: ionStorms[i].x, y: ionStorms[i].y}, {x: object.x, y: object.y}));
+            // toDo: consider distance next turn
             if (strict) // only true if object is INSIDE ionstorm
             {
                 if (ionStorms[i].radius > curDistToIonStormCenter) return ionStorms[i];
@@ -2313,23 +2314,26 @@ function wrapper () { // wrapper for injection
     {
         // toDo: planets in radiation zones, if you don't have special shielding
         //
-        var ionStorm = this.objectInsideIonStorm(planet);
+        var ionStorm = this.objectInsideIonStorm(planet); // strict
         if (ionStorm)
         {
-            //console.log("planet is inside ionstorm (" + Math.floor(ionStorm.voltage * 1.2) + "V)!");
             if (Math.floor(ionStorm.voltage * 1.2) > 150)
             {
-                console.log("...position is inside ~dangerous ion storm!");
+                console.log("...planet (" + planet.id + ") is inside ~dangerous ion storm!");
                 return false;
             }
         }
         if (this.objectInsideMineField(planet, true, true)) return true; //  position is protected by minefield
         if (this.objectInsideMineField(planet, false, true)) // don't visit planets in enemy minefields
         {
-            console.log("...position is inside / close to minefield!");
+            console.log("...planet (" + planet.id + ") is inside minefield!");
             return false;
         }
-        return !this.objectInRangeOfEnemy(planet);
+        if (this.objectInRangeOfEnemy(planet)) // toDo: not if object (planet) is protected by weaponized ships (with primary enemy? with kill mission?)
+        {
+            console.log("...planet (" + planet.id + ") is close to enemy!");
+            return false;
+        }
     };
     APS.prototype.getObjectsInRangeOf = function(objects, range, of)
     {
@@ -2553,6 +2557,19 @@ function wrapper () { // wrapper for injection
 		}
 		return this.ship[object];
 	};
+	APS.prototype.escapeToWarpWell = function()
+    {
+        if (this.isInWarpWell())
+        {
+            console.log("We are in warp well...");
+            // toDo: do we have to move? are there enemy ships close by?
+        } else {
+            console.log("Moving into warp well...");
+            var coords = this.getRandomWarpWellEntryPosition();
+            this.ship.targetx = coords.x;
+            this.ship.targety = coords.y;
+        }
+    };
 	/*
 	 * set next stop to destination x, y
 	 */
@@ -2581,40 +2598,40 @@ function wrapper () { // wrapper for injection
             if (adjustment > 500) break;
             turnTargets = this.getTurnTargets(this.ship, dP, adjustment);
         }
-        if (turnTargets.length > 0) {
-            var tP = vgap.planetAt(turnTargets[0].x, turnTargets[0].y);
-            if (this.isSavePosition(tP))
+        if (turnTargets.length > 0)
+        {
+            if (turnTargets.length > 1)
             {
-                this.ship.targetx = tP.x;
-                this.ship.targety = tP.y;
-            }
-        } else {
-            // toDo... if danger is closing in on current position... flee
-            //
-            if (turnTargets.length > 1) {
-                tP = vgap.planetAt(turnTargets[1].x, turnTargets[1].y);
-                console.log("Current target is unsave... try one alternative...");
-                if (this.isSavePosition(tP)) {
+                var i = 0;
+                var tP = vgap.planetAt(turnTargets[i].x, turnTargets[i].y);
+                var isSave = this.isSavePosition(tP);
+                while(!isSave && i < turnTargets.length)
+                {
+                    i++;
+                    tP = vgap.planetAt(turnTargets[i].x, turnTargets[i].y);
+                    isSave = this.isSavePosition(tP);
+                }
+                if (isSave)
+                {
                     this.ship.targetx = tP.x;
                     this.ship.targety = tP.y;
                 } else {
-                    console.log("Primary and alternative targets are unsave...");
-                    if (this.isInWarpWell()) {
-                        console.log("We are in warp well...");
-                        // toDo: do we have to move? are there enemy ships close by?
-                    } else {
-                        console.log("Moving into warp well...");
-                        var coords = this.getRandomWarpWellEntryPosition();
-                        this.ship.targetx = coords.x;
-                        this.ship.targety = coords.y;
-                    }
+                    this.escapeToWarpWell();
                 }
-            } else {
-                // toDo: no turntargets... should be almost impossible... if player has only 1 planet left?
-                console.log("No turn targets... stay at current position...");
-                this.ship.targetx = this.ship.x;
-                this.ship.targety = this.ship.y;
+            } else
+            {
+                var tP = vgap.planetAt(turnTargets[0].x, turnTargets[0].y);
+                if (this.isSavePosition(tP))
+                {
+                    this.ship.targetx = tP.x;
+                    this.ship.targety = tP.y;
+                } else
+                {
+                    this.escapeToWarpWell();
+                }
             }
+        } else {
+            this.escapeToWarpWell();
         }
     };
 	APS.prototype.updateStoredData = function()
@@ -3560,7 +3577,7 @@ function wrapper () { // wrapper for injection
                     }
                 });
             }
-            console.log(vgap.messages);
+            //console.log(vgap.messages);
 		},
 		/*
          * loaddashboard: executed to rebuild the dashboard content after a turn is loaded
