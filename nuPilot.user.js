@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable semi-intelligent auto-pilots
-// @version       0.06.56
+// @version       0.06.64
 // @date          2017-01-08
 // @author        drgirasol
 // @include       http://planets.nu/*
@@ -1034,7 +1034,7 @@ function wrapper () { // wrapper for injection
 	 */
 	function collectorAPS()
 	{
-		this.minimalCargoRatioToGo = 0.25; // in percent of cargo capacity (e.g. 0.7 = 70%)
+		this.minimalCargoRatioToGo = 0.5; // in percent of cargo capacity (e.g. 0.7 = 70%)
 		this.cruiseMode = "safe"; // safe = 1-turn-connetions, fast = direct if faster, direct = always direct
 		this.energyMode = "conservative"; // conservative = use only the required amount of fuel, moderate = use 20 % above required amount, max = use complete tank capacity
         this.ooiPriority = "all"; // object of interest (ooi) priority: "all" (=dur, tri, mol), "dur", "tri", "mol", "mcs", "sup", "cla"
@@ -1079,6 +1079,11 @@ function wrapper () { // wrapper for injection
 	collectorAPS.prototype.setSources = function(aps)
 	{
 		this.setScopeRange(aps);
+		var devisor = aps.hull.cargo;
+		if (this.ooiPriority == "mcs" || this.ooiPriority == "neu")
+        {
+            devisor = this.devideThresh;
+        }
 		var targetsInRange = aps.getTargetsInRange(autopilot.frnnOwnPlanets, aps.base.x, aps.base.y, aps.scopeRange);
 		//
 		for (var i = 0; i < targetsInRange.length; i++)
@@ -1086,35 +1091,22 @@ function wrapper () { // wrapper for injection
 			var tPlanet = vgap.planetAt(targetsInRange[i].x, targetsInRange[i].y);
 			// check 4 conflicts
 			if (aps.getMissionConflict(tPlanet.id)) continue;
-			var distance = Math.floor(aps.getDistance({x: tPlanet.x, y: tPlanet.y}, {x:aps.ship.x ,y:aps.ship.y}));
-			var tValue = this.getObjectExcess(tPlanet);
+			var distance = Math.floor(aps.getDistance( {x: tPlanet.x, y: tPlanet.y}, {x:aps.ship.x ,y:aps.ship.y} ));
+			var tValue = aps.getObjectExcess(tPlanet);
 			this.sources.push( { x: tPlanet.x, y: tPlanet.y, pid: tPlanet.id, value: tValue, distance: distance } );
 		}
-		this.sources = aps.getDevidedCollection(this.sources, "value", this.devideThresh, "distance");
-	};
-	collectorAPS.prototype.getObjectExcess = function(object)
-    {
-        var tValue = 0;
-        if (this.ooiPriority == "all")
+		// devide collection (this.sources) by "value" threshold, and sort by "distance"
+		//this.sources = aps.getDevidedCollection(this.sources, "value", this.devideThresh, "distance");
+        // devide collection in optimal (within +/- 10% of "value" thresh) and suboptimal sources, both sorted by "distance" and concatenated
+        var tempSources = aps.getOptimalCollection(this.sources, "value", devisor, "distance");
+		if (!tempSources)
         {
-            // amount of all resources that are used to build ships
-            tValue = parseInt(object.duranium) + parseInt(object.tritanium) + parseInt(object.molybdenum);
-        } else if (this.ooiPriority == "cla")
-        {
-            // amount of free clans
-            tValue = autopilot.getFreeClans(object);
-        } else if (this.ooiPriority == "mcs")
-        {
-            // amount of theoretical cash (megacredits and supplies)
-            tValue = parseInt(object.megacredits) + parseInt(object.supplies);
-            // if we don't want to sell supplies on bovinoid planets we only count megacredits
-            if (object.nativeracename == "Bovinoid" && this.sellSupply == "notBov") tValue = object.megacredits;
+            this.sources = aps.getDevidedCollection(this.sources, "value", devisor, "distance");
         } else
         {
-            tValue = parseInt(object[aps.moveables[this.ooiPriority]]);
+            this.sources = tempSources;
         }
-        return tValue;
-    };
+	};
 	collectorAPS.prototype.setPotentialDestinations = function(aps)
 	{
 		if (aps.destination) return;
@@ -1129,8 +1121,6 @@ function wrapper () { // wrapper for injection
 			// if we are at base (sink), set sources as potential destinations
 			console.log("...for collector at base (sink)...");
 			aps.potDest = this.sources;
-			// sort by value... high to low
-			aps.potDest = aps.sortCollection(aps.potDest, "value", "desc");
 		} else
 		{
 			// set base as only potential destination, if we are at a source
@@ -2293,6 +2283,40 @@ function wrapper () { // wrapper for injection
             this.escapeToWarpWell();
         }
     };
+    APS.prototype.getOptimalCollection = function(collection, devisor, thresh, order, direction)
+    {
+        var min = 0.9;
+        var max = 1.1;
+        //
+        var pileA = [];
+        var pileB = [];
+        // default sorting by distance
+        if (typeof order == "undefined") order = "distance";
+        // default sorting - from low to high (ascending)
+        if (typeof direction == "undefined") direction = "asc";
+        //
+        //console.log("Splitting the collection at " + thresh);
+        for(var i = 0; i < collection.length; i++)
+        {
+            //console.log("Value = " + collection[i][devisor]);
+            if ((collection[i][devisor] * -1) > (thresh * min) && (collection[i][devisor] * -1) < (thresh * max))
+            {
+                pileA.push(collection[i]);
+            } else
+            {
+                pileB.push(collection[i]);
+            }
+        }
+        if (pileA.length == 0)
+        {
+            return false;
+        } else
+        {
+            pileA = this.sortCollection(pileA, order, direction);
+            pileB = this.sortCollection(pileB, order, direction);
+            return [].concat(pileA, pileB);
+        }
+    };
 	APS.prototype.getDevidedCollection = function(collection, devisor, thresh, order, direction)
 	{
 		var pileA = [];
@@ -2314,34 +2338,8 @@ function wrapper () { // wrapper for injection
 				pileB.push(collection[i]);
 			}
 		}
-		var returnIfSmaller = -1;
-		var returnIfBigger = 1;
-		if (direction == "desc")
-		{
-			// sorting from high to low
-			returnIfSmaller = 1;
-			returnIfBigger = -1;
-		}
-		pileA.sort(
-			function(a, b)
-			{
-				var x = a[order];
-				var y = b[order];
-				if (x < y) {return returnIfSmaller;}
-				if (x > y) {return returnIfBigger;}
-				return 0;
-			}
-		);
-		pileB.sort(
-			function(a, b)
-			{
-				var x = a[order];
-				var y = b[order];
-				if (x < y) {return returnIfSmaller;}
-				if (x > y) {return returnIfBigger;}
-				return 0;
-			}
-		);
+		pileA = this.sortCollection(pileA, order, direction);
+		pileB = this.sortCollection(pileB, order, direction);
 		return [].concat(pileA, pileB);
 	};
 	APS.prototype.getDevisionThresh = function()
@@ -2716,6 +2714,29 @@ function wrapper () { // wrapper for injection
             // toDo: warp well entry from space
             return { x: this.ship.x, y: this.ship.y };
         }
+    };
+    APS.prototype.getObjectExcess = function(object)
+    {
+        var tValue = 0;
+        if (this.functionModule.ooiPriority == "all")
+        {
+            // amount of all resources that are used to build ships
+            tValue = parseInt(object.duranium) + parseInt(object.tritanium) + parseInt(object.molybdenum);
+        } else if (this.functionModule.ooiPriority == "cla")
+        {
+            // amount of free clans
+            tValue = autopilot.getFreeClans(object);
+        } else if (this.functionModule.ooiPriority == "mcs")
+        {
+            // amount of theoretical cash (megacredits and supplies)
+            tValue = parseInt(object.megacredits) + parseInt(object.supplies);
+            // if we don't want to sell supplies on bovinoid planets we only count megacredits
+            if (object.nativeracename == "Bovinoid" && this.functionModule.sellSupply == "notBov") tValue = object.megacredits;
+        } else
+        {
+            tValue = parseInt(object[this.moveables[this.functionModule.ooiPriority]]);
+        }
+        return tValue;
     };
 	// Ship specifics
     APS.prototype.getHullCargoMass = function(scargo)
