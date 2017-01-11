@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable semi-intelligent auto-pilots
-// @version       0.06.41
+// @version       0.06.42
 // @date          2017-01-08
 // @author        drgirasol
 // @include       http://planets.nu/*
@@ -2329,7 +2329,7 @@ function wrapper () { // wrapper for injection
             console.log("...planet (" + planet.id + ") is inside minefield!");
             return false;
         }
-        if (this.objectInRangeOfEnemy(planet)) // toDo: not if object (planet) is protected by weaponized ships (with primary enemy? with kill mission?)
+        if (this.objectInRangeOfEnemy(planet)) // toDo: not if object (planet) is protected by weaponized ship(s) (with primary enemy? with kill mission?)
         {
             console.log("...planet (" + planet.id + ") is close to enemy!");
             return false;
@@ -2588,7 +2588,7 @@ function wrapper () { // wrapper for injection
         // distance from current location to destination planet
         var curPosDistance = Math.floor(this.getDistance({x: this.ship.x, y: this.ship.y}, {x: dP.x, y: dP.y}));
         //
-        console.log("Turntargets: " + adjustment);
+        console.log("Turntargets:");
         console.log(turnTargets);
         //console.log(turnTargets);
         //
@@ -2600,15 +2600,16 @@ function wrapper () { // wrapper for injection
         }
         if (turnTargets.length > 0)
         {
+            var i = 0;
             if (turnTargets.length > 1)
             {
-                var i = 0;
-                var tP = vgap.planetAt(turnTargets[i].x, turnTargets[i].y);
+                var tP = vgap.getPlanet(turnTargets[i].pid);
                 var isSave = this.isSavePosition(tP);
-                while(!isSave && i < turnTargets.length)
+                while(!isSave && i < (turnTargets.length - 1))
                 {
+                    console.log("check target " + i);
                     i++;
-                    tP = vgap.planetAt(turnTargets[i].x, turnTargets[i].y);
+                    tP = vgap.getPlanet(turnTargets[i].pid);
                     isSave = this.isSavePosition(tP);
                 }
                 if (isSave)
@@ -2620,7 +2621,7 @@ function wrapper () { // wrapper for injection
                 }
             } else
             {
-                var tP = vgap.planetAt(turnTargets[0].x, turnTargets[0].y);
+                var tP = vgap.getPlanet(turnTargets[0].pid);
                 if (this.isSavePosition(tP))
                 {
                     this.ship.targetx = tP.x;
