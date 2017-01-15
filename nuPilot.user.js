@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable semi-intelligent auto-pilots
-// @version       0.06.74
+// @version       0.06.75
 // @date          2017-01-08
 // @author        drgirasol
 // @include       http://planets.nu/*
@@ -1234,7 +1234,11 @@ function wrapper () { // wrapper for injection
             // only use destinations that offer enough minerals
             if (this.ooiPriority != "mcs")
             {
-                var futRes = aps.getFutureSurfaceResources(pp, aps.getETA(pp.x, pp.y));
+                var dPlanet = vgap.getPlanet(pp.pid);
+                var futRes = aps.getFutureSurfaceResources(dPlanet, aps.getETA(pp.x, pp.y));
+                console.log(" FUTURE RESOURCES: " + futRes.buildRes);
+                console.log(futRes);
+                console.log(aps.getETA(pp.x, pp.y));
                 var minimal = Math.floor(parseInt(aps.hull.cargo) * this.minimalCargoRatioToGo);
                 if (futRes.buildRes < minimal) {
                     console.log("...removing destinations: " + pp.id + " due to lack of resources (" + futRes.buildRes + " / " + minimal + ")!");
@@ -2452,10 +2456,7 @@ function wrapper () { // wrapper for injection
                 //turnTargets[i].fuel = futRes.neutronium;
                 //turnTargets[i].pid = tP.id;
                 closerTurnTargets.push(turnTargets[i]);
-                continue;
             }
-            console.log(nextPosDistance);
-            console.log(curPosDistance);
 		}
 		// sort the targets by distance
         closerTurnTargets.sort(function(a, b) {
