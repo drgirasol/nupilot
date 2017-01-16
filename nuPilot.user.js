@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable semi-intelligent auto-pilots
-// @version       0.06.75
+// @version       0.06.81
 // @date          2017-01-08
 // @author        drgirasol
 // @include       http://planets.nu/*
@@ -931,44 +931,57 @@ function wrapper () { // wrapper for injection
 	expanderAPS.prototype.setSinks = function(aps)
 	{
 		// as expander, each unowned planet is a sink
-		this.sinks = autopilot.frnnUnownedPlanets;
 		// and the object of interest will always be clans
         // however, if it would be known that there are natives (bioscan) priority could be used for those planets
         // the same goes for planets where the resources are known
-        var amorph = [];
-		for (var i = 0; i < this.sinks.length; i++)
-		{
-			var sinkPlanet = vgap.getPlanet(this.sinks[i].pid);
-            this.frnnSinks.push({x: sinkPlanet.x, y: sinkPlanet.y}); // redundant?
-            var shipsAtSink = vgap.shipsAt(sinkPlanet.x, sinkPlanet.y);
-            if (shipsAtSink.length > 0)
+        var k = 0;
+        var targetsInRange = [];
+        //var targetsInRange = aps.getTargetsInRange(autopilot.frnnUnownedPlanets, aps.base.x, aps.base.y, aps.simpleRange*k);
+        while(targetsInRange.length < 1)
+        {
+            k++;
+            if (k > 20) break;
+            targetsInRange = aps.getTargetsInRange(autopilot.frnnUnownedPlanets, aps.base.x, aps.base.y, aps.simpleRange*k);
+            console.log("... potential targets: " + targetsInRange.length);
+            if (targetsInRange.length > 0)
             {
-                this.sinks.splice(i, 1);
+                for (var i = 0; i < targetsInRange.length; i++)
+                {
+                    var shipsAtSink = vgap.shipsAt(targetsInRange[i].x, targetsInRange[i].y);
+                    var p = vgap.planetAt(targetsInRange[i].x, targetsInRange[i].y);
+                    if (shipsAtSink.length > 0)
+                    {
+                        console.log("... there are ships at sink... removing planet " + p.id);
+                        targetsInRange.splice(i, 1);
+                    }
+                }
+            }
+        }
+        var amorph = [];
+        var potential = [];
+		for (var i = 0; i < targetsInRange.length; i++)
+		{
+			var sP = vgap.planetAt(targetsInRange[i].x, targetsInRange[i].y);
+			var distance = Math.floor(aps.getDistance({x: sP.x, y: sP.y}, {x:aps.ship.x ,y:aps.ship.y}));
+            var deficiency = 150;
+            if (sP.temp > -1) deficiency = autopilot.getMaxColonistPopulation(sP) * -1;
+            //
+            this.frnnSinks.push({x: sP.x, y: sP.y}); // redundant?
+            //
+            if (sP.nativeracename == "Amorphous")
+            {
+                console.log("... there are amorphous natives living on " + sP.id + " ... sorting to the back...");
+                amorph.push({ x: sP.x, y: sP.y, pid: sP.id, distance: distance, deficiency: deficiency });
                 continue;
             }
-			var distance = Math.floor(aps.getDistance({x: sinkPlanet.x, y: sinkPlanet.y}, {x:aps.ship.x ,y:aps.ship.y}));
-			this.sinks[i].deficiency = 150;
-			if (sinkPlanet.temp > -1) this.sinks[i].deficiency = autopilot.getMaxColonistPopulation(sinkPlanet) * -1;
-			this.sinks[i].distance = distance;
-			// data already known...
-			this.sinks[i].x = sinkPlanet.x;
-			this.sinks[i].y = sinkPlanet.y;
-
-            if (sinkPlanet.nativeracename == "Amorphous")
-            {
-                amorph.push(this.sinks[i]);
-                this.sinks.splice(i, 1);
-            }
+            potential.push({ x: sP.x, y: sP.y, pid: sP.id, distance: distance, deficiency: deficiency });
 		}
-		if (amorph.length > 0)
+        this.sinks = aps.sortCollection(potential, "distance");
+        if (amorph.length > 0)
         {
             // putting amorph planets to the end of the line...
             this.sinks.concat(amorph);
         }
-        this.sinks = aps.sortCollection(this.sinks, "distance");
-        // priorities by degree of deficiency (split)... and sort splits by distance
-		// this.sinks = aps.getDevidedCollection(this.sinks, "deficiency", this.devideThresh, "distance");
-		//console.log(this.sinks);
 	};
 	expanderAPS.prototype.setSources = function(aps)
 	{
@@ -980,10 +993,10 @@ function wrapper () { // wrapper for injection
 		for (var i = 0; i < this.sources.length; i++)
 		{
 			var sourcePlanet = vgap.getPlanet(this.sources[i].pid);
-			this.frnnSources.push({x: sourcePlanet.x, y: sourcePlanet.y});
+			//
+			this.frnnSources.push({x: sourcePlanet.x, y: sourcePlanet.y}); // redundant ?
+			//
 			var distance = Math.floor(aps.getDistance({x: sourcePlanet.x, y: sourcePlanet.y}, {x:aps.ship.x ,y:aps.ship.y}));
-			// within the simpleRange (and a multitude of it), differences in distance not really matter
-			if (distance <= aps.simpleRange) distance = 1;
 			// update deficiencies (...unloading has occured)
 			var value = autopilot.getFreeClans(sourcePlanet);
 			if (value < 500) value = 0; // only higly over-populated planets are considered sources
@@ -1236,9 +1249,6 @@ function wrapper () { // wrapper for injection
             {
                 var dPlanet = vgap.getPlanet(pp.pid);
                 var futRes = aps.getFutureSurfaceResources(dPlanet, aps.getETA(pp.x, pp.y));
-                console.log(" FUTURE RESOURCES: " + futRes.buildRes);
-                console.log(futRes);
-                console.log(aps.getETA(pp.x, pp.y));
                 var minimal = Math.floor(parseInt(aps.hull.cargo) * this.minimalCargoRatioToGo);
                 if (futRes.buildRes < minimal) {
                     console.log("...removing destinations: " + pp.id + " due to lack of resources (" + futRes.buildRes + " / " + minimal + ")!");
@@ -2216,14 +2226,26 @@ function wrapper () { // wrapper for injection
                 this.updateStoredData();
             } else {
                 console.warn("Checkfuel not ok...(idle)");
-                this.isIdle = true;
-                this.updateStoredData();
+                if (this.planet && !this.isSavePosition(this.planet))
+                {
+                    this.escapeToWarpWell();
+                } else
+                {
+                    this.isIdle = true;
+                    this.updateStoredData();
+                }
             }
         } else
         {
             console.warn("No destination found...(idle)");
-            this.isIdle = true;
-            this.updateStoredData();
+            if (this.planet && !this.isSavePosition(this.planet))
+            {
+                this.escapeToWarpWell();
+            } else
+            {
+                this.isIdle = true;
+                this.updateStoredData();
+            }
         }
 	};
 	APS.prototype.getMissionConflict = function(potPlanet)
@@ -2508,10 +2530,29 @@ function wrapper () { // wrapper for injection
         }
         return objectsInRange;
     };
+    APS.prototype.objectGuarded = function(object)
+    {
+        var ships = vgap.shipsAt(object.x, object.y);
+        if (ships.length > 0)
+        {
+            for (var i = 0; i < ships.length; i++)
+            {
+                var cH = vgap.getHull(ships[i].hullid);
+                if (cH.mass > 200 && ships[i].beams > 0 && (ships[i].torps > 0 || ships[i].bays > 0) && ships[i].ammo > 0)
+                {
+                    console.log("...ship " + ships[i].id + " is guarding the planet.");
+                    return true;
+                }
+                //console.log(ships[i]);
+            }
+        }
+        return false;
+    };
     APS.prototype.objectInRangeOfEnemy = function(object)
     {
         if (typeof object == "undefined") return true;
-        if (object.id == this.base.id) return false; // exclude base planets from this check
+        var objectGuarded = this.objectGuarded(object);
+        if (object.id == this.base.id && objectGuarded) return false; // exclude guarded base planets from this check
         // objects = enemy planets, in range of... object
         var eP = this.getObjectsInRangeOf(autopilot.frnnEnemyPlanets, this.enemySafetyZone, object);
         // objects = enemy ships, in range of... object
@@ -2728,6 +2769,7 @@ function wrapper () { // wrapper for injection
             var coords = this.getRandomWarpWellEntryPosition();
             this.ship.targetx = coords.x;
             this.ship.targety = coords.y;
+            this.setWarp();
         }
     };
 	APS.prototype.updateStoredData = function()
