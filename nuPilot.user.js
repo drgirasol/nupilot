@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable semi-intelligent auto-pilots
-// @version       0.06.81
+// @version       0.06.82
 // @date          2017-01-08
 // @author        drgirasol
 // @include       http://planets.nu/*
@@ -2145,26 +2145,32 @@ function wrapper () { // wrapper for injection
 		console.log("...filtering destinations: " + this.potDest.length);
 		for (var i = 0; i < this.potDest.length; i++)
 		{
-			var potPlanet = vgap.getPlanet(this.potDest[i].pid);
-			if (this.planet && potPlanet.id == this.planet.id) continue; // toDo: current planet can't be a mission destination ?
-			if (potPlanet.note && potPlanet.note.body.match(/nup:base/)) // don't use prospected starbase planets
-			{
-				console.log("...removing destinations: " + potPlanet.id + " - a starbase will be built here!");
-				continue;
-			}
-			if (this.getMissionConflict(potPlanet))
-			{
-				console.log("removing destinations: " + potPlanet.id + " due to mission conflict...");
-				continue;
-			}
-			// lastly... if potential destination is unsave... add potPlanet to avoidList which will be appended to the filtered list
-			if (!this.isSavePosition(potPlanet)) // minefields, enemies, ionstorms...
-			{
-				// move this potPlanet to the end of the array
-				avoidDest.push(this.potDest[i]);
-				continue;
-			}
-			filteredDest.push(this.potDest[i]);
+            var potPlanet = vgap.getPlanet(this.potDest[i].pid);
+            if (this.planet && potPlanet.id == this.planet.id) continue; // toDo: current planet can't be a mission destination ?
+            if (potPlanet.id == this.base.id && this.isSavePosition(potPlanet)) // our base, if save, is always a valid target
+            {
+                filteredDest.push(this.potDest[i]);
+            } else
+            {
+                if (potPlanet.note && potPlanet.note.body.match(/nup:base/)) // don't use (other) prospected starbase planets
+                {
+                    console.log("...removing destinations: " + potPlanet.id + " - a starbase will be built here!");
+                    continue;
+                }
+                if (this.getMissionConflict(potPlanet))
+                {
+                    console.log("removing destinations: " + potPlanet.id + " due to mission conflict...");
+                    continue;
+                }
+                // lastly... if potential destination is unsave... add potPlanet to avoidList which will be appended to the filtered list
+                if (!this.isSavePosition(potPlanet)) // minefields, enemies, ionstorms...
+                {
+                    // move this potPlanet to the end of the array
+                    avoidDest.push(this.potDest[i]);
+                    continue;
+                }
+                filteredDest.push(this.potDest[i]);
+            }
 		}
 		console.log("Remaining destinations: " + filteredDest.length);
 		if (avoidDest.length > 0)
