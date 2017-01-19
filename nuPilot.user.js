@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable semi-intelligent auto-pilots
-// @version       0.06.82
+// @version       0.06.91
 // @date          2017-01-08
 // @author        drgirasol
 // @include       http://planets.nu/*
@@ -1075,13 +1075,6 @@ function wrapper () { // wrapper for injection
 	};
 	expanderAPS.prototype.loadCargo = function(aps)
 	{
-	    // provide basic fuel backup for return trips...
-	    var backFuel = aps.getOptimalFuelConsumptionEstimate([],150);
-	    if (aps.ship.neutronium < backFuel)
-        {
-            var toLoad = backFuel - aps.ship.neutronium;
-            aps.loadObject("neutronium", aps.planet, toLoad);
-        }
 		var curCargo = 0;
 		// colonist handling
 		// cargo = 75 % clans, 25 % supply, supply * 3 MCs (factory building)
@@ -1156,38 +1149,60 @@ function wrapper () { // wrapper for injection
             aps.scopeRange *= 3;
         }
     };
+	collectorAPS.prototype.getGoodToGoSources = function(aps, sources)
+    {
+        var goodToGo = [];
+        for (var i = 0; i < sources.length; i++)
+        {
+            // check if enough resources are there
+            var tPlanet = vgap.planetAt(sources[i].x, sources[i].y);
+            var futRes = aps.getFutureSurfaceResources(tPlanet, aps.getETA(tPlanet.x, tPlanet.y));
+            //console.log("... potential target's " + tPlanet.id + " future resources ");
+            //console.log(futRes);
+            //
+            var tValue = 0;
+            if (this.ooiPriority == "all")
+            {
+                tValue = futRes.buildRes;
+            } else
+            {
+                tValue = futRes[aps.moveables[this.ooiPriority]];
+            }
+            //console.log("... [i] minimum amount of " + this.ooiPriority + ": " + this.devideThresh + " (" + tValue + " available) ");
+            if (tValue < this.devideThresh)
+            {
+                console.log("...removing destinations: " + tPlanet.id + " due to lack of resources (" + tValue + " / " + this.devideThresh + ")!");
+                continue;
+            }
+            goodToGo.push(sources[i]);
+        }
+        return goodToGo;
+    };
 	collectorAPS.prototype.setSources = function(aps)
 	{
 		this.setScopeRange(aps);
-		var devisor = aps.hull.cargo;
-		if (this.ooiPriority == "mcs" || this.ooiPriority == "neu")
+        var k = 0;
+        var targetsInRange = [];
+        while(targetsInRange.length < 1)
         {
-            devisor = this.devideThresh;
+            k++;
+            if (k > 5) break; // toDo: this way scope range is ineffective...
+            targetsInRange = aps.getTargetsInRange(autopilot.frnnOwnPlanets, aps.base.x, aps.base.y, aps.scopeRange*k);
+            if (targetsInRange.length > 0 && this.ooiPriority != "mcs")
+            {
+                targetsInRange = this.getGoodToGoSources(aps, targetsInRange);
+            }
         }
-		var targetsInRange = aps.getTargetsInRange(autopilot.frnnOwnPlanets, aps.base.x, aps.base.y, aps.scopeRange);
-		//
+        console.log("... potential targets: " + targetsInRange.length);
+        var potential = [];
 		for (var i = 0; i < targetsInRange.length; i++)
 		{
 			var tPlanet = vgap.planetAt(targetsInRange[i].x, targetsInRange[i].y);
-			// check 4 conflicts
+            var tValue = aps.getObjectExcess(tPlanet);
 			var distance = Math.floor(aps.getDistance( {x: tPlanet.x, y: tPlanet.y}, {x:aps.ship.x ,y:aps.ship.y} ));
-			var tValue = aps.getObjectExcess(tPlanet);
-			if (tValue > 0)
-            {
-                this.sources.push( { x: tPlanet.x, y: tPlanet.y, pid: tPlanet.id, value: tValue, distance: distance } );
-            }
+            potential.push( { x: tPlanet.x, y: tPlanet.y, pid: tPlanet.id, value: tValue, distance: distance } );
 		}
-		// devide collection (this.sources) by "value" threshold, and sort by "distance"
-		//this.sources = aps.getDevidedCollection(this.sources, "value", this.devideThresh, "distance");
-        // devide collection in optimal (within +/- 10% of "value" thresh) and suboptimal sources, both sorted by "distance" and concatenated
-        var tempSources = aps.getOptimalCollection(this.sources, "value", devisor, "distance");
-		if (!tempSources)
-        {
-            this.sources = aps.getDevidedCollection(this.sources, "value", devisor, "distance");
-        } else
-        {
-            this.sources = tempSources;
-        }
+        this.sources = aps.sortCollection(potential, "distance");
 	};
     collectorAPS.prototype.setPotentialTurnTargets = function(aps)
     {
@@ -1241,17 +1256,6 @@ function wrapper () { // wrapper for injection
                 if (aps.baseHasSameAPStype(pp.pid, "col", this.ooiPriority))
                 {
                     console.log("...removing destination " + pp.pid + " due to collector mission conflict");
-                    continue;
-                }
-            }
-            // only use destinations that offer enough minerals
-            if (this.ooiPriority != "mcs")
-            {
-                var dPlanet = vgap.getPlanet(pp.pid);
-                var futRes = aps.getFutureSurfaceResources(dPlanet, aps.getETA(pp.x, pp.y));
-                var minimal = Math.floor(parseInt(aps.hull.cargo) * this.minimalCargoRatioToGo);
-                if (futRes.buildRes < minimal) {
-                    console.log("...removing destinations: " + pp.id + " due to lack of resources (" + futRes.buildRes + " / " + minimal + ")!");
                     continue;
                 }
             }
@@ -1541,7 +1545,9 @@ function wrapper () { // wrapper for injection
 	{
 		var transCargo = 0;
 		var dP = vgap.getPlanet(aps.destination.id);
-		var deficiency = Math.floor((this.getObjectDeficiency(dP) * -1) * 1.1); // bring more...
+		var factor = 1.1;
+		if (this.ooiPriority == "neu") factor = 2;
+		var deficiency = Math.floor((this.getObjectDeficiency(dP) * -1) * factor); // bring more...
 		if (deficiency > 0)
 		{
 			var object = aps.moveables[this.ooiPriority];
@@ -1551,15 +1557,6 @@ function wrapper () { // wrapper for injection
 			if (deficiency > available)
             {
                 deficiency = available;
-            } else
-            {
-                if (this.ooiPriority == "neu")
-                {
-                    deficiency = aps.hull.fueltank;
-                } else
-                {
-                    // deficiency = aps.hull.cargo;
-                }
             }
 			transCargo = aps.loadObject(object, aps.planet, deficiency);
 		}
@@ -1644,6 +1641,7 @@ function wrapper () { // wrapper for injection
 		this.defaultFixedRadius = 160; // adjusted by maxRange (=50 %)
 
 		this.planet = false; // current planet (if at any)
+        this.isOwnPlanet = false;
 		this.base = false; // base -> planet object
         this.atBase = false; // bool
         this.inWarpWell = false; // bool
@@ -1772,6 +1770,7 @@ function wrapper () { // wrapper for injection
         this.inWarpWell = this.isInWarpWell({ x: this.ship.x,y: this.ship.y });
         if (this.inWarpWell) this.planet = false;
         if (this.planet && this.planet.ownerid != vgap.player.id && cfgFunction != "exp") this.planet = false; // we don't want to interact (yet) with planets not owned by us
+        this.isOwnPlanet = (this.planet && this.planet.ownerid == vgap.player.id); // toDo: this should replace the preceding line, check for "if (this.planet)..."
         //
 		var cfgBase = parseInt(configuration[1]); // base planet id
 		this.base = vgap.getPlanet(cfgBase);
@@ -2002,6 +2001,11 @@ function wrapper () { // wrapper for injection
             frnnPositions.push( { x: p.x , y: p.y } );
         }
         return frnnPositions;
+    };
+    APS.prototype.curTargetIsNotOurs = function()
+    {
+        var tP = vgap.planetAt(this.ship.targetx, this.ship.targety);
+        return (tP.ownerid != vgap.player.id);
     };
     //
 	APS.prototype.isDangerousIonStorm = function(iStorm)
@@ -2586,40 +2590,44 @@ function wrapper () { // wrapper for injection
 	// interaction specifics
 	APS.prototype.checkFuel = function()
 	{
-		if (this.planet)
+        this.setWarp(); // set warp factor according to current circumstances
+        var fuel = Math.floor(this.getFuelConsumptionEstimate() * 1.5); // use more to be more flexible
+        if (fuel <= parseInt(this.ship.neutronium)) return true; // if there is enough, we don't need to load fuel
+        var loadedFuel = this.ship.neutronium; // amount we have on board
+        var backFuel = 0;
+        // provide basic fuel backup for (empty) return trip from unowned planet..
+        if (this.curTargetIsNotOurs())
+        {
+            var distance = this.getDistance( { x: this.ship.x, y: this.ship.y }, { x: this.ship.targetx, y: this.ship.targety } );
+            backFuel = Math.floor(this.getOptimalFuelConsumptionEstimate([], distance) * 1.1);
+        }
+        fuel += backFuel;
+		if (this.planet && this.isOwnPlanet) // only load if we are in orbit around one of our planets
 		{
-			this.setWarp(); // set most efficient warp factor for fuel consumption estimation
-			var fuel = Math.floor(this.getFuelConsumptionEstimate() * 1.5); // use more, so there will be enough for return trip
-			if (fuel <= parseInt(this.ship.neutronium)) return true; // if there is enough, we don't need to load fuel
-            var loadedFuel = this.loadObject("neutronium", this.planet, fuel);
-			console.log("We have " + loadedFuel + " neutronium aboard and need " + fuel);
-			if (loadedFuel >= fuel)
-			{
-				return true;
-			} else
-			{
-				// there is not enough fuel!
-				var shortage = fuel - loadedFuel;
-				var futureFuel = this.planet.neutronium + this.getMiningOutput("neutronium", 2);
-				if (futureFuel >= shortage)
-				{
-					// if there will be enough in 2 turns, lets wait
-					console.log("Waiting for enough fuel (" + shortage + ") to be available (" + futureFuel + ")...");
-					this.setWarp(0);
-					return false;
-				} else
-				{
-                    console.log("Waiting for fuel (" + shortage + ") to become available...");
-					this.setWarp(0);
-					return false; // consider other options
-				}
-			}
-		} else
-		{
-			// in space...
-			this.setWarp(); // set most efficient warp factor
-			return true;
-		}
+            loadedFuel = this.loadObject("neutronium", this.planet, fuel); // returns amount on board after loading
+        }
+        console.log("We have " + loadedFuel + " neutronium aboard and need " + fuel);
+        if (loadedFuel >= fuel)
+        {
+            return true;
+        } else
+        {
+            // there is not enough fuel!
+            var shortage = fuel - loadedFuel;
+            var futureFuel = this.planet.neutronium + this.getMiningOutput("neutronium", 2);
+            if (futureFuel >= shortage)
+            {
+                // if there will be enough in 2 turns, lets wait
+                console.log("Waiting for enough fuel (" + shortage + ") to be available (" + futureFuel + ")...");
+                this.setWarp(0);
+                return false;
+            } else
+            {
+                console.log("Waiting for fuel (" + shortage + ") to become available...");
+                this.setWarp(0);
+                return false; // consider other options
+            }
+        }
 	};
 	APS.prototype.unloadFuel = function()
 	{
