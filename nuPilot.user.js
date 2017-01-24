@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable semi-intelligent auto-pilots
-// @version       0.06.91
+// @version       0.06.98
 // @date          2017-01-08
 // @author        drgirasol
 // @include       http://planets.nu/*
@@ -817,6 +817,7 @@ function wrapper () { // wrapper for injection
 	function alchemyAPS()
 	{
 		this.minimalCargoRatioToGo = 0.5; // in percent of cargo capacity (e.g. 0.7 = 70%)
+        this.turnRangeAmp = 1;
 		this.cruiseMode = "safe"; // safe = 1-turn-connetions, fast = direct if faster, direct = always direct
 		this.energyMode = "conservative"; // conservative = use only the required amount of fuel, moderate = use 20 % above required amount, max = use complete tank capacity
 		this.ooiPriority = "all"; // object of interest (ooi) priority: always "cla"
@@ -911,7 +912,8 @@ function wrapper () { // wrapper for injection
 	function expanderAPS()
 	{
 		this.minimalCargoRatioToGo = 0.5; // in percent of cargo capacity (e.g. 0.7 = 70%)
-		this.cruiseMode = "safe"; // safe = 1-turn-connetions, fast = direct if faster, direct = always direct
+        this.turnRangeAmp = 1;
+        this.cruiseMode = "fast"; // safe = 1-turn-connetions, fast = direct if faster, direct = always direct
 		this.energyMode = "conservative"; // conservative = use only the required amount of fuel, moderate = use 20 % above required amount, max = use complete tank capacity
 		this.ooiPriority = "cla"; // object of interest (ooi) priority: always "cla"
 		this.alwaysLoadMC = true; // freighter missions will always include MCs
@@ -935,14 +937,15 @@ function wrapper () { // wrapper for injection
         // however, if it would be known that there are natives (bioscan) priority could be used for those planets
         // the same goes for planets where the resources are known
         var k = 0;
+        var range = parseInt(aps.simpleRange);
         var targetsInRange = [];
         //var targetsInRange = aps.getTargetsInRange(autopilot.frnnUnownedPlanets, aps.base.x, aps.base.y, aps.simpleRange*k);
         while(targetsInRange.length < 1)
         {
             k++;
             if (k > 20) break;
-            targetsInRange = aps.getTargetsInRange(autopilot.frnnUnownedPlanets, aps.base.x, aps.base.y, aps.simpleRange*k);
-            console.log("... potential targets: " + targetsInRange.length);
+            targetsInRange = aps.getTargetsInRange(autopilot.frnnUnownedPlanets, aps.base.x, aps.base.y, (range * k));
+            console.log("... potential targets: " + targetsInRange.length + " (" + (range * k) + ")");
             if (targetsInRange.length > 0)
             {
                 for (var i = 0; i < targetsInRange.length; i++)
@@ -1034,7 +1037,7 @@ function wrapper () { // wrapper for injection
 		//
 		if (this.sources.length < 1) this.setSources(aps);
 		//
-		if (aps.planet && this.isSource(aps.planet))
+		if (aps.planet && (this.isSource(aps.planet) || aps.ship.clans > 0)) // toDo: function that returns if we have a "colonization kit" on board (clans and suplies (and MCs))
 		{
 			// if we are at source, set sinks as potential destinations
 			console.log("...for expander at source:");
@@ -1063,7 +1066,7 @@ function wrapper () { // wrapper for injection
 	{
 		if (aps.planet)
 		{
-			if (this.isSource(aps.planet)) // we are at a source
+			if (aps.isOwnPlanet && this.isSource(aps.planet)) // we are at a source
 			{
 				var transCargo = this.loadCargo(aps);
 				console.log("Cargo summary: " + transCargo);
@@ -1102,13 +1105,32 @@ function wrapper () { // wrapper for injection
 		}
 		return curCargo;
 	};
+	expanderAPS.prototype.transferCargo = function(aps)
+    {
+        if (aps.planet && !aps.isOwnPlanet)
+        {
+            var unloadingSequence = ["molybdenum", "duranium", "tritanium", "supplies", "clans", "megacredits"];
+            var maxAmounts = [0, 0, 0, 50, 150, 150];
+            for (var i = 0; i < unloadingSequence.length; i++)
+            {
+                var cargo = unloadingSequence[i];
+                var amount = maxAmounts[i];
+                if (parseInt(aps.ship[cargo]) <= amount)
+                {
+                    amount = parseInt(aps.ship[cargo]);
+                }
+                aps.transferObject(cargo, aps.planet, amount);
+            }
+        }
+    };
 	/*
 	 * Autopilot - Collector Module
 	 */
 	function collectorAPS()
 	{
 		this.minimalCargoRatioToGo = 0.5; // in percent of cargo capacity (e.g. 0.7 = 70%)
-		this.cruiseMode = "safe"; // safe = 1-turn-connetions, fast = direct if faster, direct = always direct
+        this.turnRangeAmp = 1;
+        this.cruiseMode = "fast"; // safe = 1-turn-connetions, fast = direct if faster, direct = always direct
 		this.energyMode = "conservative"; // conservative = use only the required amount of fuel, moderate = use 20 % above required amount, max = use complete tank capacity
         this.ooiPriority = "all"; // object of interest (ooi) priority: "all" (=dur, tri, mol), "dur", "tri", "mol", "mcs", "sup", "cla"
 		this.alwaysLoadMC = true; // freighter missions will always include MCs
@@ -1156,7 +1178,7 @@ function wrapper () { // wrapper for injection
         {
             // check if enough resources are there
             var tPlanet = vgap.planetAt(sources[i].x, sources[i].y);
-            var futRes = aps.getFutureSurfaceResources(tPlanet, aps.getETA(tPlanet.x, tPlanet.y));
+            var futRes = aps.getFutureSurfaceResources(tPlanet, aps.getETA(tPlanet));
             //console.log("... potential target's " + tPlanet.id + " future resources ");
             //console.log(futRes);
             //
@@ -1181,13 +1203,13 @@ function wrapper () { // wrapper for injection
 	collectorAPS.prototype.setSources = function(aps)
 	{
 		this.setScopeRange(aps);
-        var k = 0;
+        var k = 1;
         var targetsInRange = [];
         while(targetsInRange.length < 1)
         {
             k++;
-            if (k > 5) break; // toDo: this way scope range is ineffective...
-            targetsInRange = aps.getTargetsInRange(autopilot.frnnOwnPlanets, aps.base.x, aps.base.y, aps.scopeRange*k);
+            if (k * aps.simpleRange > aps.scopeRange) break; // toDo: this way scope range is ineffective...
+            targetsInRange = aps.getTargetsInRange(autopilot.frnnOwnPlanets, aps.base.x, aps.base.y, aps.simpleRange * k);
             if (targetsInRange.length > 0 && this.ooiPriority != "mcs")
             {
                 targetsInRange = this.getGoodToGoSources(aps, targetsInRange);
@@ -1200,9 +1222,11 @@ function wrapper () { // wrapper for injection
 			var tPlanet = vgap.planetAt(targetsInRange[i].x, targetsInRange[i].y);
             var tValue = aps.getObjectExcess(tPlanet);
 			var distance = Math.floor(aps.getDistance( {x: tPlanet.x, y: tPlanet.y}, {x:aps.ship.x ,y:aps.ship.y} ));
-            potential.push( { x: tPlanet.x, y: tPlanet.y, pid: tPlanet.id, value: tValue, distance: distance } );
+			var eta = aps.getETA(tPlanet);
+            potential.push( { x: tPlanet.x, y: tPlanet.y, pid: tPlanet.id, value: tValue, distance: distance, eta: eta } );
 		}
-        this.sources = aps.sortCollection(potential, "distance");
+		this.sources = aps.clusterSortCollection(potential, "eta", "value");
+        //this.sources = aps.sortCollection(potential, "distance");
 	};
     collectorAPS.prototype.setPotentialTurnTargets = function(aps)
     {
@@ -1340,7 +1364,8 @@ function wrapper () { // wrapper for injection
 	function distributorAPS()
 	{
 		this.minimalCargoRatioToGo = 0.25; // in percent of cargo capacity (e.g. 0.7 = 70%)
-		this.cruiseMode = "safe"; // safe = 1-turn-connetions, fast = direct if faster, direct = always direct
+        this.turnRangeAmp = 1;
+        this.cruiseMode = "safe"; // safe = 1-turn-connetions, fast = direct if faster, direct = always direct
 		this.energyMode = "conservative"; // conservative = use only the required amount of fuel, moderate = use 20 % above required amount, max = use complete tank capacity
 		this.ooiPriority = "cla"; // object of interest (ooi) priority = "all" (=dur, tri, mol), "dur", "tri", "mol", "mcs", "sup", "cla"
 		this.alwaysLoadMC = true; // freighter missions will always include MCs
@@ -1769,8 +1794,8 @@ function wrapper () { // wrapper for injection
         this.planet = vgap.planetAt(this.ship.x, this.ship.y); // note: planetAt returns planet, even if the exact position is in warp well!
         this.inWarpWell = this.isInWarpWell({ x: this.ship.x,y: this.ship.y });
         if (this.inWarpWell) this.planet = false;
-        if (this.planet && this.planet.ownerid != vgap.player.id && cfgFunction != "exp") this.planet = false; // we don't want to interact (yet) with planets not owned by us
-        this.isOwnPlanet = (this.planet && this.planet.ownerid == vgap.player.id); // toDo: this should replace the preceding line, check for "if (this.planet)..."
+        //if (this.planet && this.planet.ownerid != vgap.player.id && cfgFunction != "exp") this.planet = false; // we don't want to interact (yet) with planets not owned by us
+        this.isOwnPlanet = (this.planet && this.planet.ownerid == vgap.player.id);
         //
 		var cfgBase = parseInt(configuration[1]); // base planet id
 		this.base = vgap.getPlanet(cfgBase);
@@ -1887,13 +1912,13 @@ function wrapper () { // wrapper for injection
             return this.getTargetsInRange(frnnPositions, center.x, center.y, range);
         }
     };
-	APS.prototype.getETA = function(tx, ty)
+	APS.prototype.getETA = function( dest, origin )
 	{
-		if (typeof tx == "undefined") tx = this.ship.targetx;
-		if (typeof ty == "undefined") ty = this.ship.targety;
+		if (typeof origin == "undefined") origin = { x: this.ship.x, y: this.ship.y };
+        if (typeof dest == "undefined") dest = { x: this.ship.targetx, y: this.ship.targety };
 		var ETA = 1;
 		var maxTurnDist = Math.pow(this.ship.warp,2);
-		var journeyDist = Math.floor(this.getDistance({x: this.ship.x, y: this.ship.y}, {x: tx, y: ty}));
+		var journeyDist = Math.floor(this.getDistance({ x: origin.x, y: origin.y }, { x: dest.x, y: dest.y }));
 		if (journeyDist > maxTurnDist) ETA = Math.ceil(journeyDist / maxTurnDist);
 		return ETA;
 	};
@@ -2005,7 +2030,8 @@ function wrapper () { // wrapper for injection
     APS.prototype.curTargetIsNotOurs = function()
     {
         var tP = vgap.planetAt(this.ship.targetx, this.ship.targety);
-        return (tP.ownerid != vgap.player.id);
+        if (tP) return (tP.ownerid != vgap.player.id);
+        return true;
     };
     //
 	APS.prototype.isDangerousIonStorm = function(iStorm)
@@ -2047,6 +2073,53 @@ function wrapper () { // wrapper for injection
 			}
 		);
 	};
+	APS.prototype.clusterSortCollection = function(collection, cluster, order)
+    {
+        // get unique categories
+        var categories = [];
+        for (var i = 0; i < collection.length; i++)
+        {
+            if (categories.indexOf(collection[i][cluster]) === -1)
+            {
+                categories.push(collection[i][cluster]);
+            }
+        }
+        // sort categories ascending by "cluster"
+        categories.sort(function(a, b) {
+            return a - b;
+        });
+        //console.log("Collection clustering by " + categories.length + " categories.");
+        //console.log(categories);
+        //
+        var newCollection = [];
+        // put data in clusters, sort clusters by value and concatenate clusters
+        for (var j = 0; j < categories.length; j++)
+        {
+            var clusterCollection = [];
+            for (var k = 0; k < collection.length; k++)
+            {
+                //console.log("Category = " + categories[j] + " - collection category value = " + collection[k][cluster]);
+                if (categories[j] == collection[k][cluster])
+                {
+                    //console.log("Add collection to cluster...");
+                    clusterCollection.push(collection[k]);
+                }
+            }
+            if (clusterCollection.length > 0)
+            {
+                if (newCollection.length > 0)
+                {
+                    newCollection.concat(this.sortCollection(clusterCollection, order, "desc"));
+                } else
+                {
+                    newCollection = this.sortCollection(clusterCollection, order, "desc");
+                }
+            }
+        }
+        //console.log("clustered Collection:");
+        //console.log(newCollection);
+        return newCollection;
+    };
 	APS.prototype.getOptimalFuelConsumptionEstimate = function(cargo, distance)
 	{
 		var hullCargoMass = this.getHullCargoMass(cargo);
@@ -2211,7 +2284,7 @@ function wrapper () { // wrapper for injection
                 console.log("APS on route to destination...");
             }
         }
-        if (this.planet) this.functionModule.handleCargo(this); // load specific amount...
+        if (this.planet && this.isOwnPlanet) this.functionModule.handleCargo(this); // load specific amount...
         if (dP && (this.planet || this.isInWarpWell()))
         {
             this.setShipTarget(dP);
@@ -2298,7 +2371,6 @@ function wrapper () { // wrapper for injection
                         console.log("...planet " + potPlanet.id + " is mission destination of another APS with the same mission objective!");
                         // toDo: reconsider
                         //   - if the planet has more resourcen than one APS can carry
-                        //   - if mines will surface enough until ETA
                         //   - if another APS will drop something off... etc.
                         //   -
                         return true;
@@ -2335,6 +2407,32 @@ function wrapper () { // wrapper for injection
 	/*
 	 *  target selection specifics
 	 */
+	APS.prototype.getETAbyTargets = function()
+    {
+        var targetIds = [];
+        var adjustment = 0;
+        var ETA = 0;
+        var ship = { x: this.ship.x, y: this.ship.y };
+        while(targetIds.indexOf(this.destination.id) === -1)
+        {
+            var curTargets = [];
+            while(curTargets.length < 1)
+            {
+                curTargets = this.getTurnTargets(ship, this.destination, adjustment);
+                adjustment += 10;
+                if (adjustment > 300) break;
+            }
+            if (curTargets.length > 0)
+            {
+                // push first ID to array
+                targetIds.push(curTargets[0].pid);
+                ETA += curTargets[0].eta;
+                ship = { x: curTargets[0].x, y: curTargets[0].y };
+            }
+        }
+        console.log("The ship (" + this.ship.id + ") needs " + ETA + " turns, to arrive at destination when using turnTargets...");
+        return ETA;
+    };
 	APS.prototype.targetHasEnoughFuel = function(tP)
     {
         var dP = this.destination;
@@ -2347,7 +2445,7 @@ function wrapper () { // wrapper for injection
         var futRes = {neutronium: 0};
         if (tP.ownerid == vgap.player.id)
         {
-            futRes = this.getFutureSurfaceResources(tP, 1); // toDo: get "turns to target"
+            futRes = this.getFutureSurfaceResources(tP, this.getETA(tP));
         }
         console.log("...targetHasEnoughFuel: (" + tP.id + ") " + (nextFuelCons <= (futRes.neutronium + remainingFuel)));
         return (nextFuelCons <= (futRes.neutronium + remainingFuel));
@@ -2357,15 +2455,28 @@ function wrapper () { // wrapper for injection
      */
     APS.prototype.setShipTarget = function(dP)
     {
+        var turnTargets = [];
         console.log("Searching target on the way to " + dP.name + " (" + dP.id + ")...");
-        var adjustment = 0;
-        var turnTargets = this.getTurnTargets(this.ship, dP, adjustment);
-        //
-        while (turnTargets.length === 0)
+        var ttETA = this.getETAbyTargets(); // toDo: not accurate yet...
+        var dirETA = this.getETA(dP);
+        if ((dirETA < ttETA && this.functionModule.cruiseMode == "fast") || this.functionModule.cruiseMode == "direct")
         {
-            adjustment += 10;
-            if (adjustment > 300) break;
+            console.log("A direct approach of destination is faster (" + dirETA + "/" + ttETA+ ")!");
+            if (this.isSavePosition(dP))
+            {
+                turnTargets.push( { x: dP.x, y: dP.y } );
+            }
+        } else
+        {
+            var adjustment = 0;
             turnTargets = this.getTurnTargets(this.ship, dP, adjustment);
+            //
+            while (turnTargets.length === 0)
+            {
+                adjustment += 10;
+                if (adjustment > 300) break;
+                turnTargets = this.getTurnTargets(this.ship, dP, adjustment);
+            }
         }
         console.log("Turntargets:");
         console.log(turnTargets);
@@ -2460,8 +2571,7 @@ function wrapper () { // wrapper for injection
 	APS.prototype.getTargetsInRange = function(coords, x, y, r)
 	{
 		var frnn = new FRNN(coords, r);
-		var inRange = frnn.inRange({x: x,y: y}, r);
-		return inRange;
+		return frnn.inRange( { x: x, y: y }, r);
 	};
 	APS.prototype.getTurnTargets = function(ship, dP, adjustment)
 	{
@@ -2476,17 +2586,17 @@ function wrapper () { // wrapper for injection
 			var tt = turnTargets[i];
             var tP = vgap.planetAt(tt.x, tt.y);
             // distance from current location to destination planet
-            var curPosDistance = Math.floor(this.getDistance( {x: this.ship.x, y: this.ship.y}, {x: dP.x, y: dP.y} ));
+            var curPosDistance = Math.floor(this.getDistance( {x: ship.x, y: ship.y}, {x: dP.x, y: dP.y} ));
 			// distance between potential next stop and the destination (in case the potential next stop is the destination, distance is 0)
             var nextPosDistance = Math.floor(this.getDistance( {x: tt.x , y: tt.y}, {x: dP.x , y: dP.y} ));
+            // toDo: exclude targets where minefields or other dangers had to be crossed/passed
             if (nextPosDistance < curPosDistance && this.targetHasEnoughFuel(tP) && this.isSavePosition(tP))
             {
-                //var travelDistance = Math.floor(this.getDistance( {x: this.ship.x, y: this.ship.y}, {x: tt.x, y: tt.y} ));
-                //var turns = Math.ceil(travelDistance / this.simpleRange);
                 turnTargets[i].distance = nextPosDistance;
+                turnTargets[i].eta = this.getETA(tt, ship);
                 //var futRes = this.getFutureSurfaceResources(tP, turns);
                 //turnTargets[i].fuel = futRes.neutronium;
-                //turnTargets[i].pid = tP.id;
+                turnTargets[i].pid = tP.id;
                 closerTurnTargets.push(turnTargets[i]);
             }
 		}
@@ -2519,7 +2629,7 @@ function wrapper () { // wrapper for injection
             console.log("...planet (" + planet.id + ") is inside minefield!");
             return false;
         }
-        if (this.objectInRangeOfEnemy(planet)) // toDo: not if object (planet) is protected by weaponized ship(s) (with primary enemy? with kill mission?)
+        if (this.objectInRangeOfEnemy(planet))
         {
             console.log("...planet (" + planet.id + ") is close to enemy!");
             return false;
@@ -2548,6 +2658,7 @@ function wrapper () { // wrapper for injection
             for (var i = 0; i < ships.length; i++)
             {
                 var cH = vgap.getHull(ships[i].hullid);
+                // toDo: primary enemy set? kill mission set?
                 if (cH.mass > 200 && ships[i].beams > 0 && (ships[i].torps > 0 || ships[i].bays > 0) && ships[i].ammo > 0)
                 {
                     console.log("...ship " + ships[i].id + " is guarding the planet.");
@@ -2561,24 +2672,17 @@ function wrapper () { // wrapper for injection
     APS.prototype.objectInRangeOfEnemy = function(object)
     {
         if (typeof object == "undefined") return true;
-        var objectGuarded = this.objectGuarded(object);
-        if (object.id == this.base.id && objectGuarded) return false; // exclude guarded base planets from this check
+        if (this.objectGuarded(object)) return false; // exclude guarded planets from this check
         // objects = enemy planets, in range of... object
         var eP = this.getObjectsInRangeOf(autopilot.frnnEnemyPlanets, this.enemySafetyZone, object);
         // objects = enemy ships, in range of... object
         var eS = this.getObjectsInRangeOf(autopilot.frnnEnemyShips, this.enemySafetyZone, object);
-        // toDo: minefields
-
+        // avoid planets in close proximity of enemy planets
         if (eP.length > 0) return true;
-        /*
-        for (var i = 0; i < eP.length; i++)
-        {
-            console.log("...position (" + object.id + ":" + object.x + "x" + object.y + ") is in range of enemy planet - (" + eP[i].x + "x" + eP[i].y + ")!");
-            return true;
-        } */
+        //
         for (var j = 0; j < eS.length; j++)
         {
-            // only when ship has weapons toDo: danger of robbing?
+            // only when ship has weapons toDo: or when ship is capable of robbing?
             if (eS[j].armed)
             {
                 console.log("...position (" + object.id + ":" + object.x + "x" + object.y + ") is in range (" + this.enemySafetyZone + " lj) of enemy ship - (" + eS[j].x + "x" + eS[j].y + ")!");
@@ -2613,25 +2717,35 @@ function wrapper () { // wrapper for injection
         } else
         {
             // there is not enough fuel!
-            var shortage = fuel - loadedFuel;
-            var futureFuel = this.planet.neutronium + this.getMiningOutput("neutronium", 2);
-            if (futureFuel >= shortage)
+            if (this.planet)
             {
-                // if there will be enough in 2 turns, lets wait
-                console.log("Waiting for enough fuel (" + shortage + ") to be available (" + futureFuel + ")...");
-                this.setWarp(0);
-                return false;
-            } else
-            {
-                console.log("Waiting for fuel (" + shortage + ") to become available...");
-                this.setWarp(0);
-                return false; // consider other options
+                var shortage = fuel - loadedFuel;
+                var futureFuel = this.planet.neutronium + this.getMiningOutput("neutronium", 2);
+                if (futureFuel >= shortage)
+                {
+                    // if there will be enough in 2 turns, lets wait
+                    console.log("Waiting for enough fuel (" + shortage + ") to be available (" + futureFuel + ")...");
+                    this.setWarp(0);
+                    return false;
+                } else
+                {
+                    console.log("Waiting for fuel (" + shortage + ") to become available...");
+                    this.setWarp(0);
+                    return false; // consider other options
+                }
+            } else {
+                if (this.isInWarpWell())
+                {
+                    console.log("Waiting for fuel (" + shortage + ") to become available...");
+                    this.setWarp(0);
+                    return false; // consider other options
+                }
             }
         }
 	};
 	APS.prototype.unloadFuel = function()
 	{
-		if (this.planet)
+		if (this.planet && this.isOwnPlanet)
 		{
 			var amount = parseInt(this.ship.neutronium) - 1;
 			var onShip = this.unloadObject("neutronium", this.planet, amount);
@@ -2639,21 +2753,17 @@ function wrapper () { // wrapper for injection
 	};
 	APS.prototype.unloadCargo = function()
 	{
-		if (this.planet)
+        if (this.primaryFunction == "exp")
+        {
+            this.functionModule.transferCargo(this);
+        } else if (this.planet && this.isOwnPlanet)
 		{
-			var unloadingSequence = ["molybdenum", "duranium", "tritanium", "supplies", "clans", "megacredits"];
-			for (var i = 0; i < unloadingSequence.length; i++)
-			{
-				var cargo = unloadingSequence[i];
-				var onShip = 0;
-				if (this.planet.ownerid == vgap.player.id)
-				{
-					onShip = this.unloadObject(cargo, this.planet, parseInt(this.ship[cargo]));
-				} else
-				{
-					onShip = this.transferObject(cargo, this.planet, parseInt(this.ship[cargo]));
-				}
-			}
+            var unloadingSequence = ["molybdenum", "duranium", "tritanium", "supplies", "clans", "megacredits"];
+            for (var i = 0; i < unloadingSequence.length; i++)
+            {
+                var cargo = unloadingSequence[i];
+                var onShip = this.unloadObject(cargo, this.planet, parseInt(this.ship[cargo]));
+            }
 		}
 	};
 	APS.prototype.loadMegacredits = function(from, amount)
@@ -2783,7 +2893,7 @@ function wrapper () { // wrapper for injection
             var coords = this.getRandomWarpWellEntryPosition();
             this.ship.targetx = coords.x;
             this.ship.targety = coords.y;
-            this.setWarp();
+            this.setWarp(1);
         }
     };
 	APS.prototype.updateStoredData = function()
@@ -2803,7 +2913,7 @@ function wrapper () { // wrapper for injection
 		if (destination)
 		{
 			var destPlanet = vgap.getPlanet(destination);
-			if (destPlanet) return (destPlanet.ownerid == vgap.player.id);
+			if (destPlanet) return (destPlanet.ownerid == vgap.player.id || destPlanet.ownerid == 0);
 		}
 		return false;
 	};
@@ -2954,7 +3064,13 @@ function wrapper () { // wrapper for injection
     APS.prototype.setWarp = function(warp)
     {
         this.ship.warp = 0;
-        if (typeof warp == "undefined") this.ship.warp = this.ship.engineid;
+        if (typeof warp == "undefined")
+        {
+            this.ship.warp = this.ship.engineid;
+        } else
+        {
+            this.ship.warp = warp;
+        }
         if (warp > 0 && warp < 10) this.ship.warp = warp;
         // reduce speed to warp 4, if we are currently inside a minefield
         if (this.objectInsideMineField( {x: this.ship.x, y: this.ship.y}, false, true ) && this.ship.engineid > 4) this.ship.warp = 4;
@@ -2966,9 +3082,11 @@ function wrapper () { // wrapper for injection
 	APS.prototype.setRange = function()
 	{
 		this.maxRange = this.getShipRange(false, [this.hull.mass, this.hull.cargo], this.hull.fueltank);
-		this.simpleRange = Math.pow(this.ship.warp,2); // max turn distance
+		var amp = 1;
+		if (typeof this.functionModule.turnRangeAmp != "undefined") amp = this.functionModule.turnRangeAmp;
+		console.log("...engineid: " + this.ship.engineid + " amp: " + amp);
+		this.simpleRange = Math.floor(Math.pow(this.ship.engineid,2) * amp); // max turn distance with max efficient warp (=engineid)
 		if (this.gravitonic) this.simpleRange *= 2;
-		if (this.maxRange > 0) this.defaultFixedRadius = Math.floor(this.simpleRange * 2); // changed 19.12.16 from half the max range to 2 * simple range
 		//console.log("simple Range: " + this.simpleRange);
 	};
 	APS.prototype.getShipRange = function(byTurn, cargo, fuel)
