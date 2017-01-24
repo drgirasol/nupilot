@@ -2224,7 +2224,7 @@ function wrapper () { // wrapper for injection
 		{
             var potPlanet = vgap.getPlanet(this.potDest[i].pid);
             if (this.planet && potPlanet.id == this.planet.id) continue; // toDo: current planet can't be a mission destination ?
-            if (potPlanet.id == this.base.id && this.isSavePosition(potPlanet)) // our base, if save, is always a valid target
+            if (potPlanet.id == this.base.id && this.isSavePlanet(potPlanet)) // our base, if save, is always a valid target
             {
                 filteredDest.push(this.potDest[i]);
             } else
@@ -2240,7 +2240,7 @@ function wrapper () { // wrapper for injection
                     continue;
                 }
                 // lastly... if potential destination is unsave... add potPlanet to avoidList which will be appended to the filtered list
-                if (!this.isSavePosition(potPlanet)) // minefields, enemies, ionstorms...
+                if (!this.isSavePlanet(potPlanet)) // minefields, enemies, ionstorms...
                 {
                     // move this potPlanet to the end of the array
                     avoidDest.push(this.potDest[i]);
@@ -2295,7 +2295,7 @@ function wrapper () { // wrapper for injection
 	{
 		// this.functionModule.confirmMission(this);
         var curTarget = vgap.planetAt(this.ship.targetx, this.ship.targety);
-        if (curTarget && !this.isSavePosition(curTarget))
+        if (curTarget && !this.isSavePlanet(curTarget))
         {
             // fall-back to base...
             console.warn("Emergency: Enemy in range - flight mode -> returning back to base!");
@@ -2309,7 +2309,7 @@ function wrapper () { // wrapper for injection
                 this.updateStoredData();
             } else {
                 console.warn("Checkfuel not ok...(idle)");
-                if (this.planet && !this.isSavePosition(this.planet))
+                if (this.planet && !this.isSavePlanet(this.planet))
                 {
                     this.escapeToWarpWell();
                 } else
@@ -2321,7 +2321,7 @@ function wrapper () { // wrapper for injection
         } else
         {
             console.warn("No destination found...(idle)");
-            if (this.planet && !this.isSavePosition(this.planet))
+            if (this.planet && !this.isSavePlanet(this.planet))
             {
                 this.escapeToWarpWell();
             } else
@@ -2418,10 +2418,11 @@ function wrapper () { // wrapper for injection
             var curTargets = [];
             while(curTargets.length < 1)
             {
-                curTargets = this.getTurnTargets(ship, this.destination, adjustment);
+                curTargets = this.getPotentialWaypoints(ship, this.destination, adjustment);
                 adjustment += 10;
                 if (adjustment > 300) break;
             }
+            if (adjustment > 300) break;
             if (curTargets.length > 0)
             {
                 // push first ID to array
@@ -2433,7 +2434,7 @@ function wrapper () { // wrapper for injection
         console.log("The ship (" + this.ship.id + ") needs " + ETA + " turns, to arrive at destination when using turnTargets...");
         return ETA;
     };
-	APS.prototype.targetHasEnoughFuel = function(tP)
+	APS.prototype.planetHasEnoughFuel = function(tP)
     {
         var dP = this.destination;
         if (tP.id == dP.id) return true;
@@ -2447,7 +2448,7 @@ function wrapper () { // wrapper for injection
         {
             futRes = this.getFutureSurfaceResources(tP, this.getETA(tP));
         }
-        console.log("...targetHasEnoughFuel: (" + tP.id + ") " + (nextFuelCons <= (futRes.neutronium + remainingFuel)));
+        console.log("...planetHasEnoughFuel: (" + tP.id + ") " + (nextFuelCons <= (futRes.neutronium + remainingFuel)));
         return (nextFuelCons <= (futRes.neutronium + remainingFuel));
     };
     /*
@@ -2462,20 +2463,20 @@ function wrapper () { // wrapper for injection
         if ((dirETA < ttETA && this.functionModule.cruiseMode == "fast") || this.functionModule.cruiseMode == "direct")
         {
             console.log("A direct approach of destination is faster (" + dirETA + "/" + ttETA+ ")!");
-            if (this.isSavePosition(dP))
+            if (this.isSavePlanet(dP))
             {
                 turnTargets.push( { x: dP.x, y: dP.y } );
             }
         } else
         {
             var adjustment = 0;
-            turnTargets = this.getTurnTargets(this.ship, dP, adjustment);
+            turnTargets = this.getPotentialWaypoints(this.ship, dP, adjustment);
             //
             while (turnTargets.length === 0)
             {
                 adjustment += 10;
                 if (adjustment > 300) break;
-                turnTargets = this.getTurnTargets(this.ship, dP, adjustment);
+                turnTargets = this.getPotentialWaypoints(this.ship, dP, adjustment);
             }
         }
         console.log("Turntargets:");
@@ -2573,7 +2574,7 @@ function wrapper () { // wrapper for injection
 		var frnn = new FRNN(coords, r);
 		return frnn.inRange( { x: x, y: y }, r);
 	};
-	APS.prototype.getTurnTargets = function(ship, dP, adjustment)
+	APS.prototype.getPotentialWaypoints = function(ship, dP, adjustment)
 	{
 	    this.functionModule.setPotentialTurnTargets(this);
 	    // TurnTargets: {x, y, distance(toDestination), planetId}
@@ -2590,7 +2591,7 @@ function wrapper () { // wrapper for injection
 			// distance between potential next stop and the destination (in case the potential next stop is the destination, distance is 0)
             var nextPosDistance = Math.floor(this.getDistance( {x: tt.x , y: tt.y}, {x: dP.x , y: dP.y} ));
             // toDo: exclude targets where minefields or other dangers had to be crossed/passed
-            if (nextPosDistance < curPosDistance && this.targetHasEnoughFuel(tP) && this.isSavePosition(tP))
+            if (nextPosDistance < curPosDistance && this.planetHasEnoughFuel(tP) && this.isSavePlanet(tP))
             {
                 turnTargets[i].distance = nextPosDistance;
                 turnTargets[i].eta = this.getETA(tt, ship);
@@ -2610,7 +2611,7 @@ function wrapper () { // wrapper for injection
 			});
 		return closerTurnTargets;
 	};
-    APS.prototype.isSavePosition = function(planet)
+    APS.prototype.isSavePlanet = function(planet)
     {
         // toDo: planets in radiation zones, if you don't have special shielding
         //
