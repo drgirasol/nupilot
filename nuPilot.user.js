@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable semi-intelligent auto-pilots
-// @version       0.06.98
+// @version       0.06.99
 // @date          2017-01-08
 // @author        drgirasol
 // @include       http://planets.nu/*
@@ -850,9 +850,9 @@ function wrapper () { // wrapper for injection
 		if (planet.supplies > 0) return true;
 		return false;
 	};
-    alchemyAPS.prototype.setPotentialTurnTargets = function(aps)
+    alchemyAPS.prototype.setPotentialWaypoints = function(aps)
     {
-        aps.turnTargets = autopilot.frnnOwnPlanets;
+        aps.potentialWaypoints = autopilot.frnnOwnPlanets;
     };
 	alchemyAPS.prototype.setPotentialDestinations = function(aps)
 	{
@@ -1020,12 +1020,12 @@ function wrapper () { // wrapper for injection
 		}
 		return false;
 	};
-	expanderAPS.prototype.setPotentialTurnTargets = function(aps)
+	expanderAPS.prototype.setPotentialWaypoints = function(aps)
     {
-        aps.turnTargets = autopilot.frnnOwnPlanets;
+        aps.potentialWaypoints = autopilot.frnnOwnPlanets;
         if (aps.destination.ownerid != vgap.player.id)
         {
-            aps.turnTargets.push({ pid: aps.destination.id, x: aps.destination.x, y: aps.destination.y });
+            aps.potentialWaypoints.push({ pid: aps.destination.id, x: aps.destination.x, y: aps.destination.y });
         }
     };
 	expanderAPS.prototype.setPotentialDestinations = function(aps)
@@ -1228,9 +1228,9 @@ function wrapper () { // wrapper for injection
 		this.sources = aps.clusterSortCollection(potential, "eta", "value");
         //this.sources = aps.sortCollection(potential, "distance");
 	};
-    collectorAPS.prototype.setPotentialTurnTargets = function(aps)
+    collectorAPS.prototype.setPotentialWaypoints = function(aps)
     {
-        aps.turnTargets = autopilot.frnnOwnPlanets;
+        aps.potentialWaypoints = autopilot.frnnOwnPlanets;
     };
 	collectorAPS.prototype.setPotentialDestinations = function(aps)
 	{
@@ -1509,9 +1509,9 @@ function wrapper () { // wrapper for injection
 		}
 		return false;
 	};
-    distributorAPS.prototype.setPotentialTurnTargets = function(aps)
+    distributorAPS.prototype.setPotentialWaypoints = function(aps)
     {
-        aps.turnTargets = autopilot.frnnOwnPlanets;
+        aps.potentialWaypoints = autopilot.frnnOwnPlanets;
     };
 	distributorAPS.prototype.setPotentialDestinations = function(aps)
 	{
@@ -1698,7 +1698,7 @@ function wrapper () { // wrapper for injection
 			cla: "clans"
 		};
 		this.noteColor = "ff9900";
-		this.turnTargets = []; // potential next targets
+		this.potentialWaypoints = []; // potential next targets
 		this.potDest = []; // potential destinations
 		//
 		if (typeof cfgData != "undefined" && cfgData !== false)
@@ -2407,31 +2407,42 @@ function wrapper () { // wrapper for injection
 	/*
 	 *  target selection specifics
 	 */
-	APS.prototype.getETAbyTargets = function()
+	APS.prototype.getRouteETA = function()
     {
-        var targetIds = [];
+        var wpIds = []; // planet Ids of waypoints
         var adjustment = 0;
-        var ETA = 0;
-        var ship = { x: this.ship.x, y: this.ship.y };
-        while(targetIds.indexOf(this.destination.id) === -1)
+        var ETA = 0; // route ETA
+        var considered = 0;
+        var ship = { x: this.ship.x, y: this.ship.y }; // current ship position, starting point for route
+        //
+        while(wpIds.indexOf(this.destination.id) === -1)    // as long as destination has not been included in the route...
         {
-            var curTargets = [];
-            while(curTargets.length < 1)
+            var wp = {};
+            wp.waypoints = [];
+            wp.considered = 0;
+            wp.destIncluded = false;
+            while(wp.waypoints.length === 0  && !wp.destIncluded && considered < this.potentialWaypoints.length)
             {
-                curTargets = this.getPotentialWaypoints(ship, this.destination, adjustment);
+                wp = this.getPotentialWaypoints(ship, this.destination, adjustment);
+                considered += (wp.considered - considered);
                 adjustment += 10;
                 if (adjustment > 300) break;
             }
-            if (adjustment > 300) break;
-            if (curTargets.length > 0)
+            if (wp.waypoints.length > 0)
             {
                 // push first ID to array
-                targetIds.push(curTargets[0].pid);
-                ETA += curTargets[0].eta;
-                ship = { x: curTargets[0].x, y: curTargets[0].y };
+                wpIds.push(wp.waypoints[0].pid); // save waypoint planet id
+                ETA += wp.waypoints[0].eta; // save ETA to next waypoint
+                ship = { x: wp.waypoints[0].x, y: wp.waypoints[0].y }; // set next waypoint as new starting point for route calculation
+            } else
+            {
+                if (considered == this.potentialWaypoints.length || adjustment > 300 || wp.destIncluded)
+                {
+                    break;
+                }
             }
         }
-        console.log("The ship (" + this.ship.id + ") needs " + ETA + " turns, to arrive at destination when using turnTargets...");
+        console.log("The ship (" + this.ship.id + ") needs " + ETA + " turns, to arrive at destination when using waypoints...");
         return ETA;
     };
 	APS.prototype.planetHasEnoughFuel = function(tP)
@@ -2448,7 +2459,7 @@ function wrapper () { // wrapper for injection
         {
             futRes = this.getFutureSurfaceResources(tP, this.getETA(tP));
         }
-        console.log("...planetHasEnoughFuel: (" + tP.id + ") " + (nextFuelCons <= (futRes.neutronium + remainingFuel)));
+        //console.log("...planetHasEnoughFuel: (" + tP.id + ") " + (nextFuelCons <= (futRes.neutronium + remainingFuel)));
         return (nextFuelCons <= (futRes.neutronium + remainingFuel));
     };
     /*
@@ -2456,36 +2467,42 @@ function wrapper () { // wrapper for injection
      */
     APS.prototype.setShipTarget = function(dP)
     {
-        var turnTargets = [];
-        console.log("Searching target on the way to " + dP.name + " (" + dP.id + ")...");
-        var ttETA = this.getETAbyTargets(); // toDo: not accurate yet...
+        var wp = {};
+        wp.waypoints = [];
+        wp.considered = 0;
+        wp.destIncluded = false;
+        this.functionModule.setPotentialWaypoints(this);
+        var considered = 0;
+        //
+        console.log("Searching waypoints to " + dP.name + " (" + dP.id + ")...");
+        var ttETA = this.getRouteETA(); // toDo: not accurate yet...
         var dirETA = this.getETA(dP);
         if ((dirETA < ttETA && this.functionModule.cruiseMode == "fast") || this.functionModule.cruiseMode == "direct")
         {
             console.log("A direct approach of destination is faster (" + dirETA + "/" + ttETA+ ")!");
             if (this.isSavePlanet(dP))
             {
-                turnTargets.push( { x: dP.x, y: dP.y } );
+                wp.waypoints.push( { x: dP.x, y: dP.y } );
             }
         } else
         {
             var adjustment = 0;
-            turnTargets = this.getPotentialWaypoints(this.ship, dP, adjustment);
-            //
-            while (turnTargets.length === 0)
+            while (wp.waypoints.length === 0 && !wp.destIncluded && considered < this.potentialWaypoints.length)
             {
+                wp = this.getPotentialWaypoints(this.ship, dP, adjustment);
+                considered += (wp.considered - considered);
                 adjustment += 10;
                 if (adjustment > 300) break;
-                turnTargets = this.getPotentialWaypoints(this.ship, dP, adjustment);
             }
         }
-        console.log("Turntargets:");
-        console.log(turnTargets);
-        if (turnTargets.length > 0)
+        console.log("Filtered potential waypoints: " + considered);
+        console.log(wp);
+        if (wp.waypoints.length > 0)
         {
-            this.ship.targetx = turnTargets[0].x;
-            this.ship.targety = turnTargets[0].y;
-        } else {
+            this.ship.targetx = wp.waypoints[0].x;
+            this.ship.targety = wp.waypoints[0].y;
+        } else
+        {
             this.escapeToWarpWell();
         }
     };
@@ -2576,16 +2593,17 @@ function wrapper () { // wrapper for injection
 	};
 	APS.prototype.getPotentialWaypoints = function(ship, dP, adjustment)
 	{
-	    this.functionModule.setPotentialTurnTargets(this);
-	    // TurnTargets: {x, y, distance(toDestination), planetId}
+	    // potentialWaypoints: {x, y, distance(toDestination), planetId}
         // var frnnTargets = autopilot.frnnOwnPlanets;
-		var frnnTargets = this.turnTargets;
-		var closerTurnTargets = [];
-		var turnTargets = this.getTargetsInRange(frnnTargets, ship.x, ship.y, (this.simpleRange + adjustment));
-		for (var i = 0; i < turnTargets.length; i++)
+		var frnnTargets = this.potentialWaypoints;
+		var closerWaypoints = [];
+		var containsDest = false;
+		var waypoints = this.getTargetsInRange(frnnTargets, ship.x, ship.y, (this.simpleRange + adjustment));
+		for (var i = 0; i < waypoints.length; i++)
 		{
-			var tt = turnTargets[i];
+			var tt = waypoints[i];
             var tP = vgap.planetAt(tt.x, tt.y);
+            if (tP.id == dP.id) containsDest = true;
             // distance from current location to destination planet
             var curPosDistance = Math.floor(this.getDistance( {x: ship.x, y: ship.y}, {x: dP.x, y: dP.y} ));
 			// distance between potential next stop and the destination (in case the potential next stop is the destination, distance is 0)
@@ -2593,23 +2611,24 @@ function wrapper () { // wrapper for injection
             // toDo: exclude targets where minefields or other dangers had to be crossed/passed
             if (nextPosDistance < curPosDistance && this.planetHasEnoughFuel(tP) && this.isSavePlanet(tP))
             {
-                turnTargets[i].distance = nextPosDistance;
-                turnTargets[i].eta = this.getETA(tt, ship);
+                waypoints[i].distance = nextPosDistance; // distance between potential next waypoint and the final destination
+                waypoints[i].eta = this.getETA(tP, ship); // ETA from current position to potential next waypoint
+                console.log("...ETA to target: " + waypoints[i].eta);
                 //var futRes = this.getFutureSurfaceResources(tP, turns);
-                //turnTargets[i].fuel = futRes.neutronium;
-                turnTargets[i].pid = tP.id;
-                closerTurnTargets.push(turnTargets[i]);
+                //waypoints[i].fuel = futRes.neutronium;
+                waypoints[i].pid = tP.id;
+                closerWaypoints.push(waypoints[i]);
             }
 		}
 		// sort the targets by distance
-        closerTurnTargets.sort(function(a, b) {
+        closerWaypoints.sort(function(a, b) {
 				var x = a.distance;
 				var y = b.distance;
 				if (x < y) {return -1;}
 				if (x > y) {return 1;}
 				return 0;
 			});
-		return closerTurnTargets;
+		return { waypoints: closerWaypoints, considered: waypoints.length, destIncluded: containsDest };
 	};
     APS.prototype.isSavePlanet = function(planet)
     {
@@ -2686,7 +2705,7 @@ function wrapper () { // wrapper for injection
             // only when ship has weapons toDo: or when ship is capable of robbing?
             if (eS[j].armed)
             {
-                console.log("...position (" + object.id + ":" + object.x + "x" + object.y + ") is in range (" + this.enemySafetyZone + " lj) of enemy ship - (" + eS[j].x + "x" + eS[j].y + ")!");
+                //console.log("...position (" + object.id + ":" + object.x + "x" + object.y + ") is in range (" + this.enemySafetyZone + " lj) of enemy ship - (" + eS[j].x + "x" + eS[j].y + ")!");
                 return true;
             }
         }
