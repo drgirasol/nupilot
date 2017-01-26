@@ -1917,7 +1917,7 @@ function wrapper () { // wrapper for injection
 		if (typeof origin == "undefined") origin = { x: this.ship.x, y: this.ship.y };
         if (typeof dest == "undefined") dest = { x: this.ship.targetx, y: this.ship.targety };
 		var ETA = 1;
-		var maxTurnDist = Math.pow(this.ship.warp,2);
+		var maxTurnDist = Math.pow(this.ship.engineid,2);
 		var journeyDist = Math.floor(this.getDistance({ x: origin.x, y: origin.y }, { x: dest.x, y: dest.y }));
 		if (journeyDist > maxTurnDist) ETA = Math.ceil(journeyDist / maxTurnDist);
 		return ETA;
