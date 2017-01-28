@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable semi-intelligent auto-pilots
-// @version       0.07.03
+// @version       0.07.04
 // @date          2017-01-08
 // @author        drgirasol
 // @include       http://planets.nu/*
@@ -1427,7 +1427,7 @@ function wrapper () { // wrapper for injection
         var trueSinks = [];
 		for (var i = 0; i < this.sinks.length; i++)
 		{
-			if (aps.getMissionConflict(this.sinks[i].pid)) continue;
+			if (aps.getMissionConflict(this.sinks[i].pid)) continue; // toDo: collector
 			var sinkPlanet = vgap.getPlanet(this.sinks[i].pid);
 			this.frnnSinks.push({x: sinkPlanet.x, y: sinkPlanet.y});
 			var distance = Math.floor(aps.getDistance({x: sinkPlanet.x, y: sinkPlanet.y}, {x:aps.ship.x ,y:aps.ship.y}));
@@ -1446,7 +1446,7 @@ function wrapper () { // wrapper for injection
             }
 		}
 		// priorities by degree of deficiency (split)... and sort splits by distance
-		this.sinks = aps.getDevidedCollection(trueSinks, splitBy, this.devideThresh, "distance");
+		this.sinks = aps.getDevidedCollection(trueSinks, splitBy, this.devideThresh, "value", "desc");
 		console.log(this.sinks);
 	};
 	distributorAPS.prototype.getObjectDeficiency = function(object)
@@ -1572,16 +1572,14 @@ function wrapper () { // wrapper for injection
     };
 	distributorAPS.prototype.handleCargo = function (aps)
 	{
-		if (aps.planet && aps.isOwnPlanet)
+		if (aps.planet && aps.isOwnPlanet && aps.destination.id == aps.planet.id) // distributors only handle cargo at destination (source or sink)
 		{
 			var transCargo = 0;
             aps.unloadCargo(); // unload cargo
+            if (this.ooiPriority == "neu") aps.unloadFuel();
 			if (this.isSource(aps.planet))
 			{
 				transCargo = this.loadCargo(aps); // load cargo
-			} else if (this.isSink(aps.planet))
-			{
-				if (this.ooiPriority == "neu") aps.unloadFuel();
 			}
 			console.log("Cargo summary: " + transCargo);
 		}
@@ -3485,6 +3483,8 @@ function wrapper () { // wrapper for injection
         },
 		getMcDeficiency: function(planet)
 		{
+		    // deficiency is based on building que
+            // toDo: consider the demand of money at starbases building particular ships...
 			var deficiency = 0;
 			var tfdef = parseInt(planet.targetfactories) - parseInt(planet.factories);
 			var tmdef = parseInt(planet.targetmines) - parseInt(planet.mines);
@@ -3567,9 +3567,9 @@ function wrapper () { // wrapper for injection
                     }
                     // megacredit sinks (-) and sources (+)
                     def = autopilot.getMcDeficiency(planet);
-                    if (def >= 0)
+                    if (def > 500)
                     {
-                        if (def > 500) autopilot.mcSources.push({ pid: planet.id, value: def });
+                        autopilot.mcSources.push({ pid: planet.id, value: def });
                     } else
                     {
                         autopilot.mcDeficiencies.push({ pid: planet.id, deficiency: def, resources: autopilot.getSumAvailableObjects(planet, "minerals") });
