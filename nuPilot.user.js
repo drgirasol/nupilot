@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable semi-intelligent auto-pilots
-// @version       0.06.99
+// @version       0.07.03
 // @date          2017-01-08
 // @author        drgirasol
 // @include       http://planets.nu/*
@@ -10,12 +10,7 @@
 // @resource	  Documentation https://github.com/drgirasol/nupilot/wiki
 // @updateURL     https://greasyfork.org/scripts/26189-nupilot/code/nuPilot.user.js
 // @downloadURL   https://greasyfork.org/scripts/26189-nupilot/code/nuPilot.user.js
-// @history       0.01 (01)  Initial [2016-11-19]
-// @history       0.02 (22)  Collectors & Distributers - an Introduction [2016-12-05]
-// @history       0.03 (35)  Transition from note configuration to shipScreen Mission Dialog configuration [2016-12-26]
-// @history       0.04 (40)  Colonization module (Expander) added [2016-12-28]
-// @history       0.04 (41)  Ally minefields, planets and ships are no longer recognized as danger [2016-12-30]
-// @history       0.05 (44)  Alchemy module (Alchemist) added [2016-12-31]
+
 // ==/UserScript==
 
 
@@ -357,6 +352,7 @@ function wrapper () { // wrapper for injection
 			 	desc: "Collect resources and deliver them to the current planet.",
 				shipFunction: "col",
 				ooiOptions: [ "all", "neu", "dur", "tri", "mol", "cla", "mcs", "sup" ],
+                action: false,
 				hullId: 0
 			},
 			{
@@ -364,6 +360,7 @@ function wrapper () { // wrapper for injection
 				desc: "Distribute resources from sources to sinks.",
 				shipFunction: "dis",
 				ooiOptions: [ "neu", "cla", "sup", "mcs" ],
+                action: false,
 				hullId: 0
 			},
 			{
@@ -371,6 +368,7 @@ function wrapper () { // wrapper for injection
 				desc: "Load supply and unload products",
 				shipFunction: "alc",
 				ooiOptions: [ "all", "dur", "tri", "mol" ],
+                action: false,
 				hullId: 0
 			},
 			{
@@ -378,13 +376,15 @@ function wrapper () { // wrapper for injection
 				desc: "Colonize unowned planets",
 				shipFunction: "exp",
 				ooiOptions: [ "cla" ],
+                action: false,
 				hullId: 0
 			},
 			{
 				name: "Deactivate",
 				desc: "Deactivate auto-pilot",
 				shipFunction: "000",
-				ooiOptions: [ "END" ],
+				ooiOptions: [ false ],
+                action: "END",
 				hullId: 0
 			}
 		];
@@ -397,61 +397,65 @@ function wrapper () { // wrapper for injection
             var c = apcOptions[a];
 			if (vgap.shipScreen.ship.hullid != 105 && c.shipFunction == "alc") continue; // only show alchemy module if its an alchemy ship
 			//
-			var d = function(g) {
-				return function() {
-					vgap.shipScreen.selectMission(curMission);
-				};
-			};
-			if (c.ooiOptions.length > 1)
-			{
-				$("<div>" + c.name + "<span>" + c.desc + "<br/>Priority: <b id='ooiPriority" + c.shipFunction + "'></b></span></div>").tclick(d()).appendTo("#OrdersScreen");
-				for (j = 0; j < c.ooiOptions.length; j++)
-				{
-					var clickf = function(g, h) {
-						return function() {
-						    var cfgData = autopilot.isInStorage(vgap.shipScreen.ship.id);
-						    if (!cfgData)
+            var setShipFunction = function(func, ooiPriority, action) {
+                return function() {
+                    if (action) // is "END" = stop APS function
+                    {
+                        var cfgData = autopilot.isInStorage(vgap.shipScreen.ship.id);
+                        if (cfgData) {
+                            cfgData.action = "END";
+                            autopilot.syncLocalStorage(cfgData); // will remove entry and update ship
+                        }
+                    } else if (func && ooiPriority) // currently this is only relevant for Expander (colonize)
+                    {
+                        var cfgData = autopilot.isInStorage(vgap.shipScreen.ship.id);
+                        if (!cfgData)
+                        {
+                            var baseId = 0; // todo: closest owned planet
+                            var planet = vgap.planetAt(vgap.shipScreen.ship.x, vgap.shipScreen.ship.y);
+                            if (planet) baseId = planet.id;
+                            var data = { sid: vgap.shipScreen.ship.id, base: baseId, shipFunction: func, ooiPriority: ooiPriority };
+                            var newAPS = new APSdata(data);
+                            //cfgData = autopilot.syncLocalStorage(data); // will get default cfgData (=data)
+                            autopilot.setupAPS(vgap.shipScreen.ship.id, newAPS);
+                        }
+                        // else... function already set for APS - do nothing
+                    }
+                    vgap.shipScreen.selectMission(curMission);
+                };
+            };
+            if (c.ooiOptions.length > 1)
+            {
+                $("<div>" + c.name + "<span>" + c.desc + "<br/>Priority: <b id='ooiPriority" + c.shipFunction + "'></b></span></div>").tclick(setShipFunction(false, false, false)).appendTo("#OrdersScreen");
+                for (var j = 0; j < c.ooiOptions.length; j++)
+                {
+                    var setShipFunctionOoi = function(func, ooiPriority) {
+                        return function() {
+                            var cfgData = autopilot.isInStorage(vgap.shipScreen.ship.id);
+                            if (!cfgData)
                             {
                                 var baseId = 0; // todo: closest owned planet
                                 var planet = vgap.planetAt(vgap.shipScreen.ship.x, vgap.shipScreen.ship.y);
                                 if (planet) baseId = planet.id;
-                                var data = { sid: vgap.shipScreen.ship.id, base: baseId, shipFunction: g, ooiPriority: h };
-                                cfgData = autopilot.syncLocalStorage(data); // will get default cfgData (=data)
-                                if (h != "END") autopilot.setupAPS(vgap.shipScreen.ship.id, cfgData);
+                                var data = { sid: vgap.shipScreen.ship.id, base: baseId, shipFunction: func, ooiPriority: ooiPriority };
+                                var newAPS = new APSdata(data);
+                                //cfgData = autopilot.syncLocalStorage(data); // will get default cfgData (=data)
+                                autopilot.setupAPS(vgap.shipScreen.ship.id, newAPS);
                             } else {
-						        cfgData.shipFunction = g;
-						        cfgData.ooiPriority = h;
-                                cfgData = autopilot.syncLocalStorage(cfgData); // will get default cfgData (=data)
-                                if (h != "END") autopilot.updateAPS(vgap.shipScreen.ship.id, cfgData);
+                                cfgData.shipFunction = func;
+                                cfgData.ooiPriority = ooiPriority;
+                                //cfgData = autopilot.syncLocalStorage(cfgData); // will get default cfgData (=data)
+                                autopilot.updateAPS(vgap.shipScreen.ship.id, cfgData);
                             }
-							return false;
-						};
-					};
-					$("<a style='color:cyan;font-size: 10px;'>" + c.ooiOptions[j] + " </a>").tclick(clickf(c.shipFunction, c.ooiOptions[j])).appendTo("#ooiPriority" + c.shipFunction);
-				}
-			} else
-			{
-				var d = function(g, h) {
-					return function() {
-                        var cfgData = autopilot.isInStorage(vgap.shipScreen.ship.id);
-                        if (!cfgData) {
-                            var baseId = 0; // todo: closest owned planet
-                            var planet = vgap.planetAt(vgap.shipScreen.ship.x, vgap.shipScreen.ship.y);
-                            if (planet) baseId = planet.id;
-                            var data = {sid: vgap.shipScreen.ship.id, base: baseId, shipFunction: g, ooiPriority: h};
-                            cfgData = autopilot.syncLocalStorage(data);
-                            if (h != "END") autopilot.setupAPS(vgap.shipScreen.ship.id, cfgData);
-                        } else {
-                            cfgData.shipFunction = g;
-                            cfgData.ooiPriority = h;
-                            cfgData = autopilot.syncLocalStorage(cfgData); // will get default cfgData (=data)
-                            if (h != "END") autopilot.updateAPS(vgap.shipScreen.ship.id, cfgData);
-                        }
-                        vgap.shipScreen.selectMission(curMission);
-					};
-				};
-				$("<div>" + c.name + "<span>" + c.desc + "</span></div>").tclick(d(c.shipFunction, c.ooiOptions[0])).appendTo("#OrdersScreen");
-			}
+                            return false;
+                        };
+                    };
+                    $("<a style='color:cyan;font-size: 10px;'>" + c.ooiOptions[j] + " </a>").tclick(setShipFunctionOoi(c.shipFunction, c.ooiOptions[j])).appendTo("#ooiPriority" + c.shipFunction);
+                }
+            } else
+            {
+                $("<div>" + c.name + "<span>" + c.desc + "</span></div>").tclick(setShipFunction(c.shipFunction, c.ooiOptions[0], c.action)).appendTo("#OrdersScreen");
+            }
         }
         shtml.moreBack();
         vgap.showMore();
@@ -1062,47 +1066,54 @@ function wrapper () { // wrapper for injection
     {
         // aps.potDest = aps.potDest;
     };
-	expanderAPS.prototype.handleCargo = function (aps)
+	expanderAPS.prototype.handleCargo = function (aps) // called on arrival at destination and when at owned planet
 	{
-		if (aps.planet)
-		{
-			if (aps.isOwnPlanet && this.isSource(aps.planet)) // we are at a source
-			{
-				var transCargo = this.loadCargo(aps);
-				console.log("Cargo summary: " + transCargo);
-			} else // sink
-			{
-				aps.unloadCargo();
-			}
-		}
+	    if (aps.planet)
+        {
+            if (!aps.isOwnPlanet)
+            {
+                // = new colony
+                aps.unloadCargo();
+            } else
+            {
+                var transCargo = this.loadCargo(aps, this.isSource(aps.planet));
+                console.log("Cargo summary: " + transCargo);
+            }
+        }
 	};
-	expanderAPS.prototype.loadCargo = function(aps)
+	expanderAPS.prototype.loadCargo = function(aps, isSource)
 	{
-		var curCargo = 0;
-		// colonist handling
-		// cargo = 75 % clans, 25 % supply, supply * 3 MCs (factory building)
-		var clans = Math.floor(0.75 * aps.hull.cargo);
-		var supply = aps.hull.cargo - clans;
-		var mcs = supply * 3;
-		if (this.ooiPriority == "cla") // fixed
-		{
-			var value = autopilot.getFreeClans(aps.planet);
-			if (value >= clans)
-			{
-				curCargo = aps.loadObject("clans", aps.planet, clans);
-			} else
-			{
-				curCargo = aps.loadObject("clans", aps.planet, value);
-			}
-			if (aps.planet.supplies >= supply)
-			{
-				curCargo += aps.loadObject("supplies", aps.planet, supply);
-			} else
-			{
-				curCargo += aps.loadObject("supplies", aps.planet, aps.planet.supplies);
-			}
-			aps.loadMegacredits(aps.planet, mcs);
-		}
+        var curCargo = 0;
+	    if (isSource)
+        {
+            // colonist handling
+            // cargo = 75 % clans, 25 % supply, supply * 3 MCs (factory building)
+            var clans = Math.floor(0.75 * aps.hull.cargo);
+            var supply = aps.hull.cargo - clans;
+            var mcs = supply * 3;
+            if (this.ooiPriority == "cla") // fixed
+            {
+                var value = autopilot.getFreeClans(aps.planet);
+                if (value >= clans) {
+                    curCargo = aps.loadObject("clans", aps.planet, clans);
+                } else {
+                    curCargo = aps.loadObject("clans", aps.planet, value);
+                }
+                if (aps.planet.supplies >= supply) {
+                    curCargo += aps.loadObject("supplies", aps.planet, supply);
+                } else {
+                    curCargo += aps.loadObject("supplies", aps.planet, aps.planet.supplies);
+                }
+                aps.loadMegacredits(aps.planet, mcs);
+            }
+        } else
+        {
+	        var mcValue = aps.getObjectExcess(aps.planet, "mcs");
+	        if (mcValue > 50)
+            {
+                aps.loadMegacredits(aps.planet, (mcValue - 50));
+            }
+        }
 		return curCargo;
 	};
 	expanderAPS.prototype.transferCargo = function(aps)
@@ -1210,7 +1221,7 @@ function wrapper () { // wrapper for injection
             k++;
             if (k * aps.simpleRange > aps.scopeRange) break; // toDo: this way scope range is ineffective...
             targetsInRange = aps.getTargetsInRange(autopilot.frnnOwnPlanets, aps.base.x, aps.base.y, aps.simpleRange * k);
-            if (targetsInRange.length > 0 && this.ooiPriority != "mcs")
+            if (targetsInRange.length > 0)
             {
                 targetsInRange = this.getGoodToGoSources(aps, targetsInRange);
             }
@@ -1287,15 +1298,15 @@ function wrapper () { // wrapper for injection
         }
         aps.potDest = filteredDest;
     };
-	collectorAPS.prototype.handleCargo = function (aps)
+	collectorAPS.prototype.handleCargo = function (aps) // called on arrival at destination and when at owned planet
 	{
-		if (aps.planet)
+		if (aps.planet && aps.isOwnPlanet)
 		{
 			if (aps.atBase) // we are at base (sink)
 			{
 				aps.unloadCargo();
 				if (this.ooiPriority == "neu") aps.unloadFuel();
-			} else // source
+			} else // source or waypoint
 			{
 				var transCargo = this.loadCargo(aps);
 				console.log("Cargo summary: " + transCargo);
@@ -1304,56 +1315,65 @@ function wrapper () { // wrapper for injection
 	};
 	collectorAPS.prototype.loadCargo = function(aps)
 	{
-		var curCargo = 0;
-		// Supply & MC handling
-		if (this.ooiPriority == "mcs" || (this.alwaysLoadMC && this.ooiPriority != "cla"))
-		{
-			if (!(this.sellSupply == "notBov" && aps.planet.nativeracename == "Bovinoid"))
-			{
-				aps.sellSupply();
-			}
-			aps.loadMegacredits(aps.planet);
-		}
-		// colonist handling
-		if (this.ooiPriority == "cla")
-		{
-			var value = autopilot.getFreeClans(aps.planet);
-			curCargo = aps.loadObject("clans", aps.planet, value);
-		}
-		// Resources handling
-		if (this.ooiPriority != "mcs" && this.ooiPriority != "cla")
-		{
-			var baseSequence = [];
-			var loadingSequence = [];
-			if (this.ooiPriority == "all")
-			{
-				baseSequence = [ { res: "dur", value: parseInt(aps.planet.duranium) }, { res: "tri", value: parseInt(aps.planet.tritanium) }, { res: "mol", value: parseInt(aps.planet.molybdenum) } ];
-			} else if (this.ooiPriority == "dur")
-			{
-				loadingSequence = ["duranium"];
-				baseSequence = [ { res: "mol", value: parseInt(aps.planet.molybdenum) }, { res: "tri", value: parseInt(aps.planet.tritanium) } ];
-			} else if (this.ooiPriority == "tri")
-			{
-				loadingSequence = ["tritanium"];
-				baseSequence = [ { res: "mol", value: parseInt(aps.planet.molybdenum) }, { res: "dur", value: parseInt(aps.planet.duranium) } ];
-			} else if (this.ooiPriority == "mol")
-			{
-				loadingSequence = ["molybdenum"];
-				baseSequence = [ { res: "tri", value: parseInt(aps.planet.tritanium) }, { res: "dur", value: parseInt(aps.planet.duranium) } ];
-			}
-			// determine the (remaining) loading sequence by what is needed at base (sink)
-			baseSequence = aps.sortCollection(baseSequence, "value");
-			baseSequence.forEach(function(seq){ loadingSequence.push(aps.moveables[seq.res]); });
-			//console.log(loadingSequence);
-			//
-			// loading
-			//
-			for (var i = 0; i < loadingSequence.length; i++)
-			{
-				curCargo += aps.loadObject(loadingSequence[i], aps.planet);
-				if (curCargo == aps.hull.cargo) break;
-			}
-		}
+        var curCargo = 0;
+	    if (aps.destination.id == aps.planet.id)
+        {
+            // Supply & MC handling
+            if (this.ooiPriority == "mcs" || (this.alwaysLoadMC && this.ooiPriority != "cla"))
+            {
+                if (!(this.sellSupply == "notBov" && aps.planet.nativeracename == "Bovinoid"))
+                {
+                    aps.sellSupply();
+                }
+                aps.loadMegacredits(aps.planet);
+            }
+            // colonist handling
+            if (this.ooiPriority == "cla")
+            {
+                var value = autopilot.getFreeClans(aps.planet);
+                curCargo = aps.loadObject("clans", aps.planet, value);
+            }
+            // Resources handling
+            if (this.ooiPriority != "mcs" && this.ooiPriority != "cla")
+            {
+                var baseSequence = [];
+                var loadingSequence = [];
+                if (this.ooiPriority == "all")
+                {
+                    baseSequence = [ { res: "dur", value: parseInt(aps.planet.duranium) }, { res: "tri", value: parseInt(aps.planet.tritanium) }, { res: "mol", value: parseInt(aps.planet.molybdenum) } ];
+                } else if (this.ooiPriority == "dur")
+                {
+                    loadingSequence = ["duranium"];
+                    baseSequence = [ { res: "mol", value: parseInt(aps.planet.molybdenum) }, { res: "tri", value: parseInt(aps.planet.tritanium) } ];
+                } else if (this.ooiPriority == "tri")
+                {
+                    loadingSequence = ["tritanium"];
+                    baseSequence = [ { res: "mol", value: parseInt(aps.planet.molybdenum) }, { res: "dur", value: parseInt(aps.planet.duranium) } ];
+                } else if (this.ooiPriority == "mol")
+                {
+                    loadingSequence = ["molybdenum"];
+                    baseSequence = [ { res: "tri", value: parseInt(aps.planet.tritanium) }, { res: "dur", value: parseInt(aps.planet.duranium) } ];
+                }
+                // determine the (remaining) loading sequence by what is needed at base (sink)
+                baseSequence = aps.sortCollection(baseSequence, "value");
+                baseSequence.forEach(function(seq){ loadingSequence.push(aps.moveables[seq.res]); });
+                //console.log(loadingSequence);
+                //
+                // loading
+                //
+                for (var i = 0; i < loadingSequence.length; i++)
+                {
+                    curCargo += aps.loadObject(loadingSequence[i], aps.planet);
+                    if (curCargo == aps.hull.cargo) break;
+                }
+            }
+        } else {
+            var mcValue = aps.getObjectExcess(aps.planet, "mcs");
+            if (mcValue > 50)
+            {
+                aps.loadMegacredits(aps.planet, (mcValue - 50));
+            }
+        }
 		return curCargo;
 	};
 	/*
@@ -1552,7 +1572,7 @@ function wrapper () { // wrapper for injection
     };
 	distributorAPS.prototype.handleCargo = function (aps)
 	{
-		if (aps.planet)
+		if (aps.planet && aps.isOwnPlanet)
 		{
 			var transCargo = 0;
             aps.unloadCargo(); // unload cargo
@@ -1568,25 +1588,28 @@ function wrapper () { // wrapper for injection
 	};
 	distributorAPS.prototype.loadCargo = function(aps)
 	{
-		var transCargo = 0;
-		var dP = vgap.getPlanet(aps.destination.id);
-		var factor = 1.1;
-		if (this.ooiPriority == "neu") factor = 2;
-		var deficiency = Math.floor((this.getObjectDeficiency(dP) * -1) * factor); // bring more...
-		if (deficiency > 0)
-		{
-			var object = aps.moveables[this.ooiPriority];
-			var available = autopilot.getSumAvailableObjects(aps.planet, object);
-            console.log("There is " + available + " " + object + " available");
-			if (available < 0) available = 0;
-			if (deficiency > available)
+	    if (aps.destination)
+        {
+            var transCargo = 0;
+            var dP = vgap.getPlanet(aps.destination.id);
+            var factor = 1.1;
+            if (this.ooiPriority == "neu") factor = 2;
+            var deficiency = Math.floor((this.getObjectDeficiency(dP) * -1) * factor); // bring more...
+            if (deficiency > 0)
             {
-                deficiency = available;
+                var object = aps.moveables[this.ooiPriority];
+                var available = autopilot.getSumAvailableObjects(aps.planet, object);
+                console.log("There is " + available + " " + object + " available");
+                if (available < 0) available = 0;
+                if (deficiency > available)
+                {
+                    deficiency = available;
+                }
+                transCargo = aps.loadObject(object, aps.planet, deficiency);
             }
-			transCargo = aps.loadObject(object, aps.planet, deficiency);
-		}
-		console.log("Loaded (" + this.ooiPriority + "): " + transCargo + "/" + deficiency);
-		return (transCargo - deficiency);
+            console.log("Loaded (" + this.ooiPriority + "): " + transCargo + "/" + deficiency);
+            return (transCargo - deficiency);
+        }
 	};
 	/*
 	 *  Container for local storage data entries
@@ -1821,8 +1844,8 @@ function wrapper () { // wrapper for injection
 			// if we are at the destination, clear destination setting
 			if (this.destination.id == this.planet.id)
 			{
+                this.functionModule.handleCargo(this);
 				console.log("We are at destination, clear setting...");
-				this.functionModule.handleCargo(this);
 				this.destination = false;
 				storageData.destination = false;
 				// if new behaviour is requested, now is the time for change
@@ -1917,7 +1940,8 @@ function wrapper () { // wrapper for injection
 		if (typeof origin == "undefined") origin = { x: this.ship.x, y: this.ship.y };
         if (typeof dest == "undefined") dest = { x: this.ship.targetx, y: this.ship.targety };
 		var ETA = 1;
-		var maxTurnDist = Math.pow(this.ship.engineid,2);
+		if (this.ship.warp == 0) this.setWarp();
+		var maxTurnDist = Math.pow(this.ship.warp,2);
 		var journeyDist = Math.floor(this.getDistance({ x: origin.x, y: origin.y }, { x: dest.x, y: dest.y }));
 		if (journeyDist > maxTurnDist) ETA = Math.ceil(journeyDist / maxTurnDist);
 		return ETA;
@@ -2284,7 +2308,7 @@ function wrapper () { // wrapper for injection
                 console.log("APS on route to destination...");
             }
         }
-        if (this.planet && this.isOwnPlanet) this.functionModule.handleCargo(this); // load specific amount...
+        //if (this.planet && this.isOwnPlanet) this.functionModule.handleCargo(this); // load specific amount...
         if (dP && (this.planet || this.isInWarpWell()))
         {
             this.setShipTarget(dP);
@@ -2301,6 +2325,7 @@ function wrapper () { // wrapper for injection
             console.warn("Emergency: Enemy in range - flight mode -> returning back to base!");
             this.setShipTarget(this.base);
         }
+        if (this.planet && this.isOwnPlanet) this.functionModule.handleCargo(this);
         if (this.destination)
         {
             if (this.checkFuel()) {
@@ -2578,7 +2603,7 @@ function wrapper () { // wrapper for injection
 				devideThresh = Math.floor(this.hull.fueltank * this.functionModule.minimalCargoRatioToGo);
 			} else if (this.objectOfInterest == "mcs")
 			{
-				devideThresh = 5000;
+				devideThresh = 250;
 			} else
 			{
 				devideThresh = Math.floor(this.hull.cargo * this.functionModule.minimalCargoRatioToGo);
@@ -2972,26 +2997,28 @@ function wrapper () { // wrapper for injection
             return { x: this.ship.x, y: this.ship.y };
         }
     };
-    APS.prototype.getObjectExcess = function(object)
+    APS.prototype.getObjectExcess = function(object, ooi)
     {
         var tValue = 0;
-        if (this.functionModule.ooiPriority == "all")
+        if (typeof ooi == "undefined")
+        {
+            ooi = this.functionModule.ooiPriority;
+        }
+        if (ooi == "all")
         {
             // amount of all resources that are used to build ships
             tValue = parseInt(object.duranium) + parseInt(object.tritanium) + parseInt(object.molybdenum);
-        } else if (this.functionModule.ooiPriority == "cla")
+        } else if (ooi == "cla")
         {
             // amount of free clans
             tValue = autopilot.getFreeClans(object);
-        } else if (this.functionModule.ooiPriority == "mcs")
+        } else if (ooi == "mcs")
         {
-            // amount of theoretical cash (megacredits and supplies)
-            tValue = parseInt(object.megacredits) + parseInt(object.supplies);
-            // if we don't want to sell supplies on bovinoid planets we only count megacredits
-            if (object.nativeracename == "Bovinoid" && this.functionModule.sellSupply == "notBov") tValue = object.megacredits;
+            // amount of megacredits
+            tValue = autopilot.getMcDeficiency(object);
         } else
         {
-            tValue = parseInt(object[this.moveables[this.functionModule.ooiPriority]]);
+            tValue = parseInt(object[this.moveables[ooi]]);
         }
         return tValue;
     };
@@ -3308,16 +3335,21 @@ function wrapper () { // wrapper for injection
         {
             // check messages for combat reports where APS might have been destroyed...
             // this is necessary due to the recycling of shipIDs
-            vgap.messages.forEach(function (msg) {
-                if (msg.template == "shipdestroyed")
+            vgap.messages.forEach(function (msg)
+            {
+                console.log(msg);
+                if (msg.body.match(/has been destroyed/) !== null)
                 {
+                    console.warn("A ship has been destroyed...");
                     if (msg.ownerid == vgap.player.id)
                     {
+                        console.warn("...the ship is from us...");
                         // if target is a APS, delete local storage entry
                         var apsData = autopilot.isInStorage(msg.target);
                         if (apsData)
                         {
-                            apsData.ooiPriority = "END";
+                            console.warn("...the ship is an APS...");
+                            apsData.action = "DEL";
                             autopilot.syncLocalStorage(apsData);
                         }
                     }
@@ -3682,12 +3714,17 @@ function wrapper () { // wrapper for injection
 					if (storedGameData[i].sid == data.sid)
 					{
 						// if turned off
-						if (data.ooiPriority == "END")
-						{
-							storedGameData.splice(i, 1); // delete entry
-							autopilot.clearShipTarget(data.sid);
-							autopilot.clearShipNote(data.sid);
-						} else
+                        if (data.action == "END" || data.action == "DEL")
+                        {
+                            storedGameData.splice(i, 1); // delete stored data entry
+                            if (data.action == "END")
+                            {
+                                // set ship waypoint to current position
+                                autopilot.clearShipTarget(data.sid);
+                                // clear the ship note toDo: delete ship note?
+                                autopilot.clearShipNote(data.sid);
+                            }
+                        } else
 						{
 							// if ship function or priority has been changed...
 							if (autopilot.behaviourHasToChange(storedGameData[i], data) && data.destination)
@@ -3781,7 +3818,6 @@ function wrapper () { // wrapper for injection
 			var aps = new APS(ship, cfgData);
 			if (aps.isAPS)
 			{
-
 				if (aps.hasToSetPotDes)
 				{
                     autopilot.collectSourceSinkData();
@@ -3805,6 +3841,7 @@ function wrapper () { // wrapper for injection
          */
 		processload: function() {
             console.log(vgap);
+            autopilot.scanReports();
             //console.log("realTurn = " + autopilot.realTurn + " / " + vgap.game.turn);
             if (!autopilot.realTurn || autopilot.realTurn < vgap.game.turn || autopilot.gameId != vgap.game.id)
             {
