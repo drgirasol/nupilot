@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable semi-intelligent auto-pilots
-// @version       0.07.06
+// @version       0.07.16
 // @date          2017-01-08
 // @author        drgirasol
 // @include       http://planets.nu/*
@@ -308,15 +308,12 @@ function wrapper () { // wrapper for injection
                 var a = new Array();
                 if (vgap.player.raceid != 12)
                 {
-                    if (this.planet)
-                    {
-                        a.push({
-                            name: "APC",
-                            onclick: function() {
-                                vgap.shipScreen.autopilotControl();
-                            }
-                        });
-                    }
+                    a.push({
+                        name: "APC",
+                        onclick: function() {
+                            vgap.shipScreen.autopilotControl(this.planet);
+                        }
+                    });
                     a.push({
                         name: nu.t.friendly,
                         onclick: function() {
@@ -398,67 +395,75 @@ function wrapper () { // wrapper for injection
 		//
         for (var a = 0; a < apcOptions.length; a++)
 		{
-            var c = apcOptions[a];
-			if (vgap.shipScreen.ship.hullid != 105 && c.shipFunction == "alc") continue; // only show alchemy module if its an alchemy ship
-			//
-            var setShipFunction = function(func, ooiPriority, action) {
-                return function() {
-                    if (action) // is "END" = stop APS function
-                    {
-                        var cfgData = autopilot.isInStorage(vgap.shipScreen.ship.id);
-                        if (cfgData) {
-                            cfgData.action = "END";
-                            autopilot.syncLocalStorage(cfgData); // will remove entry and update ship
-                        }
-                    } else if (func && ooiPriority) // currently this is only relevant for Expander (colonize)
-                    {
-                        var cfgData = autopilot.isInStorage(vgap.shipScreen.ship.id);
-                        if (!cfgData)
-                        {
-                            var baseId = 0;
-                            var planet = vgap.planetAt(vgap.shipScreen.ship.x, vgap.shipScreen.ship.y);
-                            if (planet) baseId = planet.id;
-                            var data = { sid: vgap.shipScreen.ship.id, base: baseId, shipFunction: func, ooiPriority: ooiPriority };
-                            var newAPS = new APSdata(data);
-                            //cfgData = autopilot.syncLocalStorage(data); // will get default cfgData (=data)
-                            autopilot.setupAPS(vgap.shipScreen.ship.id, newAPS);
-                        }
-                        // else... function already set for APS - do nothing
-                    }
-                    vgap.shipScreen.selectMission(curMission);
-                };
-            };
-            if (c.ooiOptions.length > 1)
+            if (this.planet || apcOptions[a].action)
             {
-                $("<div>" + c.name + "<span>" + c.desc + "<br/>Priority: <b id='ooiPriority" + c.shipFunction + "'></b></span></div>").tclick(setShipFunction(false, false, false)).appendTo("#OrdersScreen");
-                for (var j = 0; j < c.ooiOptions.length; j++)
-                {
-                    var setShipFunctionOoi = function(func, ooiPriority) {
-                        return function() {
+                var c = apcOptions[a];
+                if (vgap.shipScreen.ship.hullid != 105 && c.shipFunction == "alc") continue; // only show alchemy module if its an alchemy ship
+                //
+                var setShipFunction = function (func, ooiPriority, action) {
+                    return function () {
+                        if (action) // is "END" = stop APS function
+                        {
                             var cfgData = autopilot.isInStorage(vgap.shipScreen.ship.id);
-                            if (!cfgData)
-                            {
+                            if (cfgData) {
+                                cfgData.action = "END";
+                                autopilot.syncLocalStorage(cfgData); // will remove entry and update ship
+                            }
+                        } else if (func && ooiPriority) // currently this is only relevant for Expander (colonize)
+                        {
+                            var cfgData = autopilot.isInStorage(vgap.shipScreen.ship.id);
+                            if (!cfgData) {
                                 var baseId = 0;
                                 var planet = vgap.planetAt(vgap.shipScreen.ship.x, vgap.shipScreen.ship.y);
                                 if (planet) baseId = planet.id;
-                                var data = { sid: vgap.shipScreen.ship.id, base: baseId, shipFunction: func, ooiPriority: ooiPriority };
+                                var data = {
+                                    sid: vgap.shipScreen.ship.id,
+                                    base: baseId,
+                                    shipFunction: func,
+                                    ooiPriority: ooiPriority
+                                };
                                 var newAPS = new APSdata(data);
                                 //cfgData = autopilot.syncLocalStorage(data); // will get default cfgData (=data)
                                 autopilot.setupAPS(vgap.shipScreen.ship.id, newAPS);
-                            } else {
-                                cfgData.shipFunction = func;
-                                cfgData.ooiPriority = ooiPriority;
-                                //cfgData = autopilot.syncLocalStorage(cfgData); // will get default cfgData (=data)
-                                autopilot.updateAPS(vgap.shipScreen.ship.id, cfgData);
                             }
-                            return false;
-                        };
+                            // else... function already set for APS - do nothing
+                        }
+                        vgap.shipScreen.selectMission(curMission);
                     };
-                    $("<a style='color:cyan;font-size: 10px;'>" + c.ooiOptions[j] + " </a>").tclick(setShipFunctionOoi(c.shipFunction, c.ooiOptions[j])).appendTo("#ooiPriority" + c.shipFunction);
+                };
+                if (c.ooiOptions.length > 1) {
+                    $("<div>" + c.name + "<span>" + c.desc + "<br/>Priority: <b id='ooiPriority" + c.shipFunction + "'></b></span></div>").tclick(setShipFunction(false, false, false)).appendTo("#OrdersScreen");
+                    for (var j = 0; j < c.ooiOptions.length; j++) {
+                        var setShipFunctionOoi = function (func, ooiPriority) {
+                            return function () {
+                                var cfgData = autopilot.isInStorage(vgap.shipScreen.ship.id);
+                                if (!cfgData) {
+                                    var baseId = 0;
+                                    var planet = vgap.planetAt(vgap.shipScreen.ship.x, vgap.shipScreen.ship.y);
+                                    if (planet) baseId = planet.id;
+                                    var data = {
+                                        sid: vgap.shipScreen.ship.id,
+                                        base: baseId,
+                                        shipFunction: func,
+                                        ooiPriority: ooiPriority
+                                    };
+                                    var newAPS = new APSdata(data);
+                                    //cfgData = autopilot.syncLocalStorage(data); // will get default cfgData (=data)
+                                    autopilot.setupAPS(vgap.shipScreen.ship.id, newAPS);
+                                } else {
+                                    cfgData.shipFunction = func;
+                                    cfgData.ooiPriority = ooiPriority;
+                                    //cfgData = autopilot.syncLocalStorage(cfgData); // will get default cfgData (=data)
+                                    autopilot.updateAPS(vgap.shipScreen.ship.id, cfgData);
+                                }
+                                return false;
+                            };
+                        };
+                        $("<a style='color:cyan;font-size: 10px;'>" + c.ooiOptions[j] + " </a>").tclick(setShipFunctionOoi(c.shipFunction, c.ooiOptions[j])).appendTo("#ooiPriority" + c.shipFunction);
+                    }
+                } else {
+                    $("<div>" + c.name + "<span>" + c.desc + "</span></div>").tclick(setShipFunction(c.shipFunction, c.ooiOptions[0], c.action)).appendTo("#OrdersScreen");
                 }
-            } else
-            {
-                $("<div>" + c.name + "<span>" + c.desc + "</span></div>").tclick(setShipFunction(c.shipFunction, c.ooiOptions[0], c.action)).appendTo("#OrdersScreen");
             }
         }
         shtml.moreBack();
@@ -916,6 +921,8 @@ function wrapper () { // wrapper for injection
 	};
 	/*
 	 * Autopilot - Expansion Module
+	 * toDo: major rework...
+     *      - an expander's destination is always an unowned planet (sink)!
 	 */
 	function expanderAPS()
 	{
@@ -947,8 +954,9 @@ function wrapper () { // wrapper for injection
         var k = 0;
         var range = parseInt(aps.simpleRange);
         var targetsInRange = [];
+        var trueTargets = [];
         //var targetsInRange = aps.getTargetsInRange(autopilot.frnnUnownedPlanets, aps.base.x, aps.base.y, aps.simpleRange*k);
-        while(targetsInRange.length < 1)
+        while(trueTargets.length < 5)
         {
             k++;
             if (k > 20) break;
@@ -960,19 +968,21 @@ function wrapper () { // wrapper for injection
                 {
                     var shipsAtSink = vgap.shipsAt(targetsInRange[i].x, targetsInRange[i].y);
                     var p = vgap.planetAt(targetsInRange[i].x, targetsInRange[i].y);
-                    if (shipsAtSink.length > 0)
+                    if (shipsAtSink.length == 0)
                     {
+                        trueTargets.push(targetsInRange[i]);
+                    } else {
                         console.log("... there are ships at sink... removing planet " + p.id);
-                        targetsInRange.splice(i, 1);
                     }
                 }
             }
+            console.log("... trueTargets (sinks): " + trueTargets.length + " (" + (range * k) + ")");
         }
         var amorph = [];
         var potential = [];
-		for (var i = 0; i < targetsInRange.length; i++)
+		for (var i = 0; i < trueTargets.length; i++)
 		{
-			var sP = vgap.planetAt(targetsInRange[i].x, targetsInRange[i].y);
+			var sP = vgap.planetAt(trueTargets[i].x, trueTargets[i].y);
 			var distance = Math.floor(aps.getDistance({x: sP.x, y: sP.y}, {x:aps.ship.x ,y:aps.ship.y}));
             var deficiency = 150;
             if (sP.temp > -1) deficiency = autopilot.getMaxColonistPopulation(sP) * -1;
@@ -997,17 +1007,18 @@ function wrapper () { // wrapper for injection
 	expanderAPS.prototype.getExpanderKit = function(aps)
     {
         // cargo = 75 % clans, 25 % supply, supply * 3 MCs (factory building)
+        var clans = Math.floor(0.75 * aps.hull.cargo);
         return {
-            cla: Math.floor(0.75 * aps.hull.cargo),
-            sup: aps.hull.cargo - Math.floor(0.75 * aps.hull.cargo),
-            mcs: 3 * (aps.hull.cargo - Math.floor(0.75 * aps.hull.cargo))
+            cla: clans,
+            sup: aps.hull.cargo - clans,
+            mcs: 3 * (aps.hull.cargo - clans)
         }
     };
 	expanderAPS.prototype.setSources = function(aps)
 	{
 		// sources are the same as for a clan distributer...
-        // toDo: ...except that also supplies and MCs are needed!
 		this.sources = autopilot.clanSources;
+        console.log("... initialSources: " + this.sources.length);
 		var cutOff = this.getExpanderKit(aps);
         var goodSources = [];
 		for (var i = 0; i < this.sources.length; i++)
@@ -1016,16 +1027,19 @@ function wrapper () { // wrapper for injection
             var value = autopilot.getFreeClans(sourcePlanet); // update deficiencies (...unloading has occured)
             var supplies = aps.getObjectExcess(sourcePlanet, "sup");
             var mcs = aps.getObjectExcess(sourcePlanet, "mcs");
-            if (value >= cutOff.cla && supplies >= cutOff.sup && mcs >= cutOff.mcs)
+            if ((value >= cutOff.cla && supplies >= cutOff.sup && mcs >= cutOff.mcs) || sourcePlanet.id == aps.base.id) // always add the base planet, regardless if everything is available
             {
                 var distance = Math.floor(aps.getDistance({x: sourcePlanet.x, y: sourcePlanet.y}, {x:aps.ship.x ,y:aps.ship.y}));
                 this.sources[i].value = value;
                 this.sources[i].distance = distance;
                 goodSources.push(this.sources[i]);
+            } else
+            {
+                console.log("... planet " + this.sources[i].pid + " has no expander kit to offer!");
             }
 		}
 		this.sources = aps.sortCollection(goodSources, "distance");
-		//console.log(this.sources);
+		console.log(this.sources);
 	};
 	expanderAPS.prototype.isSource = function(planet)
 	{
@@ -1047,24 +1061,18 @@ function wrapper () { // wrapper for injection
 	{
 		if (aps.destination) return;
 		console.log("Determine potential destinations...");
-		//
-		if (this.sinks.length < 1) this.setSinks(aps);
-		//
-		if (this.sources.length < 1) this.setSources(aps);
-		//
-		if (aps.planet && (this.isSource(aps.planet) || aps.ship.clans > 0)) // toDo: function that returns if we have a "colonization kit" on board (clans and suplies (and MCs))
-		{
-			// if we are at source, set sinks as potential destinations
-			console.log("...for expander at source:");
-			aps.potDest = this.sinks;
-			// sort by value... high to low
-			// aps.potDest = aps.sortCollection(aps.potDest, "value", "desc");
-		} else
-		{
-			// set sources as potential destinations, if we are at a sink
-			console.log("...for expander at an unowned planet:");
-			aps.potDest = this.sources;
-		}
+		// if we have clans + supplies + mcs (expanderKit), next destination should be an unowned planet
+        if (this.hasExpKit(aps))
+        {
+            this.setSinks(aps);
+            console.log("...for expander at source:");
+            aps.potDest = this.sinks;
+        } else
+        {
+            this.setSources(aps);
+            console.log("...for expander at an unowned planet:");
+            aps.potDest = this.sources;
+        }
 		if (aps.potDest.length === 0)
 		{
 			console.warn("No destinations available!");
@@ -1092,37 +1100,32 @@ function wrapper () { // wrapper for injection
             }
         }
 	};
+	expanderAPS.prototype.hasExpKit = function(aps)
+    {
+        var expanderKit = this.getExpanderKit(aps);
+        return (aps.ship.clans >= expanderKit.cla && aps.ship.supplies >= expanderKit.sup && aps.ship.megacredits >= expanderKit.mcs);
+    };
 	expanderAPS.prototype.loadCargo = function(aps)
 	{
         var curCargo = 0;
-	    if (this.isSource(aps.destination))
+        var expanderKit = this.getExpanderKit(aps);
+        if (!this.hasExpKit(aps))
         {
-            var mcValue = aps.getObjectExcess(aps.planet, "mcs");
-            if (mcValue > 50)
+            var kDiffCla = aps.ship.clans - expanderKit.cla;
+            var kDiffSup = aps.ship.supplies - expanderKit.sup;
+            var kDiffMcs = aps.ship.megacredits - expanderKit.mcs;
+            //
+            if (kDiffCla < 0)
             {
-                aps.loadMegacredits(aps.planet, (mcValue - 50));
+                curCargo = aps.loadObject("clans", aps.planet, (kDiffCla*-1));
             }
-        } else
-        {
-            var expanderKit = this.getExpanderKit(aps);
-            if (aps.ship.clans < expanderKit.cla || aps.ship.supplies < expanderKit.sup || aps.ship.megacredits < expanderKit.mcs)
+            if (kDiffSup < 0)
             {
-                var kDiffCla = aps.ship.clans - expanderKit.cla;
-                var kDiffSup = aps.ship.supplies - expanderKit.sup;
-                var kDiffMcs = aps.ship.megacredits - expanderKit.mcs;
-                //
-                if (kDiffCla < 0)
-                {
-                    curCargo = aps.loadObject("cla", aps.planet, (kDiffCla*-1));
-                }
-                if (kDiffSup < 0)
-                {
-                    curCargo += aps.loadObject("sup", aps.planet, (kDiffSup*-1));
-                }
-                if (kDiffMcs < 0)
-                {
-                    aps.loadMegacredits(aps.planet, (kDiffMcs*-1));
-                }
+                curCargo += aps.loadObject("supplies", aps.planet, (kDiffSup*-1));
+            }
+            if (kDiffMcs < 0)
+            {
+                aps.loadObject("megacredits", aps.planet, (kDiffMcs*-1));
             }
         }
 		return curCargo;
@@ -1389,7 +1392,12 @@ function wrapper () { // wrapper for injection
 	/*
 	 *
 	 * Autopilot - Distributor Module
-	 *
+	 * toDo: major rework...
+	 *      - a disributor's destination is always a sink!
+	 *      - search for closest (to sink) sufficient source
+	 *      - as long as cargo does not contain sufficient material, will target sufficient source
+	 *      - will pick up material on the way, until source is reached or cargo holds sufficient material
+	 *      - will approach sink, if cargo holds sufficient material
 	 */
 	function distributorAPS()
 	{
@@ -1415,8 +1423,8 @@ function wrapper () { // wrapper for injection
 	distributorAPS.prototype.setSinks = function(aps)
 	{
 	    var splitBy = "deficiency";
-	    var sortBy = "value";
-	    var direction = "desc";
+	    var sortBy = "distance";
+	    var direction = "asc";
 	    var cutOff = 0;
 		if (this.ooiPriority == "cla")
 		{
@@ -1430,32 +1438,24 @@ function wrapper () { // wrapper for injection
 		{
 			this.sinks = autopilot.supDeficiencies;
             splitBy = "resources";
-            sortBy = "distance";
-            direction = "asc";
 			this.devideThresh = 4000; // toDo: average of all planets?
 		} else if (this.ooiPriority == "mcs")
         {
             this.sinks = autopilot.mcDeficiencies;
             splitBy = "resources";
-            sortBy = "distance";
-            direction = "asc";
             cutOff = -100; // only consider deficiencies of 100 and more
             this.devideThresh = 4000; // toDo: average of all planets?
         }
         var trueSinks = [];
 		for (var i = 0; i < this.sinks.length; i++)
 		{
-			if (aps.getMissionConflict(this.sinks[i].pid)) continue; // toDo: collector
 			var sinkPlanet = vgap.getPlanet(this.sinks[i].pid);
 			this.frnnSinks.push({x: sinkPlanet.x, y: sinkPlanet.y});
 			var distance = Math.floor(aps.getDistance({x: sinkPlanet.x, y: sinkPlanet.y}, {x:aps.ship.x ,y:aps.ship.y}));
 			// update deficiencies (...unloading could have ocurred)
 			var def = this.getObjectDeficiency(sinkPlanet);
-			if (def > cutOff)
+			if (def < cutOff)
 			{
-			    continue;
-            } else
-            {
                 this.sinks[i].deficiency = def;
                 this.sinks[i].distance = distance;
                 this.sinks[i].x = sinkPlanet.x;
@@ -1467,18 +1467,19 @@ function wrapper () { // wrapper for injection
 		this.sinks = aps.getDevidedCollection(trueSinks, splitBy, this.devideThresh, sortBy, direction);
 		console.log(this.sinks);
 	};
-	distributorAPS.prototype.getObjectDeficiency = function(object)
+	distributorAPS.prototype.getObjectDeficiency = function(object, ooi)
     {
-        if (this.ooiPriority == "cla")
+        if (typeof ooi == "undefined") ooi = this.ooiPriority;
+        if (ooi == "cla")
         {
             return autopilot.getClanDeficiency(object);
-        } else if (this.ooiPriority == "neu")
+        } else if (ooi == "neu")
         {
             return autopilot.getFuelDeficiency(object);
-        } else if (this.ooiPriority == "sup")
+        } else if (ooi == "sup")
         {
             return autopilot.getSupDeficiency(object);
-        } else if (this.ooiPriority == "mcs")
+        } else if (ooi == "mcs")
         {
             return autopilot.getMcDeficiency(object);
         }
@@ -1496,6 +1497,10 @@ function wrapper () { // wrapper for injection
 	};
 	distributorAPS.prototype.setSources = function(aps)
 	{
+        var splitBy = "value";
+        var sortBy = "distance";
+        var direction = "asc";
+        var cutOff = 0; // toDo: by sink... only sources with high enough value should be considered
 		if (this.ooiPriority == "cla")
 		{
 			this.sources = autopilot.clanSources;
@@ -1509,35 +1514,27 @@ function wrapper () { // wrapper for injection
         {
             this.sources = autopilot.mcSources;
         }
+        var trueSources = [];
 		for (var i = 0; i < this.sources.length; i++)
 		{
-			if (aps.getMissionConflict(this.sources[i].pid)) continue; // necessary?
 			var sourcePlanet = vgap.getPlanet(this.sources[i].pid);
 			this.frnnSources.push({x: sourcePlanet.x, y: sourcePlanet.y});
 			var distance = Math.floor(aps.getDistance({x: sourcePlanet.x, y: sourcePlanet.y}, {x:aps.ship.x ,y:aps.ship.y}));
 			// within the simpleRange (and a multitude of it), differences in distance not really matter
 			if (distance <= aps.simpleRange) distance = 1;
-			// update deficiencies (...unloading has occured)
-			var value = 0;
-			if (this.ooiPriority == "cla")
-			{
-				value = autopilot.getFreeClans(sourcePlanet);
-			} else if (this.ooiPriority == "neu")
-			{
-				value = autopilot.getFuelDeficiency(sourcePlanet);
-			} else if (this.ooiPriority == "mcs")
-			{
-				value = autopilot.getMcDeficiency(sourcePlanet);
-			}
-			if (value < 0) value = 0;
-			this.sources[i].value = value;
-			this.sources[i].distance = distance;
-			this.sources[i].x = sourcePlanet.x;
-			this.sources[i].y = sourcePlanet.y;
+            var tValue = aps.getObjectExcess(sourcePlanet);
+            if (tValue > cutOff)
+            {
+                this.sources[i].value = tValue;
+                this.sources[i].distance = distance;
+                this.sources[i].x = sourcePlanet.x;
+                this.sources[i].y = sourcePlanet.y;
+                trueSources.push(this.sources[i]);
+            }
 		}
 		// priorities by degree of value (split)... and sort splits by distance
-		this.sources = aps.getDevidedCollection(this.sources, "value", this.devideThresh, "distance");
-		console.log(this.sources);
+		this.sources = aps.getDevidedCollection(trueSources, splitBy, this.devideThresh, sortBy, direction);
+		//console.log(this.sources);
 	};
 	distributorAPS.prototype.isSource = function(planet)
 	{
@@ -1547,9 +1544,34 @@ function wrapper () { // wrapper for injection
 		}
 		return false;
 	};
+	distributorAPS.prototype.getSpecificSources = function(aps)
+    {
+        var destDef = this.getObjectDeficiency(aps.destination);
+        var needed = destDef + aps.ship[aps.moveables[this.ooiPriority]];
+        var fSources = [];
+        for (var i = 0; i < autopilot.frnnOwnPlanets.length; i++)
+        {
+            var cP = vgap.getPlanet(autopilot.frnnOwnPlanets[i].pid);
+            if (cP[aps.moveables[this.ooiPriority]] >= needed && !aps.isSourceOfCollector(cP.id))
+            {
+                fSources.push(autopilot.frnnOwnPlanets[i]);
+            }
+        }
+        return fSources;
+    };
     distributorAPS.prototype.setPotentialWaypoints = function(aps)
     {
-        aps.potentialWaypoints = autopilot.frnnOwnPlanets;
+        // check if cargo contains the required amount for sink (destination)
+        var destDef = this.getObjectDeficiency(aps.destination);
+        if (aps.ship[aps.moveables[this.ooiPriority]] >= (destDef * -1) || (aps.planet && aps.planet[aps.moveables[this.ooiPriority]] >= (destDef * -1)))
+        {
+            // we (will) have everything, approach destination
+            aps.potentialWaypoints = autopilot.frnnOwnPlanets;
+        } else {
+            // we are lacking something, use filtered list of planets
+            // - only planets not destination of another aps that will pickup material we need
+            aps.potentialWaypoints = this.getSpecificSources(aps);
+        }
     };
 	distributorAPS.prototype.setPotentialDestinations = function(aps)
 	{
@@ -1560,14 +1582,14 @@ function wrapper () { // wrapper for injection
 		if (this.sources.length === 0) this.setSources(aps);
 		//
 		// set sinks as potential destinations if we are at a source
-		if (aps.planet && this.isSource(aps.planet))
-		{
+		//if (aps.planet && this.isSource(aps.planet))
+		//{
 			aps.potDest = this.sinks;
-		} else
-		{
+		//} else
+		//{
 			// set sources as potential destinations if we are at a sink or a neutral place
-			aps.potDest = this.sources;
-		}
+		//	aps.potDest = this.sources;
+		//}
 		if (aps.potDest.length === 0)
 		{
 			console.log("setPotentialDestinations: no destinations available...");
@@ -1590,11 +1612,17 @@ function wrapper () { // wrapper for injection
     };
 	distributorAPS.prototype.handleCargo = function (aps)
 	{
-		if (aps.planet && aps.isOwnPlanet) // distributors only handle cargo at destination (source or sink)
+		if (aps.planet && aps.isOwnPlanet)
 		{
 			var transCargo = 0;
-            if (aps.destination.id == aps.planet.id) aps.unloadCargo(); // unload cargo when at destination
-            if (aps.destination.id == aps.planet.id && this.ooiPriority == "neu") aps.unloadFuel();
+            if (aps.destination.id == aps.planet.id) // unload cargo when at destination
+            {
+                aps.unloadCargo();
+                if (this.ooiPriority == "neu")
+                {
+                    aps.unloadFuel();
+                }
+            }
 			if (this.isSource(aps.planet))
 			{
 				transCargo = this.loadCargo(aps); // load cargo
@@ -1614,14 +1642,19 @@ function wrapper () { // wrapper for injection
             if (deficiency > 0)
             {
                 var object = aps.moveables[this.ooiPriority];
-                var available = autopilot.getSumAvailableObjects(aps.planet, object);
-                console.log("There is " + available + " " + object + " available");
-                if (available < 0) available = 0;
-                if (deficiency > available)
-                {
-                    deficiency = available;
-                }
                 transCargo = aps.loadObject(object, aps.planet, deficiency);
+            }
+            // try to satisfy other deficiencies
+            for (var i = 0; i < aps.deficiencies.length; i++)
+            {
+                if (this.ooiPriority == aps.deficiencies[i]) continue;
+                var otherDef = this.getObjectDeficiency(aps.destination, aps.deficiencies[i]);
+                if (otherDef > 0)
+                {
+                    var otherObj = aps.moveables[aps.deficiencies[i]];
+                    console.log("...satisfying other (" + otherObj + ") deficiency :" + otherDef);
+                    transCargo = aps.loadObject(otherObj, aps.planet, otherDef);
+                }
             }
             console.log("Loaded (" + this.ooiPriority + "): " + transCargo + "/" + deficiency);
             return (transCargo - deficiency);
@@ -1716,11 +1749,13 @@ function wrapper () { // wrapper for injection
         this.apcBaseIds = [];
         this.apcDestinations = [];
         this.apcByBase = {};
+        this.apcByDest = {};
         this.apcByShip = {};
 		this.primaryFunction = false;
 		this.objectOfInterest = false;
 		this.functionModule = {};
 		this.hasToSetPotDes = false;
+		this.deficiencies = [ "cla", "neu", "sup", "mcs" ];
 		this.shipFunctions = {
 			col: "collector",
 			dis: "distributor",
@@ -1797,6 +1832,13 @@ function wrapper () { // wrapper for injection
                 this.apcByBase[apsData[i].base].push({
                     sid: apsData[i].sid,
                     destination: apsData[i].destination,
+                    shipFunction: apsData[i].shipFunction,
+                    ooiPriority: apsData[i].ooiPriority
+                });
+                if (typeof this.apcByDest[apsData[i].destination] == "undefined") this.apcByDest[apsData[i].destination] = [];
+                this.apcByDest[apsData[i].destination].push({
+                    sid: apsData[i].sid,
+                    base: apsData[i].base,
                     shipFunction: apsData[i].shipFunction,
                     ooiPriority: apsData[i].ooiPriority
                 });
@@ -2030,10 +2072,56 @@ function wrapper () { // wrapper for injection
         if (this.apcBaseIds.indexOf(pid) > -1) return true;
         return false;
     };
+    APS.prototype.isSourceOfCollector = function(pid, sf, ooi)
+    {
+        if (typeof this.apcByDest[pid] == "undefined") return false;
+        if (typeof sf == "undefined") sf = this.primaryFunction;
+        if (typeof ooi == "undefined") ooi = this.objectOfInterest;
+        for (var i = 0; i < this.apcByDest[pid].length; i++)
+        {
+            if (this.apcByDest[pid][i].sid == this.ship.id) continue;
+            if (this.apcByDest[pid][i].shipFunction == "col")
+            {
+                if (ooi == "dur" || ooi == "tri" || ooi == "mol")
+                {
+                    if (this.apcByDest[pid][i].ooiPriority == "all" || this.apcByDest[pid][i].ooiPriority == ooi) return true;
+                } else
+                {
+                    if (this.apcByDest[pid][i].ooiPriority == ooi) return true;
+                }
+            }
+        }
+        return false;
+    };
+    APS.prototype.destinationHasSameAPStype = function(pid, sf, ooi)
+    {
+        if (typeof this.apcByDest[pid] == "undefined") return false;
+        if (typeof sf == "undefined") sf = this.primaryFunction;
+        if (typeof ooi == "undefined") ooi = this.objectOfInterest;
+        for (var i = 0; i < this.apcByDest[pid].length; i++)
+        {
+            if (this.apcByDest[pid][i].sid == this.ship.id) continue;
+            if (this.apcByDest[pid][i].shipFunction == sf)
+            {
+                if (ooi == "dur" || ooi == "tri" || ooi == "mol")
+                {
+                    if (this.apcByDest[pid][i].ooiPriority == "all" || this.apcByDest[pid][i].ooiPriority == ooi) return true;
+                } else
+                {
+                    if (this.apcByDest[pid][i].ooiPriority == ooi) return true;
+                }
+            }
+        }
+        return false;
+    };
     APS.prototype.baseHasSameAPStype = function(pid, sf, ooi)
     {
+        if (typeof this.apcByBase[pid] == "undefined") return false;
+        if (typeof sf == "undefined") sf = this.primaryFunction;
+        if (typeof ooi == "undefined") ooi = this.objectOfInterest;
         for (var i = 0; i < this.apcByBase[pid].length; i++)
         {
+            if (this.apcByBase[pid][i].sid == this.ship.id) continue;
             if (this.apcByBase[pid][i].shipFunction == sf)
             {
                 if (ooi == "dur" || ooi == "tri" || ooi == "mol")
@@ -2380,6 +2468,12 @@ function wrapper () { // wrapper for injection
 	APS.prototype.getMissionConflict = function(potPlanet)
 	{
 	    // todo: module specific handling
+        if (potPlanet.id == this.base.id) return false; // exclude base planet from evaluation
+        if (this.destinationHasSameAPStype(potPlanet.id)) return true;
+        // toDo: reconsider
+        //   - if the planet has more resourcen than the other(s) can carry
+        //   - if another APS will drop something off... etc.
+
 		// Check if potential destination is in the APS control list
 		var storedGameData = autopilot.loadGameData();
 		if (storedGameData === null)
@@ -2392,35 +2486,21 @@ function wrapper () { // wrapper for injection
 			for(var i = 0; i < storedGameData.length; i++)
 			{
                 if (storedGameData[i].sid == this.ship.id) continue; // skip data from current APS
+
+                // storage APS ship object
 				var curShip = vgap.getShip(storedGameData[i].sid);
 				if (curShip)
 				{
 					// current location of storage APS
 					var curShipPlanet = vgap.planetAt(curShip.x, curShip.y);
-					// if location is potential target of current APS and has the same primary function as storage APS
-					if (curShipPlanet && curShipPlanet.id == potPlanet.id && this.primaryFunction == storedGameData[i].shipFunction)
-					{
-						// if the primary function is expansion and the potential target is NOT a source Planet
-						if (this.primaryFunction == "exp" && !this.functionModule.isSource(potPlanet))
-						{
-							// reject
-							return true;
-						}
-					}
-				}
-                // if potential destination already is mission destination of an APS...
-				if (potPlanet.id != this.base.id && storedGameData[i].destination == potPlanet.id)
-				{
-				    // if shipFunction and ooiPriority are the same...
-					if (storedGameData[i].shipFunction == this.primaryFunction && storedGameData[i].ooiPriority == this.objectOfInterest)
-					{
-                        console.log("...planet " + potPlanet.id + " is mission destination of another APS with the same mission objective!");
-                        // toDo: reconsider
-                        //   - if the planet has more resourcen than one APS can carry
-                        //   - if another APS will drop something off... etc.
-                        //   -
+					// special case of expander.... if an expander is at an unowned planet and transferring,
+                    // the planet will still be recognized as unowned and another expander will see the planet as a potential target for colonization
+                    // toDo: remove those kind of planets from unownedPlanet collection
+					if (curShipPlanet && curShipPlanet.id == potPlanet.id && this.primaryFunction == "exp" && !this.functionModule.isSource(potPlanet))
+                    {
+                        // reject
                         return true;
-					}
+                    }
 				}
 			}
 		}
@@ -2725,7 +2805,7 @@ function wrapper () { // wrapper for injection
             {
                 var cH = vgap.getHull(ships[i].hullid);
                 // toDo: primary enemy set? kill mission set?
-                if (cH.mass > 200 && ships[i].beams > 0 && (ships[i].torps > 0 || ships[i].bays > 0) && ships[i].ammo > 0)
+                if (cH.mass >= 150 && ships[i].beams > 0 && (ships[i].torps > 0 || ships[i].bays > 0) && ships[i].ammo > 0)
                 {
                     console.log("...ship " + ships[i].id + " is guarding the planet.");
                     return true;
@@ -2924,10 +3004,9 @@ function wrapper () { // wrapper for injection
 			// if amount is not defined, load all
 			actAmount = from[object];
 		} else {
-			// if it is defined use it, unless...
-			actAmount = amount;
-			// ...amount is more than what is available, then only load the latter amount
-			if (amount > from[object]) actAmount = this.getObjectExcess(from, object);
+            actAmount = amount;
+		    var actExcess = this.getObjectExcess(from, object);
+            if (actAmount > actExcess) actAmount = actExcess;
 		}
 		// now check ship specs
 		if (curCapacity >= actAmount)
@@ -3036,6 +3115,10 @@ function wrapper () { // wrapper for injection
         {
             // amount of megacredits
             tValue = autopilot.getMcDeficiency(object);
+        } else if (ooi == "neu")
+        {
+            // amount of megacredits
+            tValue = autopilot.getFuelDeficiency(object);
         } else if (ooi == "sup")
         {
             // amount of supplies
@@ -3470,30 +3553,62 @@ function wrapper () { // wrapper for injection
 			}
 			return Math.floor(deficiency);
 		},
-		getFuelDeficiency: function(planet)
+        getFuturePlanetResources: function(planet, turns)
+        {
+            if (typeof turns == "undefined") turns = 1;
+            //
+            var mines = parseInt(planet.mines);
+            var factories = parseInt(planet.factories);
+            var supplies = parseInt(planet.supplies);
+            //
+            var neu = parseInt(planet.neutronium);
+            var gneu = parseInt(planet.groundneutronium);
+            var dneu = parseInt(planet.densityneutronium);
+            var theoNeu = Math.floor((dneu / 100) * mines) * turns;
+            var actNeu = theoNeu + neu;
+            if (theoNeu > gneu) actNeu = gneu + neu;
+            //
+            var dur = parseInt(planet.duranium);
+            var gdur = parseInt(planet.groundduranium);
+            var ddur = parseInt(planet.densityduranium);
+            var theoDur = Math.floor((ddur / 100) * mines) * turns;
+            var actDur = theoDur + dur;
+            if (theoDur > gdur) actDur = gdur + dur;
+            //
+            var tri = parseInt(planet.tritanium);
+            var gtri = parseInt(planet.groundtritanium);
+            var dtri = parseInt(planet.densitytritanium);
+            var theoTri = Math.floor((dtri / 100) * mines) * turns;
+            var actTri = theoTri + tri;
+            if (theoTri > gtri) actTri = gtri + tri;
+            //
+            var mol = parseInt(planet.molybdenum);
+            var gmol = parseInt(planet.groundmolybdenum);
+            var dmol = parseInt(planet.densitymolybdenum);
+            var theoMol = Math.floor((dmol / 100) * mines) * turns;
+            var actMol = theoMol + mol;
+            if (theoMol > gmol) actMol = gmol + mol;
+            //
+            return {
+                neutronium: actNeu,
+                duranium: actDur,
+                tritanium: actTri,
+                molybdenum: actMol,
+                supplies: (supplies + (factories * turns)),
+                buildRes: (actDur + actTri + actMol)
+            };
+        },
+		getFuelDeficiency: function(planet, turns)
 		{
-			// neutronium deficiencies...
-			// toDo: if planet has a base = 500, if not 100
-			var fuelRetentionMass = 100; // global setting
-			var deficiency = 0;
-			var neu = parseInt(planet.neutronium);
-			var gneu = parseInt(planet.groundneutronium);
-			var dneu = parseInt(planet.densityneutronium);
-			if (planet.mines > 0 && gneu > 10)
-			{
-				var neuMining = Math.floor(planet.mines * (dneu / 100));
-				if (gneu >= neuMining)
-				{
-					deficiency = neu + neuMining - fuelRetentionMass;
-				} else
-				{
-					deficiency = neu + gneu - fuelRetentionMass;
-				}
-			} else
-			{
-				deficiency = neu - fuelRetentionMass;
-			}
-			return Math.floor(deficiency);
+		    if (typeof turns == "undefined") turns = 1;
+            var fuelRetentionMass = 100; // global setting for planets
+		    var sb = vgap.getStarbase(planet.id);
+		    if (sb)
+            {
+                fuelRetentionMass = 500;
+            }
+		    var futRes = autopilot.getFuturePlanetResources(planet, turns);
+			return Math.floor(futRes.neutronium - fuelRetentionMass);;
 		},
         getSupDeficiency: function(planet)
         {
