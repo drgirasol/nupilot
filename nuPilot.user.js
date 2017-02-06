@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable semi-intelligent auto-pilots
-// @version       0.07.20
+// @version       0.07.21
 // @date          2017-01-08
 // @author        drgirasol
 // @include       http://planets.nu/*
@@ -1004,27 +1004,6 @@ function wrapper () { // wrapper for injection
             this.sinks.concat(amorph);
         }
 	};
-	expanderAPS.prototype.getExpanderKit = function(aps, minimal)
-    {
-        // cargo = 75 % clans, 25 % supply, supply * 3 MCs (factory building)
-        if (typeof minimal == "undefined")
-        {
-            var clans = Math.floor(0.75 * aps.hull.cargo);
-            return {
-                cla: clans,
-                sup: aps.hull.cargo - clans,
-                mcs: 3 * (aps.hull.cargo - clans)
-            }
-        } else
-        {
-            return {
-                cla: 150,
-                sup: 50,
-                mcs: 150
-            }
-        }
-
-    };
 	expanderAPS.prototype.setSources = function(aps)
 	{
 		// sources are the same as for a clan distributer...
@@ -1107,23 +1086,55 @@ function wrapper () { // wrapper for injection
             } else
             {
                 var transCargo = this.loadCargo(aps);
-                console.log("Cargo summary: " + transCargo);
             }
         }
 	};
+    expanderAPS.prototype.getExpanderKit = function(aps, minimal)
+    {
+        // cargo = 75 % clans, 25 % supply, supply * 3 MCs (factory building)
+        if (typeof minimal == "undefined")
+        {
+            var clans = Math.floor(0.75 * aps.hull.cargo);
+            return {
+                cla: clans,
+                sup: aps.hull.cargo - clans,
+                mcs: 3 * (aps.hull.cargo - clans)
+            }
+        } else
+        {
+            return {
+                cla: 150,
+                sup: 50,
+                mcs: 150
+            }
+        }
+
+    };
 	expanderAPS.prototype.hasExpKit = function(aps)
+    {
+        var expanderKit = this.getExpanderKit(aps, true);
+        return (aps.ship.clans >= expanderKit.cla && aps.ship.supplies >= expanderKit.sup && aps.ship.megacredits >= expanderKit.mcs);
+    };
+	expanderAPS.prototype.planetHasExpKit = function(aps, partially)
     {
         var expanderKit = this.getExpanderKit(aps, true);
         var plCla = aps.getObjectExcess(aps.planet, "cla");
         var plSup = aps.getObjectExcess(aps.planet, "sup");
         var plMcs = aps.getObjectExcess(aps.planet, "mcs");
-        return ((aps.ship.clans >= expanderKit.cla || plCla >= expanderKit.cla) && (aps.ship.supplies >= expanderKit.sup || plSup >= expanderKit.sup) && (aps.ship.megacredits >= expanderKit.mcs || plMcs >= expanderKit.mcs));
+        if (typeof partially == "undefined")
+        {
+            return (plCla >= expanderKit.cla && plSup >= expanderKit.sup && plMcs >= expanderKit.mcs);
+        } else
+        {
+            // partially = minimum clans
+            return (plCla >= expanderKit.cla);
+        }
     };
 	expanderAPS.prototype.loadCargo = function(aps)
 	{
         var curCargo = 0;
         var expanderKit = this.getExpanderKit(aps);
-        if (!this.hasExpKit(aps))
+        if (!this.hasExpKit(aps) && this.planetHasExpKit(aps, true))
         {
             var kDiffCla = aps.ship.clans - expanderKit.cla;
             var kDiffSup = aps.ship.supplies - expanderKit.sup;
@@ -1142,6 +1153,7 @@ function wrapper () { // wrapper for injection
                 aps.loadObject("megacredits", aps.planet, (kDiffMcs*-1));
             }
         }
+        console.log("[" + aps.ship.id + "]-| loadCargo: " + curCargo);
 		return curCargo;
 	};
 	expanderAPS.prototype.transferCargo = function(aps)
@@ -2920,6 +2932,7 @@ function wrapper () { // wrapper for injection
 	};
 	APS.prototype.unloadCargo = function()
 	{
+        var onShip = this.hull.cargo - this.getCargoCapacity();
         if (this.primaryFunction == "exp")
         {
             this.functionModule.transferCargo(this);
@@ -2929,9 +2942,10 @@ function wrapper () { // wrapper for injection
             for (var i = 0; i < unloadingSequence.length; i++)
             {
                 var cargo = unloadingSequence[i];
-                var onShip = this.unloadObject(cargo, this.planet, parseInt(this.ship[cargo]));
+                onShip = this.unloadObject(cargo, this.planet, parseInt(this.ship[cargo]));
             }
 		}
+        console.log("[" + this.ship.id + "]-| unloadCargo: " + onShip);
 	};
 	APS.prototype.loadMegacredits = function(from, amount)
 	{
