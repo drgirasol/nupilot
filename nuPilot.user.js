@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable semi-intelligent auto-pilots
-// @version       0.08.01
-// @date          2017-03-12
+// @version       0.08.04
+// @date          2017-03-13
 // @author        drgirasol
 // @include       http://planets.nu/*
 // @include       http://play.planets.nu/*
@@ -971,56 +971,58 @@ function wrapper () { // wrapper for injection
 			var distance = Math.floor(autopilot.getDistance({x: sP.x, y: sP.y}, {x:aps.ship.x ,y:aps.ship.y}));
             var deficiency = 150;
             // this.frnnSinks.push({x: sP.x, y: sP.y}); // redundant?
+            //console.log("...distance: " + distance + " / range: " + Math.pow(aps.hull.engineid, 2));
             if (sP.nativeclans > 0 && sP.nativeracename == "Amorphous")
             {
                 console.log("... there are amorphous natives living on " + sP.id + " ... sorting to the back...");
-                amorph.push({ x: sP.x, y: sP.y, pid: sP.id, distance: distance, deficiency: deficiency });
+                amorph.push({ x: sP.x, y: sP.y, pid: sP.id, distance: distance, deficiency: deficiency, nativerace: sP.nativeracename });
                 continue;
-            } else if (sP.nativeclans > 0 && distance <= Math.pow(aps.hull.engineid, 2))
+            } else if (sP.nativeclans > 0 && distance <= (2 * Math.pow(aps.ship.engineid, 2))) // only if in 2-turn range
             {
                 console.log("... there are natives living on " + sP.id + " ...prioritise...");
-                withNatives.push({ x: sP.x, y: sP.y, pid: sP.id, distance: distance, deficiency: deficiency });
+                withNatives.push({ x: sP.x, y: sP.y, pid: sP.id, distance: distance, deficiency: deficiency, nativerace: sP.nativeracename  });
                 continue;
             }
-            potential.push({ x: sP.x, y: sP.y, pid: sP.id, distance: distance, deficiency: deficiency });
+            potential.push({ x: sP.x, y: sP.y, pid: sP.id, distance: distance, deficiency: deficiency, nativerace: sP.nativeracename  });
 		}
         console.log("... potential targets: " + potential.length);
         console.log("... amorph targets: " + amorph.length);
         console.log("... other native targets: " + withNatives.length);
-        this.sinks = autopilot.sortCollection(potential, "distance");
-        if (this.sinks.length > 0)
+        potential = autopilot.sortCollection(potential, "distance");
+        if (potential.length > 0)
         {
             if (withNatives.length > 0)
             {
                 // putting native planets to the top of the line...
                 withNatives = autopilot.sortCollection(withNatives, "distance");
-                withNatives.concat(this.sinks);
-                this.sinks = withNatives;
+                potential = withNatives.concat(potential);
             }
             if (amorph.length > 0)
             {
                 // putting amorph planets to the end of the line...
-                this.sinks.concat(amorph);
+                potential = potential.concat(amorph);
             }
+            this.sinks = potential;
         } else
         {
             if (withNatives.length > 0)
             {
                 // putting native planets to the top of the line...
                 withNatives = autopilot.sortCollection(withNatives, "distance");
-                this.sinks = withNatives;
+                potential = withNatives;
             }
             if (amorph.length > 0)
             {
                 // putting amorph planets to the end of the line...
-                if (this.sinks.length > 0)
+                if (potential.length > 0)
                 {
-                    this.sinks.concat(amorph);
+                    potential = potential.concat(amorph);
                 } else
                 {
-                    this.sinks = amorph;
+                    potential = amorph;
                 }
             }
+            this.sinks = potential;
         }
 	};
     expanderAPS.prototype.setScopeRange = function(aps)
@@ -3034,6 +3036,7 @@ function wrapper () { // wrapper for injection
     {
         var waypoints = this.potentialWaypoints;
         var dDist = autopilot.getDistance( {x: this.ship.x , y: this.ship.y}, {x: dP.x , y: dP.y} );
+        dDist -= 3; // warpWell
         var dETA = Math.ceil(dDist / Math.pow(this.ship.engineid, 2));
         //console.log("...direct ETA: " + dETA + " (" + dDist + ")");
         var uWPs = [];
@@ -3042,7 +3045,8 @@ function wrapper () { // wrapper for injection
             //console.log("...waypoint ETA: " + waypoints[i].wpETA + " (" + waypoints[i].ship2wP2dPDist + ")");
             if (waypoints[i].wpETA <= (dETA + 1)) uWPs.push(waypoints[i]);
         }
-        uWPs = autopilot.sortCollection(uWPs, "wpETA");
+        uWPs = this.clusterSortCollection(uWPs, "wpETA", "wayp2dPDist");
+        //uWPs = autopilot.sortCollection(uWPs, "wpETA");
         return uWPs;
     };
     APS.prototype.getWaypointsByEta = function()
@@ -3084,6 +3088,9 @@ function wrapper () { // wrapper for injection
             {
                 console.log("...potential urgent waypoints contain destination!");
                 target = this.destination;
+            } else if (this.destinationAmongWaypoints(dP, urgentWaypoints)) {
+                console.log("...planet not safe: " + this.isSavePlanet(dP));
+                console.log("...ship path not safe: " + this.shipPathIsSave(dP));
             }
             if (!target)
             {
@@ -3107,7 +3114,7 @@ function wrapper () { // wrapper for injection
                             console.log("...ship path not safe");
                         }
                     } else {
-                        console.log("... planet not safe");
+                        console.log("...planet not safe");
                     }
                 }
             }
@@ -3830,26 +3837,7 @@ function wrapper () { // wrapper for injection
     };
 	APS.prototype.getShipMass = function(cargo)
 	{
-		var shipMass = 0;
-		var components = [];
-		if (typeof cargo !== "undefined" && cargo.length > 0)
-		{
-			components = cargo;
-		} else
-		{
-			components = [
-				this.hull.mass,
-				this.ship.neutronium,
-				this.ship.duranium,
-				this.ship.tritanium,
-				this.ship.molybdenum,
-				this.ship.supplies,
-				this.ship.ammo, // torpedos or fighters
-				this.ship.clans
-			];
-		}
-		components.forEach(function(comp) { shipMass += parseInt(comp); });
-		return shipMass;
+		return autopilot.getHullCargoMass(this.ship.id, cargo);
 	};
 	APS.prototype.setRange = function()
 	{
@@ -4264,17 +4252,23 @@ function wrapper () { // wrapper for injection
         },
         getHullCargoMass: function(sid, scargo)
         {
+            var beamTecMass = [0,1,1,2,4,3,4,7,5,7,6];
+            var torpTecMass = [0,2,2,2,4,2,2,3,2,3,3];
             var ship = vgap.getShip(sid);
             var hull = vgap.getHull(ship.hullid);
             var hullCargoMass = hull.mass;
             var maxHullCargoMass = hull.mass + hull.cargo;
-            if (typeof scargo !== "undefined" && scargo.length > 0)
+            if (typeof scargo != "undefined" && scargo.length > 0)
             {
+                scargo.push(ship.beams * beamTecMass[ship.beamid]);
+                scargo.push(ship.torps * torpTecMass[ship.torpedoid]);
                 scargo.forEach(function(comp) { hullCargoMass += parseInt(comp); });
                 if (hullCargoMass > maxHullCargoMass) hullCargoMass = maxHullCargoMass;
             } else
             {
                 var components = [
+                    (ship.beams * beamTecMass[ship.beamid]),
+                    (ship.torps * torpTecMass[ship.torpedoid]),
                     ship.duranium,
                     ship.tritanium,
                     ship.molybdenum,
