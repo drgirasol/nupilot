@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable semi-intelligent auto-pilots
-// @version       0.08.25
+// @version       0.08.32
 // @date          2017-03-15
 // @author        drgirasol
 // @include       http://planets.nu/*
@@ -1287,7 +1287,7 @@ function wrapper () { // wrapper for injection
             var clans = aps.getObjectExcess(sourcePlanet, "cla");
             var supplies = aps.getObjectExcess(sourcePlanet, "sup");
             var mcs = aps.getObjectExcess(sourcePlanet, "mcs");
-            if ((clans >= cutOff.cla && supplies >= cutOff.sup) || sourcePlanet.id == aps.base.id) // ignore mcs; always add the base planet, regardless if everything is available
+            if ((clans >= cutOff.cla && supplies >= cutOff.sup) || sourcePlanet.id === aps.base.id) // ignore mcs; always add the base planet, regardless if everything is available
             //if ((clans >= cutOff.cla && supplies >= cutOff.sup && mcs >= cutOff.mcs) || sourcePlanet.id == aps.base.id) // always add the base planet, regardless if everything is available
             {
                 var distance = Math.floor(autopilot.getDistance({x: sourcePlanet.x, y: sourcePlanet.y}, {x:aps.ship.x ,y:aps.ship.y}));
@@ -1332,7 +1332,15 @@ function wrapper () { // wrapper for injection
             {
                 // no secondary destination (sufficient source) found
                 console.log("...couldn't find an adequate secondary destination.");
-                aps.secondaryDestination = aps.planet;
+                // get the next ETA waypoint
+                var nextWaypoint = aps.getEtaWaypoint(aps.destination);
+                if (nextWaypoint)
+                {
+                    aps.secondaryDestination = nextWaypoint;
+                } else {
+                    // toDo: get closest planet (e.g.)
+                    aps.secondaryDestination = aps.planet;
+                }
             }
         }
     };
@@ -1549,7 +1557,7 @@ function wrapper () { // wrapper for injection
             //console.log(futRes);
             //
             var tValue = 0;
-            if (this.ooiPriority == "all")
+            if (this.ooiPriority === "all")
             {
                 var baseDef = aps.getBaseDeficiency();
                 if (baseDef)
@@ -1573,11 +1581,12 @@ function wrapper () { // wrapper for injection
                     }
                 }
                 tValue = futRes.buildRes;
-            } else if (this.ooiPriority == "dur" || this.ooiPriority == "tri" || this.ooiPriority == "mol")
+            } else if (this.isMineralCollector())
             {
                 tValue = futRes[aps.moveables[this.ooiPriority]];
             } else
             {
+                // cla, sup, mcs
                 tValue = aps.getObjectExcess(tPlanet); // toDo: use amount of arrival time!
             }
             if (tValue < this.devideThresh)
@@ -1616,6 +1625,10 @@ function wrapper () { // wrapper for injection
             {
                 sortBy = "mcs";
             }
+        } else if (this.ooiPriority === "cla")
+        {
+            var baseMaxClans = autopilot.getMaxColonistPopulation(aps.base);
+            if (baseMaxClans - aps.base.clans <= 0) return; // we do not need to collect more clans
         }
         var targetsInRange = aps.getTargetsInRange(autopilot.frnnOwnPlanets, aps.base.x, aps.base.y, aps.scopeRange);
         if (targetsInRange.length > 0)
@@ -1814,8 +1827,14 @@ function wrapper () { // wrapper for injection
             // colonist handling
             if (this.ooiPriority === "cla")
             {
+                var baseMaxClans = autopilot.getMaxColonistPopulation(aps.base);
                 var clans = aps.getObjectExcess(aps.planet, "cla");
-                curCargo = aps.loadObject("clans", aps.planet, clans);
+                if (clans > baseMaxClans - aps.base.clans)
+                {
+                    curCargo = aps.loadObject("clans", aps.planet, (baseMaxClans - aps.base.clans));
+                } else {
+                    curCargo = aps.loadObject("clans", aps.planet, clans);
+                }
             }
             // Resources handling
             // fuel handling
@@ -1999,16 +2018,16 @@ function wrapper () { // wrapper for injection
     };
 	distributorAPS.prototype.getPotentialSources = function()
     {
-        if (this.ooiPriority == "cla")
+        if (this.ooiPriority === "cla")
         {
             return autopilot.clanSources;
-        } else if (this.ooiPriority == "neu")
+        } else if (this.ooiPriority === "neu")
         {
             return autopilot.neuSources;
-        } else if (this.ooiPriority == "sup")
+        } else if (this.ooiPriority === "sup")
         {
             return autopilot.supSources;
-        } else if (this.ooiPriority == "mcs")
+        } else if (this.ooiPriority === "mcs")
         {
             return autopilot.mcSources;
         }
@@ -2059,7 +2078,7 @@ function wrapper () { // wrapper for injection
     {
         // check if cargo contains the required amount for sink (destination)
         var destDef = this.getObjectDeficiency(aps.destination);
-        var cargoHoldsDef = (aps.ship[aps.moveables[this.ooiPriority]] >= (destDef * -1) || aps.ship[aps.moveables[this.ooiPriority]] == aps.hull.cargo);
+        var cargoHoldsDef = (aps.ship[aps.moveables[this.ooiPriority]] >= (destDef * -1) || aps.ship[aps.moveables[this.ooiPriority]] === aps.hull.cargo);
         var planetHoldsDef = false;
         if (aps.planet)
         {
@@ -2077,9 +2096,17 @@ function wrapper () { // wrapper for injection
                 aps.secondaryDestination = vgap.getPlanet(potSources[0].pid);
                 console.log("...secondary destination (" + aps.secondaryDestination.id + ") set.");
             } else {
-                console.log("...couldn't find a secondary destination");
-                // continue to destination, loading as much as there is on the way...
-                // toDo: consider the next best as secondary destination ?
+                // no secondary destination (sufficient source) found
+                console.log("...couldn't find an adequate secondary destination.");
+                // get the next ETA waypoint
+                var nextWaypoint = aps.getEtaWaypoint(aps.destination);
+                if (nextWaypoint)
+                {
+                    aps.secondaryDestination = nextWaypoint;
+                } else {
+                    // toDo: get closest planet (e.g.)
+                    aps.secondaryDestination = aps.planet;
+                }
             }
         }
     };
@@ -2259,7 +2286,7 @@ function wrapper () { // wrapper for injection
      */
 	function APS(ship, cfgData)
 	{
-		if (typeof ship == "undefined") return;
+		if (typeof ship === "undefined") return;
 		this.ship = ship;
 		this.hull = false;
 		this.isAPS = false;
@@ -2328,7 +2355,7 @@ function wrapper () { // wrapper for injection
 		this.potentialWaypoints = []; // potential next targets
 		this.potDest = []; // potential destinations
 		//
-		if (typeof cfgData != "undefined" && cfgData !== false)
+		if (typeof cfgData !== "undefined" && cfgData !== false)
 		{
 		    this.storedData = cfgData;
             this.isAPS = true;
@@ -3107,20 +3134,28 @@ function wrapper () { // wrapper for injection
     APS.prototype.getDevisionThresh = function()
     {
         var devideThresh = 0;
-        if (this.primaryFunction == "exp")
+        if (this.primaryFunction === "exp")
         {
             devideThresh = Math.floor(0.75 * this.hull.cargo);
         } else
         {
-            if (this.objectOfInterest == "neu")
+            if (this.objectOfInterest === "neu")
             {
                 devideThresh = Math.floor(this.hull.fueltank * this.functionModule.minimalCargoRatioToGo);
-            } else if (this.objectOfInterest == "mcs")
+            } else if (this.objectOfInterest === "mcs")
             {
                 devideThresh = 250;
             } else
             {
                 devideThresh = Math.floor(this.hull.cargo * this.functionModule.minimalCargoRatioToGo);
+                if (this.objectOfInterest === "cla")
+                {
+                    var baseMaxClans = autopilot.getMaxColonistPopulation(this.base);
+                    if (baseMaxClans - this.base.clans < this.hull.cargo * this.functionModule.minimalCargoRatioToGo)
+                    {
+                        devideThresh = baseMaxClans - this.base.clans;
+                    }
+                }
             }
         }
         return devideThresh;
@@ -3324,15 +3359,17 @@ function wrapper () { // wrapper for injection
     };
     APS.prototype.setWaypoints = function(ship, dP)
     {
-        this.functionModule.setPotentialWaypoints(this);
+        this.functionModule.setPotentialWaypoints(this); // potential waypoints specific for the current function (e.g. own planets in case of collector and distributor)
         var ship2dest = Math.ceil(autopilot.getDistance( {x: ship.x , y: ship.y}, {x: dP.x , y: dP.y} ));
-        var waypoints = this.getTargetsInRange(this.potentialWaypoints, dP.x, dP.y, ship2dest);
+        var waypoints = this.getTargetsInRange(this.potentialWaypoints, dP.x, dP.y, ship2dest); // potential waypoints closer to dP
         waypoints.push({ x: dP.x, y: dP.y }); // toDo: necessary?
+        console.log("...raw waypoints:");
         var fWPs = [];
-        for (var i = 0; i < waypoints.length; i++)
+        for (var i = 0; i < waypoints.length; i++) // set/save waypoint information
         {
             var cP = vgap.planetAt(waypoints[i].x, waypoints[i].y);
             var etaDist = Math.ceil(autopilot.getDistance( {x: cP.x , y: cP.y}, {x: ship.x , y: ship.y} ));
+            if (ship2dest < etaDist || etaDist === 0) continue; // skip waypoints past dP and this.planet
             var cP2dPDist = Math.ceil(autopilot.getDistance( {x: cP.x , y: cP.y}, {x: dP.x , y: dP.y} ));
             waypoints[i].pid = cP.id;
             waypoints[i].ship2wPDist = etaDist;
@@ -3340,11 +3377,8 @@ function wrapper () { // wrapper for injection
             waypoints[i].ship2dPDist = ship2dest;
             waypoints[i].ship2wP2dPDist = etaDist + cP2dPDist;
             waypoints[i].wpETA = Math.ceil(etaDist / Math.pow(this.ship.engineid, 2)) + Math.ceil(cP2dPDist / Math.pow(this.ship.engineid, 2));
-            // if distance between waypoint and ship is greater than the distance between destination and ship, skip
-            if (ship2dest < etaDist || etaDist == 0) continue;
             fWPs.push(waypoints[i]);
         }
-        console.log("...raw waypoints:");
         console.log(fWPs);
         this.potentialWaypoints = fWPs;
     };
@@ -3373,36 +3407,40 @@ function wrapper () { // wrapper for injection
         //uWPs = autopilot.sortCollection(uWPs, "wpETA");
         return uWPs;
     };
-    APS.prototype.getWaypointsByEta = function()
+    APS.prototype.getWaypointsByEta = function(dP)
     {
+        if (this.potentialWaypoints.length === 0) this.setWaypoints(this.ship, dP); // ensure potential waypoints have been set
         var waypoints = this.potentialWaypoints;
+        console.log("...waypoints by ETA:");
         var wpByEta = [];
+        var ETAs = [];
         for (var i = 0; i < waypoints.length; i++)
         {
             var eta = Math.ceil(waypoints[i].ship2wPDist / Math.pow(this.ship.engineid, 2));
-            if (eta == 0) continue;
+            if (eta === 0) continue;
+            ETAs.push(eta);
             // toDo: merge the first two categories (e.g. 1+2 or 1+3 or 2+3...)?
-            if (typeof wpByEta[eta] == "undefined")
+            if (typeof wpByEta[eta] === "undefined")
             {
                 wpByEta[eta] = [waypoints[i]];
             } else {
                 wpByEta[eta].push(waypoints[i]);
             }
         }
-        for (var j = 0; j < wpByEta.length; i++)
+        for (var j = 0; j < ETAs.length; j++)
         {
-            if (typeof wpByEta[j] != "undefined")
+            var curETA = ETAs[j];
+            if (typeof wpByEta[curETA] !== "undefined")
             {
-                wpByEta[j] = autopilot.sortCollection(wpByEta[i], "ship2wP2dPDist");
+                wpByEta[curETA] = autopilot.sortCollection(wpByEta[curETA], "ship2wP2dPDist"); // waypoints prioritized by smallest deviation from direct route to dP
             }
         }
-        console.log("...waypoints by ETA:");
         console.log(wpByEta);
         return wpByEta;
     };
     APS.prototype.getNextWaypoint = function(dP, notdP)
     {
-        if (typeof notdP == "undefined") notdP = false;
+        if (typeof notdP === "undefined") notdP = false;
         var target = false;
         var urgentWaypoints = this.getUrgentWaypoints(dP);
         if (urgentWaypoints.length > 0)
@@ -3454,17 +3492,18 @@ function wrapper () { // wrapper for injection
     };
     APS.prototype.getEtaWaypoint = function(dP)
     {
+        var waypoints = this.getWaypointsByEta(dP);
         var target = false;
-        var waypoints = this.getWaypointsByEta();
+        console.log("...ETA waypoint:");
         var minETA = 0;
         for (var j = 1; j < 5; j++)
         {
-            if (typeof waypoints[j] != "undefined")
+            if (typeof waypoints[j] !== "undefined")
             {
                 console.log("...potential waypoints with ETA " + j);
                 //waypoints[j] = this.sortCollection(waypoints[j]);
                 console.log(waypoints[j]);
-                if (minETA == 0)
+                if (minETA === 0)
                 {
                     minETA = j; // clostest waypoints (minimal ETA)
                     if (this.destinationAmongWaypoints(dP,waypoints[j]) && this.isSavePlanet(dP) && this.shipPathIsSave(dP))
@@ -3489,6 +3528,7 @@ function wrapper () { // wrapper for injection
             }
             if (target) break;
         }
+        console.log(target);
         return target;
     };
     /*
@@ -3565,9 +3605,9 @@ function wrapper () { // wrapper for injection
     APS.prototype.estimateMissionCargo = function(tP)
     {
         var cargo = [];
-        if (this.primaryFunction == "col")
+        if (this.primaryFunction === "col")
         {
-            if (tP.id == this.base.id)
+            if (tP.id === this.base.id)
             {
                 cargo = [ 0 ];
             } else
@@ -3580,16 +3620,16 @@ function wrapper () { // wrapper for injection
                     cargo = [ available ];
                 }
             }
-        } else if (this.primaryFunction == "dis")
+        } else if (this.primaryFunction === "dis")
         {
             cargo = [ 0 ];
             if (this.secondaryDestination)
             {
-                if (tP.id == this.secondaryDestination.id)
+                if (tP.id === this.secondaryDestination.id)
                 {
                     // primary deficiency
                     var cargoSum = 0;
-                    var sinkRequest = this.functionMOdule.getObjectDeficiency(this.destination) * -1;
+                    var sinkRequest = this.functionModule.getObjectDeficiency(this.destination) * -1;
                     var sourceValue = this.getObjectExcess(tP);
                     if (sourceValue >= sinkRequest)
                     {
@@ -3605,7 +3645,7 @@ function wrapper () { // wrapper for injection
                 }
             } else
             {
-                if (tP.id != this.destination.id)
+                if (tP.id !== this.destination.id)
                 {
                     // we will load nothing, but have cargo
                     cargo = []; // use current cargo
@@ -4802,12 +4842,8 @@ function wrapper () { // wrapper for injection
                 supply: bovDef
             };
         },
-        getClanDeficiency: function(planet, nupBase)
+        getMaxClanDeficiency: function(planet)
         {
-            var isFort = (planet.note && planet.note.body.match(/nup:fort/)); // a purely defensive base
-            var maxPop = autopilot.getMaxColonistPopulation(planet);
-            if (isFort) return maxPop*-1;
-            //
             var natDef = 0;
             if (planet.nativeclans > 0) natDef = autopilot.getNativeTaxClanDeficiency(planet);
             var bovDef = 0;
@@ -4821,34 +4857,56 @@ function wrapper () { // wrapper for injection
             {
                 allDef.sort(function(a, b) { return a-b; });
             }
-            var deficiency = allDef[0]; // use most severe deficiency
-            if (nupBase)
+            return allDef[0]; // use most severe deficiency
+        },
+        getClanDeficiency: function(planet)
+        {
+            var isBase = (planet.note && planet.note.body.match(/nup:base/));
+            var minBaseClans = 50 + Math.pow(50,2); // clans for 100 defense posts
+            var isFort = (planet.note && planet.note.body.match(/nup:fort/)); // a purely defensive base
+            var maxPop = autopilot.getMaxColonistPopulation(planet);
+            if (isFort && planet.clans < maxPop) return (planet.clans - maxPop);
+            //
+            var deficiency = autopilot.getMaxClanDeficiency(planet);
+            //
+            if (isBase && deficiency > planet.clans - minBaseClans)
             {
-                deficiency -= 1000;
-            }
-            if (deficiency < 0)
-            {
-                if ((deficiency * -1) + planet.clans > maxPop)
+                if (minBaseClans > maxPop)
                 {
-                    deficiency = (maxPop - planet.clans) * -1;
+                    deficiency = planet.clans - maxPop;
+                } else {
+                    deficiency = planet.clans - minBaseClans;
                 }
             } else {
-                if (maxPop > 100)
+                if (deficiency < 0)
                 {
-                    deficiency -= 100;
+                    if ((deficiency * -1) + planet.clans > maxPop)
+                    {
+                        deficiency = (maxPop - planet.clans) * -1;
+                    }
+                } else {
+                    // make sure we have a minimum (of 100 clans or maxPop in case that is smaller than 100) on planets
+                    if (maxPop > 100 && planet.clans < 100)
+                    {
+                        deficiency = planet.clans - 100;
+                    } else if (maxPop < 100 && planet.clans < maxPop)
+                    {
+                        deficiency = planet.clans - maxPop;
+                    }
                 }
             }
             return Math.floor(deficiency);
         },
-		getFuelDeficiency: function(planet, turns, nupBase)
+		getFuelDeficiency: function(planet, turns)
 		{
-		    if (typeof turns == "undefined") turns = 0;
-            var fuelRetentionMass = 150; // global setting for planets
-		    var sb = vgap.getStarbase(planet.id);
-		    if (sb || nupBase)
-            {
-                fuelRetentionMass += 400;
-            }
+		    if (typeof turns === "undefined") turns = 0;
+		    var fuelRetentionMass = 100; // default
+            var hasBase = vgap.getStarbase(planet.id);
+            if (hasBase && planet.neutronium < 500) fuelRetentionMass = (planet.neutronium - 500);
+            var isBase = (planet.note && planet.note.body.match(/nup:base/));
+            var isFort = (planet.note && planet.note.body.match(/nup:fort/)); // a purely defensive base
+            if (isFort && planet.neutronium < 250) fuelRetentionMass = (planet.neutronium - 250);
+
             var alchemyAtPlanet = autopilot.alchemyAtPlanet(planet);
 		    if (alchemyAtPlanet)
             {
@@ -4896,25 +4954,29 @@ function wrapper () { // wrapper for injection
             deficiency = parseInt(planet.supplies) - deficiency;
             return deficiency;
         },
-		getMcDeficiency: function(planet, nupBase)
+		getMcDeficiency: function(planet)
 		{
-		    // deficiency is based on building que
-            // toDo: consider the demand of money at starbases building particular ships...
-			var deficiency = 0;
-			var starbase = vgap.getStarbase(planet.id);
-			if (starbase || nupBase)
-            {
-                // toDo: consider techLevels... if all are level 1, less deficiency
-                deficiency = 10000;
-            }
+            var deficiency = 0;
+            var hasBase = vgap.getStarbase(planet.id);
+            if (hasBase && planet.megacredits < 10000) deficiency = (planet.megacredits - 10000);
+            var isBase = (planet.note && planet.note.body.match(/nup:base/));
+            if (isBase && planet.megacredits < 900) deficiency = (planet.megacredits - 900);
+            var isFort = (planet.note && planet.note.body.match(/nup:fort/)); // a purely defensive base
+            if (isFort && planet.megacredits < 5000) deficiency = (planet.megacredits - 5000);
+            //
+            var buildingDef = 0;
 			var tfdef = parseInt(planet.targetfactories) - parseInt(planet.factories);
 			var tmdef = parseInt(planet.targetmines) - parseInt(planet.mines);
 			var tddef = parseInt(planet.targetdefense) - parseInt(planet.defense);
-			if (tfdef > 0) deficiency += (tfdef * 3);
-			if (tmdef > 0) deficiency += (tmdef * 4);
-			if (tddef > 0) deficiency += (tddef * 10);
-			deficiency = parseInt(planet.megacredits) - deficiency;
-			return deficiency;
+			if (tfdef > 0) buildingDef += (tfdef * 3);
+			if (tmdef > 0) buildingDef += (tmdef * 4);
+			if (tddef > 0) buildingDef += (tddef * 10);
+			if (planet.megacredits - buildingDef < deficiency)
+            {
+                return (planet.megacredits - buildingDef);
+            } else {
+			    return deficiency;
+            }
 		},
         getSumOfSurfaceMinerals: function(planet)
         {
@@ -5025,18 +5087,10 @@ function wrapper () { // wrapper for injection
                 var nupHub = false;
                 var plDefNote = [];
                 var plExcNote = [];
-                if (n !== null && n.body.match(/nup:base/) !== null)
-                {
-                    nupBase = true;
-                }
-                if (n !== null && n.body.match(/nup:hub/) !== null)
-                {
-                    nupHub = true;
-                }
                 if (planet.ownerid === vgap.player.id)
                 {
                     // clan sinks (-) and sources (+)
-                    var def = autopilot.getClanDeficiency(planet, nupBase);
+                    var def = autopilot.getClanDeficiency(planet);
                     if (def > 0)
                     {
                         plExcNote.push("c:+" + def);
@@ -5047,7 +5101,7 @@ function wrapper () { // wrapper for injection
                         autopilot.clanDeficiencies.push({ pid: planet.id, x: planet.x, y: planet.y, deficiency: def, government: planet.nativegovernment });
                     }
                     // neutronium sinks (-) and sources (+)
-                    def = autopilot.getFuelDeficiency(planet, 0, (nupBase || nupHub));
+                    def = autopilot.getFuelDeficiency(planet, 0);
                     if (def > 0)
                     {
                         plExcNote.push("f:+" + def);
@@ -5069,7 +5123,7 @@ function wrapper () { // wrapper for injection
                         autopilot.supDeficiencies.push({ pid: planet.id, x: planet.x, y: planet.y, deficiency: def, resources: autopilot.getSumAvailableObjects(planet, "minerals") });
                     }
                     // megacredit sinks (-) and sources (+)
-                    def = autopilot.getMcDeficiency(planet, nupBase);
+                    def = autopilot.getMcDeficiency(planet);
                     if (def > 0)
                     {
                         plExcNote.push("m:+" + def);
@@ -5081,13 +5135,17 @@ function wrapper () { // wrapper for injection
                     }
                 }
                 var nBody = [];
-                if (nupBase)
+                if (n !== null && n.body.match(/nup:base/) !== null)
                 {
                     nBody.push("nup:base");
                 }
-                if (nupHub)
+                if (n !== null && n.body.match(/nup:hub/) !== null)
                 {
                     nBody.push("nup:hub");
+                }
+                if (n !== null && n.body.match(/nup:fort/) !== null)
+                {
+                    nBody.push("nup:fort");
                 }
                 if (plDefNote.length > 0)
                 {
@@ -5433,11 +5491,18 @@ function wrapper () { // wrapper for injection
             for (var i = 0; i < vgap.myplanets.length; i++)
             {
                 var planet = vgap.myplanets[i];
+                var hasBase = vgap.getStarbase(planet.id);
                 var isFort = (planet.note && planet.note.body.match(/nup:fort/)); // a purely defensive base
                 if (isFort)
                 {
                     // defense post to maximum
                     planet.targetdefense = autopilot.getMaxDefense(planet);
+                }
+                var isBase = (planet.note && planet.note.body.match(/nup:base/));
+                if (isBase && hasBase)
+                {
+                    var newBody = planet.note.body.replace("nup:base", "");
+                    planet.note.body = newBody;
                 }
             }
         },
