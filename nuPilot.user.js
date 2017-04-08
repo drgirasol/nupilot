@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable semi-intelligent auto-pilots
-// @version       0.08.35
+// @version       0.08.37
 // @date          2017-03-29
 // @author        drgirasol
 // @include       http://planets.nu/*
@@ -2063,14 +2063,16 @@ function wrapper () { // wrapper for injection
     {
         var destDef = Math.floor(this.getObjectDeficiency(aps.destination) * 1.2);
         var needed = (destDef * -1) - aps.ship[aps.moveables[this.ooiPriority]];
-        console.log("...needs " + this.ooiPriority + ":" + needed);
+        console.log("...needs " + this.ooiPriority + ": " + needed);
         var fSources = []; // filtered specific (satisfy deficiency) sources
+        var capacity = aps.hull.cargo;
+        if (this.ooiPriority === "neu") capacity = aps.hull.fueltank;
         for (var i = 0; i < autopilot.frnnOwnPlanets.length; i++)
         {
             var cP = vgap.getPlanet(autopilot.frnnOwnPlanets[i].pid);
-            if (cP.id == aps.destination.id) continue; // exclude destination
+            if (cP.id === aps.destination.id) continue; // exclude destination
             var value = aps.getObjectExcess(cP);
-            if ((value >= needed || value >= aps.hull.cargo) && !aps.planetIsSourceOfCollector(cP.id))
+            if ((value >= needed || value >= capacity) && !aps.planetIsSourceOfCollector(cP.id))
             {
                 autopilot.frnnOwnPlanets[i].pid = cP.id;
                 autopilot.frnnOwnPlanets[i].value = value;
@@ -2382,7 +2384,7 @@ function wrapper () { // wrapper for injection
 		{
 		    this.storedData = cfgData;
             this.isAPS = true;
-            this.initAPScontrol();
+            // this.initAPScontrol(); // toDo: removed here because only "old" data is loaded; inserted before setMissionDestination
             this.initializeBoardComputer(cfgData);
 		} else
 		{
@@ -2418,12 +2420,12 @@ function wrapper () { // wrapper for injection
         var apsData = autopilot.loadGameData();
         for (var i = 0; i < apsData.length; i++)
         {
-            if (apsData[i].sid != this.ship.id)
+            if (apsData[i].sid !== this.ship.id)
             {
                 this.apcBaseIds.push(apsData[i].base);
                 if (apsData[i].destination) this.apcDestinations.push(apsData[i].destination);
                 //
-                if (typeof this.apcByBase[apsData[i].base] == "undefined") this.apcByBase[apsData[i].base] = [];
+                if (typeof this.apcByBase[apsData[i].base] === "undefined") this.apcByBase[apsData[i].base] = [];
                 this.apcByBase[apsData[i].base].push({
                     sid: apsData[i].sid,
                     destination: apsData[i].destination,
@@ -2434,7 +2436,7 @@ function wrapper () { // wrapper for injection
                     idleReason: apsData[i].idleReason,
                     idleTurns: apsData[i].idleTurns
                 });
-                if (typeof this.apcByDest[apsData[i].destination] == "undefined") this.apcByDest[apsData[i].destination] = [];
+                if (typeof this.apcByDest[apsData[i].destination] === "undefined") this.apcByDest[apsData[i].destination] = [];
                 this.apcByDest[apsData[i].destination].push({
                     sid: apsData[i].sid,
                     base: apsData[i].base,
@@ -2445,7 +2447,7 @@ function wrapper () { // wrapper for injection
                     idleReason: apsData[i].idleReason,
                     idleTurns: apsData[i].idleTurns
                 });
-                if (typeof this.apcBySecDest[apsData[i].secondaryDestination] == "undefined") this.apcBySecDest[apsData[i].secondaryDestination] = [];
+                if (typeof this.apcBySecDest[apsData[i].secondaryDestination] === "undefined") this.apcBySecDest[apsData[i].secondaryDestination] = [];
                 this.apcBySecDest[apsData[i].secondaryDestination].push({
                     sid: apsData[i].sid,
                     base: apsData[i].base,
@@ -2456,7 +2458,7 @@ function wrapper () { // wrapper for injection
                     idleReason: apsData[i].idleReason,
                     idleTurns: apsData[i].idleTurns
                 });
-                if (typeof this.apcByShip[apsData[i].sid] == "undefined") this.apcByShip[apsData[i].sid] = [];
+                if (typeof this.apcByShip[apsData[i].sid] === "undefined") this.apcByShip[apsData[i].sid] = [];
                 this.apcByShip[apsData[i].sid].push({
                     base: apsData[i].base,
                     destination: apsData[i].destination,
@@ -3189,22 +3191,25 @@ function wrapper () { // wrapper for injection
      */
     APS.prototype.estimateNextFuelConsumption = function(tP)
     {
-        var dP = this.destination;
-        if (this.secondaryDestination) dP = this.secondaryDestination;
-        var curDistance = Math.ceil(autopilot.getDistance({ x: tP.x, y: tP.y }, { x: this.ship.x, y: this.ship.y }));
-        var thisFuel = autopilot.getOptimalFuelConsumptionEstimate(this.ship.id, [], curDistance);
         var nextFuel = 0;
-        this.setWaypoints(tP, dP);
-        var nWP = this.getNextWaypoint(dP);
-        if (nWP)
+        if (this.destination)
         {
-            console.log("...estimated next waypoint: ");
-            console.log(nWP);
-            var distance = Math.ceil(autopilot.getDistance({ x: tP.x, y: tP.y }, { x: nWP.x, y: nWP.y }));
-            console.log("...distance from " + tP.id + " to " + nWP.id + ": " + distance);
-            var nextCargo = this.estimateMissionCargo(tP);
-            if (nextCargo[0] > thisFuel) nextCargo[0] -= thisFuel; // reduce cargo by fuel that is used up traveling to tP
-            nextFuel = autopilot.getOptimalFuelConsumptionEstimate(this.ship.id, nextCargo, distance);
+            var dP = this.destination;
+            if (this.secondaryDestination) dP = this.secondaryDestination;
+            var curDistance = Math.ceil(autopilot.getDistance({ x: tP.x, y: tP.y }, { x: this.ship.x, y: this.ship.y }));
+            var thisFuel = autopilot.getOptimalFuelConsumptionEstimate(this.ship.id, [], curDistance);
+            this.setWaypoints(tP, dP); // tP = next ship position
+            var nWP = this.getNextWaypoint(dP);
+            if (nWP)
+            {
+                console.log("...estimated next waypoint: ");
+                console.log(nWP);
+                var distance = Math.ceil(autopilot.getDistance({ x: tP.x, y: tP.y }, { x: nWP.x, y: nWP.y }));
+                console.log("...distance from " + tP.id + " to " + nWP.id + ": " + distance);
+                var nextCargo = this.estimateMissionCargo(tP);
+                if (nextCargo[0] > thisFuel) nextCargo[0] -= thisFuel; // reduce cargo by fuel that is used up traveling to tP
+                nextFuel = autopilot.getOptimalFuelConsumptionEstimate(this.ship.id, nextCargo, distance);
+            }
         }
         return nextFuel;
     };
@@ -3405,16 +3410,19 @@ function wrapper () { // wrapper for injection
         for (var i = 0; i < waypoints.length; i++) // set/save waypoint information
         {
             var cP = vgap.planetAt(waypoints[i].x, waypoints[i].y);
-            var etaDist = Math.ceil(autopilot.getDistance( {x: cP.x , y: cP.y}, {x: ship.x , y: ship.y} ));
-            if (ship2dest < etaDist || etaDist === 0) continue; // skip waypoints past dP and this.planet
-            var cP2dPDist = Math.ceil(autopilot.getDistance( {x: cP.x , y: cP.y}, {x: dP.x , y: dP.y} ));
-            waypoints[i].pid = cP.id;
-            waypoints[i].ship2wPDist = etaDist;
-            waypoints[i].wayp2dPDist = cP2dPDist;
-            waypoints[i].ship2dPDist = ship2dest;
-            waypoints[i].ship2wP2dPDist = etaDist + cP2dPDist;
-            waypoints[i].wpETA = Math.ceil(etaDist / Math.pow(this.ship.engineid, 2)) + Math.ceil(cP2dPDist / Math.pow(this.ship.engineid, 2));
-            fWPs.push(waypoints[i]);
+            if (cP)
+            {
+                var etaDist = Math.ceil(autopilot.getDistance( {x: cP.x , y: cP.y}, {x: ship.x , y: ship.y} ));
+                if (ship2dest < etaDist || etaDist === 0) continue; // skip waypoints past dP and this.planet
+                var cP2dPDist = Math.ceil(autopilot.getDistance( {x: cP.x , y: cP.y}, {x: dP.x , y: dP.y} ));
+                waypoints[i].pid = cP.id;
+                waypoints[i].ship2wPDist = etaDist;
+                waypoints[i].wayp2dPDist = cP2dPDist;
+                waypoints[i].ship2dPDist = ship2dest;
+                waypoints[i].ship2wP2dPDist = etaDist + cP2dPDist;
+                waypoints[i].wpETA = Math.ceil(etaDist / Math.pow(this.ship.engineid, 2)) + Math.ceil(cP2dPDist / Math.pow(this.ship.engineid, 2));
+                fWPs.push(waypoints[i]);
+            }
         }
         console.log(fWPs);
         this.potentialWaypoints = fWPs;
@@ -3927,6 +3935,7 @@ function wrapper () { // wrapper for injection
 	    // todo: module specific handling
         if (potPlanet.id === this.base.id) return false; // exclude base planet from evaluation
         var conflictAPS = this.destinationHasSameAPStype(potPlanet.id); // returns stored data for APS that also visit potPlanet with the same mission
+        console.log("Destination(" + potPlanet.id + ")HasSameAPStype: " + conflictAPS);
         if (conflictAPS)
         {
             console.log("..." + conflictAPS.length + " other APS approaching " + potPlanet.id);
@@ -5669,6 +5678,7 @@ function wrapper () { // wrapper for injection
                     if (shipcontrol.potDest.length > 0)
                     {
                         console.error("Set mission destination for APS " + shipcontrol.ship.id);
+                        shipcontrol.initAPScontrol();
                         shipcontrol.setMissionDestination();
                     }
                     if (!shipcontrol.isIdle)
