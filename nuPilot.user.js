@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable semi-intelligent auto-pilots
-// @version       0.08.54
+// @version       0.08.58
 // @date          2017-04-15
 // @author        drgirasol
 // @include       http://planets.nu/*
@@ -801,25 +801,36 @@ function wrapper () { // wrapper for injection
             {
                 var basePlanet = vgap.getPlanet(baseId);
                 var claDef = autopilot.getClanDeficiency(basePlanet);
+                if (claDef > 0) claDef = "+" + claDef;
                 var starbase = vgap.getStarbase(baseId);
-                $("<div style='font-size: large;border-bottom: 1px solid white;'>" + baseId + ": " + basePlanet.name + " - (" + basePlanet.temp + " °C)" + "</div>").appendTo(a);
-                var planetInfo = "<div style='font-size: smaller;'>";
-                planetInfo += "Clans: " + basePlanet.clans + " (" + claDef + ") |";
-                planetInfo += "Fuel: " + basePlanet.neutronium + " | Minerals: " + [basePlanet.duranium, basePlanet.tritanium, basePlanet.molybdenum].join("/") + " |";
-                planetInfo += "Supply: " + basePlanet.supplies + " | MCs: " + basePlanet.megacredits + "</div>";
-                $(planetInfo).appendTo(a);
+                // Header
+                var header = $("<div style='border-bottom: 1px solid white;'></div>").appendTo(a);
+                $("<span style='font-size: large;'>" + baseId + ": " + basePlanet.name + " - (" + basePlanet.temp + " °C)" + "</span>").appendTo(header);
+                // Planet Info
+                var pInfoTable = $("<table class='CleanTable' width='100%' cellspacing='10'></table>").appendTo(a);
+                $("<tr><td>Temperature</td><td>" + basePlanet.temp + " °C</td><tr>").appendTo(pInfoTable);
+                $("<tr><td>Clans</td><td>" + basePlanet.clans + " (" + claDef + ")</td><tr>").appendTo(pInfoTable);
+                $("<tr><td>Supply</td><td>" + basePlanet.supplies + "</td><tr>").appendTo(pInfoTable);
+                $("<tr><td>Megacredits</td><td>" + basePlanet.megacredits + "</td><tr>").appendTo(pInfoTable);
+                $("<tr><td>Fuel</td><td>" + basePlanet.neutronium + "</td><tr>").appendTo(pInfoTable);
+                $("<tr><td>Minerals</td><td>" + [basePlanet.duranium, basePlanet.tritanium, basePlanet.molybdenum].join("/") + "</td><tr>").appendTo(pInfoTable);
+                // Starbase Info
                 if (starbase)
                 {
                     var baseDef = autopilot.getBaseDeficiency(basePlanet);
                     $("<div style='font-size: medium;padding-top:10px;border-bottom: 1px dashed white;'>Starbase</div>").appendTo(a);
+                    $("<div style='font-size: smaller;'>Technology: " + starbase.hulltechlevel + " / " + starbase.enginetechlevel + " / " + starbase.beamtechlevel + " / " + starbase.torptechlevel + "</div>").appendTo(a);
                     $("<div style='font-size: smaller;'>Megacredits: " + baseDef.mcs + "</div>").appendTo(a);
                     $("<div style='font-size: smaller;'>Minerals: " + baseDef.dur + " / " + baseDef.tri + " / " + baseDef.mol + "</div>").appendTo(a);
                 }
-                var oir = autopilot.getSumOfObjectsInRange(basePlanet, 150);
+                // APS Info
+                var oirs = autopilot.getSumOfObjectsInRange(basePlanet, 81);
+                var oird = autopilot.getSumOfObjectsInRange(basePlanet, 162);
                 $("<div style='font-size: medium;padding-top:10px;border-bottom: 1px dashed white;'>APS Base</div>").appendTo(a);
                 var baseInfoTable = $("<table class='CleanTable' width='100%' cellspacing='10'></table>").appendTo(a);
-                $("<tr><th>Range</th><th>Planets</th><th>Clans</th><th>Neu</th><th>(Neu)</th><th>Dur</th><th>(Dur)</th><th>Tri</th><th>(Tri)</th><th>Mol</th><th>(Mol)</th><th>Mcs</th><th>Sup</th></tr>").appendTo(baseInfoTable);
-                $("<tr align='center'><td>" + oir.range + " lj</td><td>" + oir.planets + "</td><td>" + oir.cla + "</td><td>" + oir.neu + "</td><td>" + oir.gneu + "</td><td>" + oir.dur + "</td><td>" + oir.gdur + "</td><td>" + oir.tri + "</td><td>" + oir.gtri + "</td><td>" + oir.mol + "</td><td>" + oir.gmol + "</td><td>" + oir.mcs + "</td><td>" + oir.sup + "</td></tr>").appendTo(baseInfoTable);
+                $("<tr><th>Range</th><th>Planets</th><th>Clans</th><th>Neu</th><th>Dur</th><th>Tri</th><th>Mol</th><th>Mcs</th><th>Sup</th></tr>").appendTo(baseInfoTable);
+                $("<tr align='center'><td>" + oirs.range + " lj</td><td>" + oirs.planets + "</td><td>" + oirs.cla + "</td><td>" + oirs.neu + " (" + oirs.gneu + ")</td><td>" + oirs.dur + " (" + oirs.gdur + ")</td><td>" + oirs.tri + " (" + oirs.gtri + ")</td><td>" + oirs.mol + " (" + oirs.gmol + ")</td><td>" + oirs.mcs + "</td><td>" + oirs.sup + "</td></tr>").appendTo(baseInfoTable);
+                $("<tr align='center'><td>" + oird.range + " lj</td><td>" + oird.planets + "</td><td>" + oird.cla + "</td><td>" + oird.neu + " (" + oird.gneu + ")</td><td>" + oird.dur + " (" + oird.gdur + ")</td><td>" + oird.tri + " (" + oird.gtri + ")</td><td>" + oird.mol + " (" + oird.gmol + ")</td><td>" + oird.mcs + "</td><td>" + oird.sup + "</td></tr>").appendTo(baseInfoTable);
                 //
                 $("<div style='font-size: medium;padding-top:10px;border-bottom: 1px dashed white;'>Active Autopilots</div>").appendTo(a);
                 var container = $("<div style='padding-left: 20px;'></div>").appendTo(a);
@@ -1165,7 +1176,7 @@ function wrapper () { // wrapper for injection
 		{
 			aps.unloadCargo();
 			var transCargo = this.loadCargo(aps);
-			console.log("Cargo summary: " + transCargo);
+			//console.log("Cargo summary: " + transCargo);
 		}
 	};
 	alchemyAPS.prototype.loadCargo = function(aps)
@@ -1422,13 +1433,14 @@ function wrapper () { // wrapper for injection
             {
                 // = new colony
                 var enemyAtPlanet = autopilot.enemyShipAtPlanet(aps.planet);
+                console.log("...enemyAtPlanet: " + enemyAtPlanet);
                 if (!enemyAtPlanet)
                 {
                     aps.unloadCargo();
                 }
             } else
             {
-                var transCargo = this.loadCargo(aps);
+                this.loadCargo(aps);
             }
         }
 	};
@@ -1580,7 +1592,7 @@ function wrapper () { // wrapper for injection
 	collectorAPS.prototype.setScopeRange = function(aps)
     {
         var inRange = aps.getAPSinRange(aps.scopeRange);
-        if (inRange && inRange.length > 5 || this.ooiPriority == "cla")
+        if (inRange && inRange.length > 5 || this.ooiPriority === "cla")
         {
             aps.scopeRange *= 3;
         } else if (inRange && inRange.length > 2)
@@ -1597,10 +1609,10 @@ function wrapper () { // wrapper for injection
             // check if enough resources are there
             var tPlanet = vgap.planetAt(potSources[i].x, potSources[i].y);
             var curETA = aps.getETA(tPlanet);
-            console.log("...ETA to " + tPlanet.id + " -> " + curETA);
+            //console.log("...ETA to " + tPlanet.id + " -> " + curETA);
             var futRes = aps.getFutureSurfaceResources(tPlanet, curETA);
-            console.log("... potential target's " + tPlanet.id + " future resources ");
-            console.log(futRes);
+            //console.log("... potential target's " + tPlanet.id + " future resources ");
+            //console.log(futRes);
             //
             var tValue = 0;
             if (this.isMineralCollector())
@@ -1635,7 +1647,7 @@ function wrapper () { // wrapper for injection
                             potSources[i].mcs = tPlanet.megacredits;
                             potSources[i].value = tValue;
                             potSources[i].eta = curETA;
-                            console.log("...add potential destination (baseDef).");
+                            //console.log("...add potential destination (baseDef).");
                             goodToGo.push(potSources[i]);
                             continue;
                         }
@@ -1661,7 +1673,7 @@ function wrapper () { // wrapper for injection
             potSources[i].mcs = tPlanet.megacredits;
             potSources[i].value = tValue;
             potSources[i].eta = curETA;
-            console.log("...add potential destination.");
+            //console.log("...add potential destination.");
             goodToGo.push(potSources[i]);
         }
         return goodToGo;
@@ -1701,12 +1713,12 @@ function wrapper () { // wrapper for injection
             } // we do not need to collect more clans
         }
         var targetsInRange = aps.getTargetsInRange(autopilot.frnnOwnPlanets, aps.base.x, aps.base.y, aps.scopeRange);
-		console.log("... targets in range: " + targetsInRange.length);
+		//("... targets in range: " + targetsInRange.length);
         if (targetsInRange.length > 0)
         {
             targetsInRange = this.getGoodToGoSources(aps, targetsInRange);
         }
-        console.log("... good-to-go targets: " + targetsInRange.length);
+        //console.log("... good-to-go targets: " + targetsInRange.length);
         var potential = [];
 		for (var i = 0; i < targetsInRange.length; i++)
 		{
@@ -2249,7 +2261,7 @@ function wrapper () { // wrapper for injection
             {
                 this.satisfyLocalDeficiency(aps);
             }
-			console.log("Cargo summary: " + transCargo);
+			//console.log("Cargo summary: " + transCargo);
 		}
 	};
 	distributorAPS.prototype.loadCargo = function(aps)
@@ -2865,9 +2877,10 @@ function wrapper () { // wrapper for injection
     {
         return (this.objectInRangeOfEnemyPlanet(object) || this.objectInRangeOfEnemyShip(object));
     };
-    APS.prototype.shipInWarpWellOfPlanet = function(tP)
+    APS.prototype.shipInWarpWellOfPlanet = function(planet, ship)
     {
-        var distance = Math.ceil(autopilot.getDistance( {x: this.ship.x, y: this.ship.y}, {x: tP.x, y: tP.y} ));
+        if (typeof ship === "undefined") ship = this.ship;
+        var distance = Math.ceil(autopilot.getDistance( {x: ship.x, y: ship.y}, {x: planet.x, y: planet.y} ));
         return (distance <= 3);
     };
 	/*
@@ -2938,7 +2951,7 @@ function wrapper () { // wrapper for injection
     };
     APS.prototype.isInWarpWell = function(coords)
     {
-        if (typeof coords == "undefined") coords = { x: this.ship.x, y: this.ship.y };
+        if (typeof coords === "undefined") coords = { x: this.ship.x, y: this.ship.y };
         var planet = vgap.planetAt(coords.x, coords.y);
         if (planet) return false; // if we are at planet, we are not in warp well
         var cP = autopilot.getClosestPlanet(coords, 0, true);
@@ -3147,6 +3160,7 @@ function wrapper () { // wrapper for injection
             } else
             {
                 devideThresh = Math.floor(this.hull.cargo * this.functionModule.minimalCargoRatioToGo);
+                if (this.objectOfInterest !== "all") devideThresh = Math.floor(devideThresh * 0.75);
                 if (this.objectOfInterest === "cla")
                 {
                     var baseMaxClans = autopilot.getMaxColonistPopulation(this.base);
@@ -3173,6 +3187,7 @@ function wrapper () { // wrapper for injection
             if (this.secondaryDestination) dP = this.secondaryDestination;
             var curDistance = Math.ceil(autopilot.getDistance({ x: tP.x, y: tP.y }, { x: this.ship.x, y: this.ship.y }));
             var thisFuel = autopilot.getOptimalFuelConsumptionEstimate(this.ship.id, [], curDistance); // [] = current cargo
+            if (this.ship.hullid === 96) thisFuel -= (2 * (curDistance-1)); // cobol ramscoop
             var ndP = dP;
             if (tP.id === dP.id)
             {
@@ -3202,6 +3217,7 @@ function wrapper () { // wrapper for injection
                 var nextCargo = this.estimateMissionCargo(tP);
                 if (nextCargo[0] > thisFuel) nextCargo[0] -= thisFuel; // reduce cargo by fuel that is used up traveling to tP
                 nextFuel = autopilot.getOptimalFuelConsumptionEstimate(this.ship.id, nextCargo, distance);
+                if (this.ship.hullid === 96) nextFuel -= (2 * (distance-1)); // cobol ramscoop
             }
         }
         return nextFuel;
@@ -3271,7 +3287,7 @@ function wrapper () { // wrapper for injection
             }
         }
         //
-        if (loadedFuel >= fuel || this.ship.hullid === 14) // hull 14 = cobol class research cruiser ?
+        if (loadedFuel >= fuel || this.ship.hullid === 14) // hull 14 = Neutronic Fuel Carrier
         {
             return true;
         } else
@@ -3311,7 +3327,7 @@ function wrapper () { // wrapper for injection
     };
     APS.prototype.targetIsSet = function()
     {
-        return (this.ship.x != this.ship.targetx || this.ship.y != this.ship.targety);
+        return autopilot.shipTargetIsSet(this.ship);
     };
     APS.prototype.escapeToWarpWell = function()
     {
@@ -3441,7 +3457,7 @@ function wrapper () { // wrapper for injection
                     var pW = vgap.planetAt(urgentWaypoints[i].x, urgentWaypoints[i].y);
                     if (this.isSavePlanet(pW))
                     {
-                        var inWarpWell = this.shipInWarpWellOfPlanet(pW);
+                        var inWarpWell = this.shipInWarpWellOfPlanet(pW, cP);
                         if (inWarpWell || this.shipPathIsSave(pW))
                         {
                             if (inWarpWell)
@@ -4355,6 +4371,7 @@ function wrapper () { // wrapper for injection
         storageId: false,
         storageCfgId: false,
         settings: {},
+        towedShips: [],
 		shipsByDestination: [],
 		frnnPlanets: [],
 		frnnOwnPlanets: [],
@@ -4373,6 +4390,15 @@ function wrapper () { // wrapper for injection
 		neuSources: [],
 		mcDeficiencies: [],
 		mcSources: [],
+        objectTypeEnum: {
+            PLANETS     : 0,
+            BASES       : 1,
+            SHIPS       : 2
+        },
+        idColors: [ "#ffa100", "#3399FF", "#FFFF00" , "#FF8000"],
+        baseCols: {
+            0: "#FFFF00"
+        },
 		fuelFactor: {
 			t1: [0,100,800,2700,6400,12500,21600,34300,51200,72900],
 			t2: [0,100,430,2700,6400,12500,21600,34300,51200,72900],
@@ -4439,13 +4465,14 @@ function wrapper () { // wrapper for injection
                 }
 			});
 		},
-		enemyShipAtPlanet: function(planet)
+		enemyShipAtPlanet: function(planet, playerid)
         {
             var ships = vgap.shipsAt(planet.x, planet.y);
             if (ships.length > 0)
             {
                 for (var i = 0; i < ships.length; i++)
                 {
+                    if (ships[i].ownerid === vgap.player.id) continue;
                     if (!autopilot.isFriendlyPlayer(ships[i].ownerid)) return true;
                 }
             }
@@ -4455,7 +4482,7 @@ function wrapper () { // wrapper for injection
 		{
 			for (var i = 0; i < vgap.relations.length; i++)
 			{
-				if (vgap.relations[i].playertoid == playerId)
+				if (vgap.relations[i].playertoid === playerId)
 				{
 					return (vgap.relations[i].relationto >= 2);
 				}
@@ -4572,6 +4599,10 @@ function wrapper () { // wrapper for injection
                 return hull.cargo;
             }
             return 0;
+        },
+        shipTargetIsSet: function(ship)
+        {
+            return (ship.x !== ship.targetx || ship.y !== ship.targety);
         },
 		getFreeClans: function(planet)
 		{
@@ -4732,8 +4763,8 @@ function wrapper () { // wrapper for injection
         getOptimalFuelConsumptionEstimate: function(sid, cargo, distance)
         {
             var ship = vgap.getShip(sid);
-            if (typeof distance == "undefined") distance = Math.ceil(autopilot.getDistance({x: ship.x, y: ship.y}, {x: ship.targetx, y: ship.targety}));
-            if (typeof cargo == "undefined") cargo = [];
+            if (typeof distance === "undefined") distance = Math.ceil(autopilot.getDistance({x: ship.x, y: ship.y}, {x: ship.targetx, y: ship.targety}));
+            if (typeof cargo === "undefined") cargo = [];
             var hullCargoMass = autopilot.getHullCargoMass(sid, cargo); // without fueltank content
             var warp = ship.engineid;
             var hull = vgap.getHull(ship.hullid);
@@ -4750,7 +4781,7 @@ function wrapper () { // wrapper for injection
                 actualConsumption = vgap.turnFuel(distance, hullCargoMass + basicConsumption, fFactor, maxTurnDist, penalty);
             }
             actualConsumption++;
-            if (ship.hullid == 96) // = cobol class research
+            if (ship.hullid === 96) // = cobol class research toDo: what is that supposed to do?
             {
                 actualConsumption = vgap.turnFuel(maxTurnDist, hullCargoMass + basicConsumption, fFactor, maxTurnDist, penalty);
                 actualConsumption++;
@@ -5453,6 +5484,89 @@ function wrapper () { // wrapper for injection
             var maxPop = autopilot.getMaxColonistPopulation(planet);
             return Math.floor(Math.sqrt(maxPop - 50) + 50);
         },
+        shipIdleIndicator: function(ship)
+        {
+            var markup = {
+                attr : {
+                    stroke : autopilot.idColors[autopilot.objectTypeEnum.SHIPS],
+                    lineWidth: 3,
+                    lineCap: "round",
+                    lineDash: false
+                }
+            };
+            if ((ship.warp === 0 || !autopilot.shipTargetIsSet(ship)) && autopilot.towedShips.indexOf(ship.id) === -1)
+            {
+                autopilot.drawScaledQuarterCircle(ship.x, ship.y, 13, "sw", markup.attr, null, 0.5);
+            }
+
+        },
+        starbaseIdleIndicator: function(starbase, planet)
+        {
+            var markup = {
+                attr : {
+                    stroke : autopilot.idColors[autopilot.objectTypeEnum.BASES],
+                    lineWidth: 3,
+                    lineCap: "round",
+                    lineDash: false
+                }
+            };
+            if (!starbase.isbuilding && !(planet.note && planet.note.body.match(/nup:fort/)))
+            {
+                autopilot.drawScaledQuarterCircle(planet.x, planet.y, 13, "nw", markup.attr, null, 0.5);
+            }
+        },
+        planetIdleIndicator: function(planet)
+        {
+            var markup = {
+                attr : {
+                    stroke : autopilot.idColors[autopilot.objectTypeEnum.PLANETS],
+                    lineWidth: 3,
+                    lineCap: "round",
+                    lineDash: false
+                }
+            };
+            if (planet.supplies > 0 && planet.factories === 0)
+            {
+                autopilot.drawScaledQuarterCircle(planet.x, planet.y, 13, "ne", markup.attr, null, 0.5);
+            }
+            var claDef = autopilot.getClanDeficiency(planet);
+            if (claDef < 0)
+            {
+                markup.attr.lineDash = [3,3];
+                var intensity = 0.1 + (((claDef * -1) / 5000) * 0.9);
+                if (intensity > 1) intensity = 1;
+                autopilot.drawScaledQuarterCircle(planet.x, planet.y, 10, "ne", markup.attr, null, intensity);
+            }
+        },
+        apsIndicators: function()
+        {
+            for (var i = 0; i < vgap.myships.length; i++)
+            {
+                var markup = {
+                    attr : {
+                        stroke : autopilot.idColors[autopilot.objectTypeEnum.SHIPS],
+                        lineWidth: 3,
+                        lineCap: "round",
+                        lineDash: [5,5]
+                    }
+                };
+                var ship = vgap.myships[i];
+                var cfgData = autopilot.isInStorage(ship.id);
+                if (cfgData)
+                {
+                    //markup.attr.stroke = autopilot.baseCols[0];
+                    //if (autopilot.baseCols[cfgData.base]) markup.attr.stroke = autopilot.baseCols[cfgData.base];
+                    autopilot.drawScaledCircle(ship.x, ship.y, 5, markup.attr, null, 0.5); // indicate APS is at planet
+                    var bP = vgap.getPlanet(cfgData.base);
+                    if (bP)
+                    {
+                        markup.attr.stroke = autopilot.idColors[autopilot.objectTypeEnum.BASES];
+                        //if (autopilot.baseCols[cfgData.base]) markup.attr.stroke = autopilot.baseCols[cfgData.base];
+                        autopilot.drawScaledQuarterCircle(bP.x, bP.y, 10, "nw", markup.attr, null, 0.5); // indicate APS is at planet
+                    }
+                }
+            }
+        },
         planetaryManagement: function()
         {
             for (var i = 0; i < vgap.myplanets.length; i++)
@@ -5542,7 +5656,7 @@ function wrapper () { // wrapper for injection
             var storedGameData = JSON.parse(localStorage.getItem(autopilot.storageId));
             if (storedGameData === null) // no storage setup yet
             {
-                if (typeof data == "undefined") return false;
+                if (typeof data === "undefined") return false;
                 var gdo = new APSdata(data);
                 var gameData = gdo.getData();
                 if (gameData)
@@ -5801,10 +5915,12 @@ function wrapper () { // wrapper for injection
                 for (var i = 0; i < vgap.myships.length; i++)
                 {
                     var ship = vgap.myships[i];
+                    if (ship.mission === 6 && autopilot.towedShips.indexOf(ship.mission1target) === -1) autopilot.towedShips.push(ship.mission1target);
                     var cfgData = autopilot.isInStorage(ship.id);
                     if (cfgData)
                     {
                         console.log(cfgData);
+                        if (ship.hullid === 96) console.log(":::> Cobol Class Research Cruiser detected!");
                         // if configuration is available in storage
                         var aps = new APS(ship, cfgData);
                         if (aps.primaryFunction === "dis")
@@ -5815,15 +5931,15 @@ function wrapper () { // wrapper for injection
                             aps.noteColor = expCol;
                         } else
                         {
-                            if (noteColByBase[aps.base.id])
+                            if (autopilot.baseCols[aps.base.id])
                             {
-                                aps.noteColor = noteColByBase[aps.base.id];
+                                aps.noteColor = autopilot.baseCols[aps.base.id];
                             } else
                             {
                                 if (nCols.length > 0)
                                 {
-                                    noteColByBase[aps.base.id] = nCols.shift();
-                                    aps.noteColor = noteColByBase[aps.base.id];
+                                    autopilot.baseCols[aps.base.id] = nCols.shift();
+                                    aps.noteColor = autopilot.baseCols[aps.base.id];
                                 } else {
                                     aps.noteColor = "ffffff";
                                 }
@@ -5937,7 +6053,89 @@ function wrapper () { // wrapper for injection
          */
 		draw: function() {
 			//console.log("Draw: plugin called.");
+            autopilot.towedShips = [];
+            for (var i = 0; i < vgap.myships.length; i++)
+            {
+                var s = vgap.myships[i];
+                if (s.mission === 6 && autopilot.towedShips.indexOf(s.mission1target) === -1) autopilot.towedShips.push(s.mission1target);
+                autopilot.shipIdleIndicator(s);
+            }
+            for (var j = 0; j < vgap.myplanets.length; j++)
+            {
+                autopilot.planetIdleIndicator(vgap.myplanets[j]);
+                var sb = vgap.getStarbase(vgap.myplanets[j].id);
+                if (sb)
+                {
+                    autopilot.starbaseIdleIndicator(sb, vgap.myplanets[j]);
+                }
+            }
+            autopilot.apsIndicators();
 		},
+        /**
+         * Generate the content for the enemy ship dashboard tab
+         * @param x			x coordinate of ship
+         * @param y			y coordinate of ship
+         * @param radius	radius of circle
+         * @param attr		color of the drawing
+         * @param paperset	where to draw
+         * @param alpha     alpha value to use
+         */
+        drawScaledCircle : function(x, y, radius, attr, paperset, alpha) {
+            if (!vgap.map.isVisible(x, y, radius))
+                return;
+            radius *= vgap.map.zoom;
+            if (radius <= 1)
+                radius = 1;
+            if (paperset === null)
+                paperset = vgap.map.ctx;
+            paperset.strokeStyle = colorToRGBA(attr.stroke, alpha);
+            //save original line width
+            var org_line_width = paperset.lineWidth;
+            paperset.lineWidth = attr.lineWidth;
+            var org_line_cap = paperset.lineCap;
+            paperset.lineCap = attr.lineCap;
+            var org_dash_style = paperset.getLineDash();
+            if (attr.lineDash) paperset.setLineDash(attr.lineDash);
+            //paperset.setAlpha(0.5);
+            paperset.beginPath();
+            paperset.arc(vgap.map.screenX(x), vgap.map.screenY(y), radius, 0, Math.PI * 2, false);
+            paperset.stroke();
+            //restore previous line width
+            paperset.lineWidth = org_line_width;
+            paperset.lineCap = org_line_cap;
+            paperset.setLineDash(org_dash_style);
+        },
+        drawScaledQuarterCircle : function(x, y, radius, zone, attr, paperset, alpha) {
+            var zones = {
+                ne: [1.5,2],
+                se: [0,0.5],
+                sw: [0.5,1],
+                nw: [1,1.5]
+            };
+            if (!vgap.map.isVisible(x, y, radius))
+                return;
+            radius *= vgap.map.zoom;
+            if (radius <= 1)
+                radius = 1;
+            if (paperset === null)
+                paperset = vgap.map.ctx;
+            paperset.strokeStyle = colorToRGBA(attr.stroke, alpha);
+            //save original line width
+            var org_line_width = paperset.lineWidth;
+            paperset.lineWidth = attr.lineWidth;
+            var org_line_cap = paperset.lineCap;
+            paperset.lineCap = attr.lineCap;
+            var org_dash_style = paperset.getLineDash();
+            if (attr.lineDash) paperset.setLineDash(attr.lineDash);
+            //paperset.setAlpha(0.5);
+            paperset.beginPath();
+            paperset.arc(vgap.map.screenX(x), vgap.map.screenY(y), radius, Math.PI * zones[zone][0], Math.PI * zones[zone][1], false);
+            paperset.stroke();
+            //restore previous line width
+            paperset.lineWidth = org_line_width;
+            paperset.lineCap = org_line_cap;
+            paperset.setLineDash(org_dash_style);
+        },
 		/*
          * loadplanet: executed when a planet is selected on dashboard or starmap
          *
@@ -5969,7 +6167,6 @@ function wrapper () { // wrapper for injection
 			//console.log("LoadStarbase: plugin called.");
 			//console.log("Starbase id: " + vgap.starbaseScreen.starbase.id + " on planet id: " + vgap.starbaseScreen.planet.id);
 		},
-
 		/*
          * loadship: executed when a planet is selected on dashboard or starmap
          * Inside the function "load" of vgapShipScreen (vgapShipScreen.prototype.load) the normal ship screen
