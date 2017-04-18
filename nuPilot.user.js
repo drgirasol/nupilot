@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable semi-intelligent auto-pilots
-// @version       0.08.58
-// @date          2017-04-15
+// @version       0.08.60
+// @date          2017-04-18
 // @author        drgirasol
 // @include       http://planets.nu/*
 // @include       http://play.planets.nu/*
@@ -2035,6 +2035,7 @@ function wrapper () { // wrapper for injection
         }
         var trueSinks = [];
         var fortSinks = [];
+        var backupSinks = [];
 		for (var i = 0; i < potSinks.length; i++)
 		{
 			var sinkPlanet = vgap.getPlanet(potSinks[i].pid);
@@ -2044,12 +2045,17 @@ function wrapper () { // wrapper for injection
             potSinks[i].deficiency = def;
             potSinks[i].distance = distance;
             potSinks[i].isFort = isFort;
-			if (def < cutOff && capacity >= (def * -minResolveFactor) && !isFort) // at least 75% of the deficiency should be resolved by the APS
+			if (def < cutOff && capacity >= (def * -minResolveFactor)) // at least 75% of the deficiency should be resolved by the APS
 			{
-                trueSinks.push(potSinks[i]);
-            } else if (def < cutOff && isFort) // ignore capacity, anything is better than nothing
+			    if (isFort)
+                {
+                    fortSinks.push(potSinks[i]);
+                } else {
+                    trueSinks.push(potSinks[i]);
+                }
+            } else if (def < cutOff)
             {
-                fortSinks.push(potSinks[i]);
+			    backupSinks.push(potSinks[i]);
             }
 		}
 		if (fortSinks.length > 0)
@@ -2059,8 +2065,19 @@ function wrapper () { // wrapper for injection
             this.sinks = fortSinks.concat(aps.getDevidedCollection(trueSinks, splitBy, this.devideThresh, sortBy, direction));
         } else
         {
-            // priorities firstly by (split) and secondly by (sort)
-            this.sinks = aps.getDevidedCollection(trueSinks, splitBy, this.devideThresh, sortBy, direction);
+            if (trueSinks.length > 0 && backupSinks.length > 0)
+            {
+                if (trueSinks.length > 1) trueSinks = aps.getDevidedCollection(trueSinks, splitBy, this.devideThresh, sortBy, direction);
+                this.sinks = trueSinks.concat(autopilot.sortCollection(backupSinks, "distance", "asc"));
+            } else if (trueSinks.length > 0)
+            {
+                if (trueSinks.length > 1) trueSinks = aps.getDevidedCollection(trueSinks, splitBy, this.devideThresh, sortBy, direction);
+                this.sinks = trueSinks;
+            } else if (backupSinks.length > 0)
+            {
+                if (backupSinks.length > 1) backupSinks = autopilot.sortCollection(backupSinks, "distance", "asc");
+                this.sinks = backupSinks;
+            }
         }
 		console.log(this.sinks);
 	};
@@ -5496,9 +5513,11 @@ function wrapper () { // wrapper for injection
             };
             if ((ship.warp === 0 || !autopilot.shipTargetIsSet(ship)) && autopilot.towedShips.indexOf(ship.id) === -1)
             {
-                autopilot.drawScaledQuarterCircle(ship.x, ship.y, 13, "sw", markup.attr, null, 0.5);
+                var cfgData = autopilot.isInStorage(ship.id);
+                if (!cfgData || (cfgData && cfgData.shipFunction !== "alc")) {
+                    autopilot.drawScaledQuarterCircle(ship.x, ship.y, 13, "sw", markup.attr, null, 0.5);
+                }
             }
-
         },
         starbaseIdleIndicator: function(starbase, planet)
         {
@@ -5545,7 +5564,7 @@ function wrapper () { // wrapper for injection
                 var markup = {
                     attr : {
                         stroke : autopilot.idColors[autopilot.objectTypeEnum.SHIPS],
-                        lineWidth: 3,
+                        lineWidth: 2,
                         lineCap: "round",
                         lineDash: [5,5]
                     }
@@ -5561,6 +5580,7 @@ function wrapper () { // wrapper for injection
                     if (bP)
                     {
                         markup.attr.stroke = autopilot.idColors[autopilot.objectTypeEnum.BASES];
+                        markup.attr.lineWidth = 3;
                         //if (autopilot.baseCols[cfgData.base]) markup.attr.stroke = autopilot.baseCols[cfgData.base];
                         autopilot.drawScaledQuarterCircle(bP.x, bP.y, 10, "nw", markup.attr, null, 0.5); // indicate APS is at planet
                     }
