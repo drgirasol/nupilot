@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable semi-intelligent auto-pilots
-// @version       0.08.76
-// @date          2017-05-14
+// @version       0.08.77
+// @date          2017-05-15
 // @author        drgirasol
 // @include       http://planets.nu/*
 // @include       http://play.planets.nu/*
@@ -2427,8 +2427,13 @@ function wrapper () { // wrapper for injection
     {
         // check if cargo contains the required amount for sink (destination)
         var potDest = false;
-        if (aps.potDest.length === 0) potDest = this.getPotDestNull(aps);
-        potDest = aps.potDest[0];
+        if (aps.potDest.length === 0)
+        {
+            potDest = this.getPotDestNull(aps);
+        } else
+        {
+            potDest = aps.potDest[0];
+        }
         if (!potDest) console.error("...potential destination data NOT available");
         var ooi = this.ooiPriority;
         console.log("...ooi = " + ooi);
@@ -5985,7 +5990,7 @@ function wrapper () { // wrapper for injection
                     lineDash: false
                 }
             };
-            if (planet.supplies > 0 && planet.factories === 0)
+            if (planet.factories === 0)
             {
                 autopilot.drawScaledQuarterCircle(planet.x, planet.y, 13, "ne", markup.attr, null, 0.5);
             }
