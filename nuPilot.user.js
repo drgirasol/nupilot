@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable semi-intelligent auto-pilots
-// @version       0.08.77
-// @date          2017-05-15
+// @version       0.08.80
+// @date          2017-05-17
 // @author        drgirasol
 // @include       http://planets.nu/*
 // @include       http://play.planets.nu/*
@@ -478,7 +478,10 @@ function wrapper () { // wrapper for injection
 			neu: "Neutronium",
 			dur: "Duranium",
 			tri: "Tritanium",
-			mol: "Molybdenum"
+			mol: "Molybdenum",
+            cla: "Clans",
+            mcs: "Megacredits",
+            sup: "Supplies"
 		};
         apcPrio["dis"] =
         {
@@ -1699,7 +1702,7 @@ function wrapper () { // wrapper for injection
             }
             if (tValue < this.devideThresh)
             {
-                console.log("...removing destination " + tPlanet.id + " due to lack of objects (" + tValue + " / " + this.devideThresh + ")!");
+                //console.log("...removing destination " + tPlanet.id + " due to lack of objects (" + tValue + " / " + this.devideThresh + ")!");
                 continue;
             }
             potSources[i].mcs = tPlanet.megacredits;
@@ -1815,13 +1818,13 @@ function wrapper () { // wrapper for injection
                 var isFort = (potPlanet.note && potPlanet.note.body.match(/nup:fort/)); // a purely defensive base
                 if (potStarbase && this.isMineralCollector() && !isFort)
                 {
-                    console.log("...removing destination " + potPlanet.id + " as we do not collect from other bases with starbase");
+                    //console.log("...removing destination " + potPlanet.id + " as we do not collect from other bases with starbase");
                     continue;
                 }
                 var willBeBase = (potPlanet.note && potPlanet.note.body.match(/nup:base/));
                 if (willBeBase) // don't use (other) prospected starbase planets
                 {
-                    console.log("...removing destinations: " + potPlanet.id + " - a starbase will be built here!");
+                    //console.log("...removing destinations: " + potPlanet.id + " - a starbase will be built here!");
                     continue;
                 }
                 var isHub = (potPlanet.note && potPlanet.note.body.match(/nup:hub/));
@@ -1831,7 +1834,7 @@ function wrapper () { // wrapper for injection
                     // the base is employing APS of the same type (collector with priority x)
                     if (aps.baseHasSameAPStype(potPlanet.id, "col", this.ooiPriority) && !isHub && !isFort)
                     {
-                        console.log("...removing destination " + potPlanet.id + " due to collector mission conflict");
+                        //console.log("...removing destination " + potPlanet.id + " due to collector mission conflict");
                         continue;
                     }
                 }
@@ -2094,6 +2097,8 @@ function wrapper () { // wrapper for injection
                     } else {
                         if (def < cutOff && capacity >= (def * -this.minResolveFactor)) // inside of minResolveFactor
                         {
+                            // toDo: if ooi = cla, planets with less than x clans should be of highest priority
+                            // => class: weak (for a basic defense, for timely mineral retrieval) taxation and bovinoid supply are secondary
                             if (potSinks[i].government)
                             {
                                 potSinks[i].class = "goodnatives";
@@ -2930,7 +2935,7 @@ function wrapper () { // wrapper for injection
                     this.setShipTarget(this.destination);
                 } else
                 {
-                    console.log("...planet is NOT destination.");
+                    console.log("...planet is no destination.");
                     if (this.planet.id === this.base.id)
                     {
                         console.log("...planet is base.");
@@ -3642,6 +3647,7 @@ function wrapper () { // wrapper for injection
     };
     APS.prototype.shipPathIsSave = function(tP, oP)
     {
+        return true;
         // toDo: get minefields centered within a range of the current position; range = distance to travel???
         //console.log("::>shipPathIsSave");
         if (typeof oP === "undefined" || oP === null) oP = this.ship;
@@ -3659,7 +3665,7 @@ function wrapper () { // wrapper for injection
                 //return false; // deactivated 22.03.17: does not work as expected!
             }
         }
-        return true;
+        //return true;
     };
     APS.prototype.shipPathIntersectsObject = function(sx1, sy1, sx2, sy2, ox, oy, or)
     {
@@ -3683,6 +3689,7 @@ function wrapper () { // wrapper for injection
         var target = this.getNextWaypoint(dP);
         if (target)
         {
+            console.log("...fly to " + target.id);
             this.ship.targetx = target.x;
             this.ship.targety = target.y;
             var wpP = vgap.planetAt(this.ship.targetx, this.ship.targety);
@@ -3691,6 +3698,7 @@ function wrapper () { // wrapper for injection
     };
     APS.prototype.setWaypoints = function(ship, dP)
     {
+        // toDo: warpwell minimum distance used, how to implement heading consideration (warpwell max dist = 3)
         this.functionModule.setPotentialWaypoints(this); // potential waypoints specific for the current function (e.g. own planets in case of collector and distributor)
         var ship2dest = Math.ceil(autopilot.getDistance( {x: ship.x , y: ship.y}, {x: dP.x , y: dP.y} ));
         var waypoints = this.getTargetsInRange(this.potentialWaypoints, dP.x, dP.y, ship2dest); // potential waypoints closer to dP
@@ -3699,18 +3707,20 @@ function wrapper () { // wrapper for injection
         var fWPs = [];
         for (var i = 0; i < waypoints.length; i++) // set/save waypoint information
         {
-            var cP = vgap.planetAt(waypoints[i].x, waypoints[i].y);
-            if (cP)
+            var pW = vgap.planetAt(waypoints[i].x, waypoints[i].y);
+            if (pW)
             {
-                var etaDist = Math.ceil(autopilot.getDistance( {x: cP.x , y: cP.y}, {x: ship.x , y: ship.y} ));
-                if (ship2dest < etaDist || etaDist === 0) continue; // skip waypoints past dP and this.planet
-                var cP2dPDist = Math.ceil(autopilot.getDistance( {x: cP.x , y: cP.y}, {x: dP.x , y: dP.y} ));
-                waypoints[i].pid = cP.id;
+                var etaDist = Math.ceil(autopilot.getDistance( {x: pW.x , y: pW.y}, {x: ship.x , y: ship.y} )-2.2); // - warpwell of pW
+                if (this.planet) etaDist -= 2.2; // - warpwell of this.planet
+                if (ship2dest < etaDist || etaDist <= 0) continue; // skip waypoints past dP and this.planet
+                var pW2dPDist = Math.ceil(autopilot.getDistance( {x: pW.x , y: pW.y}, {x: dP.x , y: dP.y} )-4.4); // - warpwell of pW and dP
+                waypoints[i].pid = pW.id;
                 waypoints[i].ship2wPDist = etaDist;
-                waypoints[i].wayp2dPDist = cP2dPDist;
+                waypoints[i].wayp2dPDist = pW2dPDist;
                 waypoints[i].ship2dPDist = ship2dest;
-                waypoints[i].ship2wP2dPDist = etaDist + cP2dPDist;
-                waypoints[i].wpETA = Math.ceil(etaDist / Math.pow(this.ship.engineid, 2)) + Math.ceil(cP2dPDist / Math.pow(this.ship.engineid, 2)); // ETA if using cP as next stop
+                waypoints[i].ship2wP2dPDist = etaDist + pW2dPDist;
+                waypoints[i].wpETA = Math.ceil(etaDist / Math.pow(this.ship.engineid, 2)) + Math.ceil(pW2dPDist / Math.pow(this.ship.engineid, 2));
+                // ETA if using pW as next stop
                 fWPs.push(waypoints[i]);
             }
         }
@@ -3737,9 +3747,14 @@ function wrapper () { // wrapper for injection
     };
     APS.prototype.destinationAmongWaypoints = function(dP, pW)
     {
+        var destination = dP;
+        if (this.secondaryDestination)
+        {
+            destination = this.secondaryDestination;
+        }
         for (var i = 0; i < pW.length; i++)
         {
-            if (pW.pid === dP.id) return true;
+            if (pW[i].pid === destination.id) return true;
         }
         return false;
     };
@@ -3748,9 +3763,9 @@ function wrapper () { // wrapper for injection
         if (typeof origin === "undefined") origin = this.ship;
         if (this.potentialWaypoints.length === 0) this.setWaypoints(origin, dP); // ensure potential waypoints have been set
         var waypoints = this.potentialWaypoints;
-        //console.log("...waypoints by urgency:");
-        var dDist = autopilot.getDistance( {x: this.ship.x , y: this.ship.y}, {x: dP.x , y: dP.y} );
-        dDist -= 3; // warpWell
+        console.log("...waypoints by urgency:");
+        var dDist = autopilot.getDistance( {x: origin.x , y: origin.y}, {x: dP.x , y: dP.y} )-2.2;
+        if (this.planet) dDist -= 2.2; // warpWell
         var dETA = Math.ceil(dDist / Math.pow(this.ship.engineid, 2));
         //console.log("...direct ETA: " + dETA + " (" + dDist + ")");
         var uWPs = [];
@@ -3760,7 +3775,7 @@ function wrapper () { // wrapper for injection
             if (waypoints[i].wpETA <= (dETA + 1)) uWPs.push(waypoints[i]);
         }
         if (uWPs.length > 1) uWPs = this.clusterSortCollection(uWPs, "wpETA", "wayp2dPDist");
-        //console.log(uWPs);
+        console.log(uWPs);
         return uWPs;
     };
     APS.prototype.getUrgentWaypoint = function(dP, origin)
@@ -3773,7 +3788,12 @@ function wrapper () { // wrapper for injection
         if (this.destinationAmongWaypoints(dP, urgentWaypoints) && this.isSavePlanet(dP) && this.shipPathIsSave(dP))
         {
             //console.log("...potential urgent waypoints contain destination!");
-            uWP = this.destination;
+            if (this.secondaryDestination)
+            {
+                uWP = this.secondaryDestination;
+            } else {
+                uWP = this.destination;
+            }
         } else if (this.destinationAmongWaypoints(dP, urgentWaypoints))
         {
             //console.log("...planet not safe: " + this.isSavePlanet(dP));
@@ -3817,7 +3837,7 @@ function wrapper () { // wrapper for injection
         if (typeof origin === "undefined") origin = this.ship;
         if (this.potentialWaypoints.length === 0) this.setWaypoints(origin, dP); // ensure potential waypoints have been set
         var waypoints = this.potentialWaypoints;
-        //console.log("...waypoints by ETA:");
+        console.log("...waypoints by ETA:");
         var wpByEta = {};
         var ETAs = [];
         for (var i = 0; i < waypoints.length; i++)
@@ -3841,7 +3861,7 @@ function wrapper () { // wrapper for injection
                 wpByEta[curETA] = autopilot.sortCollection(wpByEta[curETA], "ship2wP2dPDist"); // waypoints prioritized by smallest deviation from direct route to dP
             }
         }
-        //console.log(wpByEta);
+        console.log(wpByEta);
         return wpByEta;
     };
     APS.prototype.getEtaWaypoint = function(dP, origin)
@@ -3855,15 +3875,15 @@ function wrapper () { // wrapper for injection
         {
             if (typeof waypoints[j] !== "undefined")
             {
-                //console.log("...potential waypoints with ETA " + j);
+                console.log("...potential waypoints with ETA " + j);
                 //waypoints[j] = this.sortCollection(waypoints[j]);
-                //console.log(waypoints[j]);
+                console.log(waypoints[j]);
                 if (minETA === 0)
                 {
                     minETA = j; // clostest waypoints (minimal ETA)
                     if (this.destinationAmongWaypoints(dP,waypoints[j]) && this.isSavePlanet(dP) && this.shipPathIsSave(dP))
                     {
-                        //console.log("...potential waypoints contain destination!");
+                        console.log("...potential waypoints contain destination!");
                         target = dP; break;
                     }
                 }
@@ -3878,7 +3898,6 @@ function wrapper () { // wrapper for injection
                         target = pW; break;
                     } else if (this.isSavePlanet(pW) && this.shipPathIsSave(pW))
                     {
-                        console.log("...fly to " + pW.id);
                         target = pW; break;
                     }
                 }
@@ -4320,36 +4339,62 @@ function wrapper () { // wrapper for injection
 	};
 	APS.prototype.updateNote = function()
 	{
+
 		var note = vgap.getNote(this.ship.id, 2);
 		if (this.isAPS)
 		{
 			var destination = "";
+			var idle = "";
 			if (this.isIdle)
             {
-                destination = "(IDLE:";
+                idle = " !IDLE:";
                 if (this.idleReason.length > 0)
                 {
-                    destination += this.idleReason.join(",");
+                    idle += this.idleReason.join(",");
                 }
-                destination += ")";
+                idle += "!";
             } else {
                 if (this.destination)
                 {
                     if (this.destination.id === this.base.id && this.primaryFunction === "col")
                     {
-                        destination = "->home";
+                        destination = "home";
                     } else
                     {
-                        destination = "->"+this.destination.id;
+                        destination = this.destination.id;
                     }
                 }
             }
 			var secDest = "";
 			if (this.secondaryDestination)
             {
-                secDest = "(" + this.secondaryDestination.id + ")";
+                secDest = this.secondaryDestination.id;
             }
-			note.body = "B|" + this.base.id + "|" + this.primaryFunction + "|" + this.objectOfInterest + " " + secDest + destination;
+            var ooiText = autopilot.apsOOItext[this.primaryFunction][this.objectOfInterest];
+			var funcText = autopilot.apsOOItext[this.primaryFunction].name;
+			note.body = "Base " + this.base.id + ", ";
+			if (destination === "home")
+            {
+                note.body += "returning to base with " + ooiText + idle;
+            } else {
+                if (this.primaryFunction === "col")
+                {
+                    ooiText += " from";
+                } else if (this.primaryFunction === "dis")
+                {
+                    if (secDest === "")
+                    {
+                        ooiText += " to";
+                    } else
+                    {
+                        funcText = "collecting";
+                        ooiText += " from";
+                        destination = secDest;
+                    }
+
+                }
+                note.body += funcText + " " + ooiText + " " + destination + idle;
+            }
 			note.color = this.noteColor;
 		} else
 		{
@@ -4725,6 +4770,38 @@ function wrapper () { // wrapper for injection
         /*
 
          */
+        apsOOItext: {
+            col: {
+                all: "Minerals",
+                neu: "Neutronium",
+                dur: "Duranium",
+                tri: "Tritanium",
+                mol: "Molybdenum",
+                cla: "Clans",
+                mcs: "Megacredits",
+                sup: "Supplies",
+                name: "collecting"
+            },
+            dis: {
+                all: "Everything",
+                neu: "Fuel",
+                sup: "Supplies",
+                mcs: "Megacredits",
+                cla: "Clans",
+                name: "distributing"
+            },
+            exp: {
+                cla: "Clans",
+                name: "colonizing"
+            },
+            alc: {
+                all: "Minerals",
+                dur: "Duranium",
+                tri: "Tritanium",
+                mol: "Molybdenum",
+                name: "producing"
+            }
+        },
         objectTypeEnum: {
             PLANETS     : 0,
             BASES       : 1,
@@ -4733,7 +4810,7 @@ function wrapper () { // wrapper for injection
             RGA         : 4,
             FORT        : 5
         },
-        idColors: [ "#ffa100", "#3399FF", "#FFFF00" , "#75a3a3", "#ff0000", "#cb42f4"],
+        idColors: [ "#00ff3f", "#3399FF", "#FFFF00" , "#75a3a3", "#ff0000", "#cb42f4"],
         baseCols: {
             0: "#FFFF00"
         },
