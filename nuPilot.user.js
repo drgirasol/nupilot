@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable semi-intelligent auto-pilots
-// @version       0.08.80
-// @date          2017-05-17
+// @version       0.08.82
+// @date          2017-05-28
 // @author        drgirasol
 // @include       http://planets.nu/*
 // @include       http://play.planets.nu/*
@@ -1682,7 +1682,7 @@ function wrapper () { // wrapper for injection
                             potSources[i].mcs = tPlanet.megacredits;
                             potSources[i].value = tValue;
                             potSources[i].eta = curETA;
-                            //console.log("...add potential destination (baseDef).");
+                            console.log("...add potential destination (baseDef).");
                             goodToGo.push(potSources[i]);
                             continue;
                         }
@@ -1690,7 +1690,8 @@ function wrapper () { // wrapper for injection
                 }
                 if (this.ooiPriority === "all")
                 {
-                    tValue = futRes.buildRes;
+                    tValue = this.getBalancedMineralValue(aps, futRes);
+                    console.log("...balanced Value: " + tValue);
                 } else
                 {
                     tValue = futRes[aps.moveables[this.ooiPriority]];
@@ -1712,6 +1713,46 @@ function wrapper () { // wrapper for injection
             goodToGo.push(potSources[i]);
         }
         return goodToGo;
+    };
+	collectorAPS.prototype.getBalancedMineralValue = function(aps, res)
+    {
+        var durTriBal = aps.base.duranium / aps.base.tritanium;
+        var durMolBal = aps.base.duranium / aps.base.molybdenum;
+        var triMolBal = aps.base.tritanium / aps.base.molybdenum;
+        var newRes = res;
+
+        // we define out of balance as the situation when there is 1.5 or more times as much of one mineral than the other
+        if (durTriBal >= 1.5 || durTriBal <= 0.75)
+        {
+            if (durTriBal >= 1.5)
+            {
+                newRes.buildRes -= newRes.duranium;
+                newRes.duranium = 0;
+            } else {
+                newRes.buildRes -= newRes.tritanium;
+                newRes.tritanium = 0;
+            }
+        }
+        if (durMolBal >= 1.5 || durMolBal <= 0.75)
+        {
+            if (durMolBal >= 1.5)
+            {
+                newRes.buildRes -= newRes.duranium;
+            } else {
+                newRes.buildRes -= newRes.molybdenum;
+                newRes.molybdenum = 0;
+            }
+        }
+        if (triMolBal >= 1.5 || triMolBal <= 0.75)
+        {
+            if (triMolBal >= 1.5)
+            {
+                newRes.buildRes -= newRes.tritanium;
+            } else {
+                newRes.buildRes -= newRes.molybdenum;
+            }
+        }
+        return newRes.buildRes;
     };
 	collectorAPS.prototype.isMineralCollector = function()
     {
@@ -3478,15 +3519,15 @@ function wrapper () { // wrapper for injection
     APS.prototype.estimateNextFuelConsumption = function(tP)
     {
         //console.log("::>estimateNextFuelConsumption");
-        //console.log("...target:" + tP.name + " (" + tP.id + ")");
+        //console.log("...current target:" + tP.name + " (" + tP.id + ")");
         var nextFuel = 0;
         if (this.destination)
         {
-            var dP = this.destination;
-            if (this.secondaryDestination) dP = this.secondaryDestination;
             var curDistance = Math.ceil(autopilot.getDistance({ x: tP.x, y: tP.y }, { x: this.ship.x, y: this.ship.y }));
             var thisFuel = autopilot.getOptimalFuelConsumptionEstimate(this.ship.id, [], curDistance); // [] = current cargo
             if (this.ship.hullid === 96) thisFuel -= (2 * (curDistance-1)); // cobol ramscoop
+            var dP = this.destination;
+            if (this.secondaryDestination) dP = this.secondaryDestination;
             var ndP = dP;
             if (tP.id === dP.id)
             {
@@ -3504,7 +3545,8 @@ function wrapper () { // wrapper for injection
                     ndP = this.destination;
                 }
             }
-            //console.log("...destination:" + ndP.name + " (" + ndP.id + ")");
+            //console.log("...current destination:" + dP.name + " (" + dP.id + ")");
+            //console.log("...next destination:" + ndP.name + " (" + ndP.id + ")");
             this.setWaypoints(tP, ndP); // tP = next ship position
             var nWP = this.getNextWaypoint(ndP, tP);
             if (nWP)
@@ -3543,10 +3585,9 @@ function wrapper () { // wrapper for injection
         console.warn("::>checkFuel");
         if (typeof cargo === "undefined") cargo = [];
         this.setWarp(); // set warp factor according to current circumstances
-        var fuel = Math.floor(autopilot.getOptimalFuelConsumptionEstimate(this.ship.id, cargo) * 1.1); // use more to be more flexible
+        var fuel = Math.ceil(autopilot.getOptimalFuelConsumptionEstimate(this.ship.id, cargo));
         if (!fuel) return false;
-        //console.log("...required fuel: " + fuel);
-        var backFuel = 0;
+        console.log("...required fuel: " + fuel);
         var tP = vgap.planetAt(this.ship.targetx, this.ship.targety);
         if (tP)
         {
@@ -3554,7 +3595,7 @@ function wrapper () { // wrapper for injection
             if (tP.neutronium > -1)
             {
                 nextFuel = this.estimateNextFuelConsumption(tP);
-                //console.log("...required fuel at next waypoint: " + nextFuel);
+                console.log("...required fuel at next waypoint: " + nextFuel);
                 if (nextFuel > tP.neutronium)
                 {
                     fuel += (nextFuel - tP.neutronium);
@@ -3703,7 +3744,7 @@ function wrapper () { // wrapper for injection
         var ship2dest = Math.ceil(autopilot.getDistance( {x: ship.x , y: ship.y}, {x: dP.x , y: dP.y} ));
         var waypoints = this.getTargetsInRange(this.potentialWaypoints, dP.x, dP.y, ship2dest); // potential waypoints closer to dP
         waypoints.push({ x: dP.x, y: dP.y });
-        console.log("...raw waypoints:");
+        //console.log("...raw waypoints:");
         var fWPs = [];
         for (var i = 0; i < waypoints.length; i++) // set/save waypoint information
         {
@@ -3724,7 +3765,7 @@ function wrapper () { // wrapper for injection
                 fWPs.push(waypoints[i]);
             }
         }
-        console.log(fWPs);
+        //console.log(fWPs);
         this.potentialWaypoints = fWPs;
     };
     APS.prototype.getNextWaypoint = function(dP, cP, notdP)
@@ -3763,7 +3804,7 @@ function wrapper () { // wrapper for injection
         if (typeof origin === "undefined") origin = this.ship;
         if (this.potentialWaypoints.length === 0) this.setWaypoints(origin, dP); // ensure potential waypoints have been set
         var waypoints = this.potentialWaypoints;
-        console.log("...waypoints by urgency:");
+        //console.log("...waypoints by urgency:");
         var dDist = autopilot.getDistance( {x: origin.x , y: origin.y}, {x: dP.x , y: dP.y} )-2.2;
         if (this.planet) dDist -= 2.2; // warpWell
         var dETA = Math.ceil(dDist / Math.pow(this.ship.engineid, 2));
@@ -3775,7 +3816,7 @@ function wrapper () { // wrapper for injection
             if (waypoints[i].wpETA <= (dETA + 1)) uWPs.push(waypoints[i]);
         }
         if (uWPs.length > 1) uWPs = this.clusterSortCollection(uWPs, "wpETA", "wayp2dPDist");
-        console.log(uWPs);
+        //console.log(uWPs);
         return uWPs;
     };
     APS.prototype.getUrgentWaypoint = function(dP, origin)
@@ -3787,13 +3828,7 @@ function wrapper () { // wrapper for injection
         //console.log("...urgent waypoint:");
         if (this.destinationAmongWaypoints(dP, urgentWaypoints) && this.isSavePlanet(dP) && this.shipPathIsSave(dP))
         {
-            //console.log("...potential urgent waypoints contain destination!");
-            if (this.secondaryDestination)
-            {
-                uWP = this.secondaryDestination;
-            } else {
-                uWP = this.destination;
-            }
+            uWP = dP;
         } else if (this.destinationAmongWaypoints(dP, urgentWaypoints))
         {
             //console.log("...planet not safe: " + this.isSavePlanet(dP));
@@ -3837,7 +3872,7 @@ function wrapper () { // wrapper for injection
         if (typeof origin === "undefined") origin = this.ship;
         if (this.potentialWaypoints.length === 0) this.setWaypoints(origin, dP); // ensure potential waypoints have been set
         var waypoints = this.potentialWaypoints;
-        console.log("...waypoints by ETA:");
+        //console.log("...waypoints by ETA:");
         var wpByEta = {};
         var ETAs = [];
         for (var i = 0; i < waypoints.length; i++)
@@ -3861,7 +3896,7 @@ function wrapper () { // wrapper for injection
                 wpByEta[curETA] = autopilot.sortCollection(wpByEta[curETA], "ship2wP2dPDist"); // waypoints prioritized by smallest deviation from direct route to dP
             }
         }
-        console.log(wpByEta);
+        //console.log(wpByEta);
         return wpByEta;
     };
     APS.prototype.getEtaWaypoint = function(dP, origin)
