@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable semi-intelligent auto-pilots
-// @version       0.08.82
-// @date          2017-05-28
+// @version       0.08.83
+// @date          2017-06-01
 // @author        drgirasol
 // @include       http://planets.nu/*
 // @include       http://play.planets.nu/*
@@ -1859,13 +1859,13 @@ function wrapper () { // wrapper for injection
                 var isFort = (potPlanet.note && potPlanet.note.body.match(/nup:fort/)); // a purely defensive base
                 if (potStarbase && this.isMineralCollector() && !isFort)
                 {
-                    //console.log("...removing destination " + potPlanet.id + " as we do not collect from other bases with starbase");
+                    console.log("...removing destination " + potPlanet.id + " as we do not collect from other bases with starbase");
                     continue;
                 }
                 var willBeBase = (potPlanet.note && potPlanet.note.body.match(/nup:base/));
                 if (willBeBase) // don't use (other) prospected starbase planets
                 {
-                    //console.log("...removing destinations: " + potPlanet.id + " - a starbase will be built here!");
+                    console.log("...removing destinations: " + potPlanet.id + " - a starbase will be built here!");
                     continue;
                 }
                 var isHub = (potPlanet.note && potPlanet.note.body.match(/nup:hub/));
@@ -1875,7 +1875,7 @@ function wrapper () { // wrapper for injection
                     // the base is employing APS of the same type (collector with priority x)
                     if (aps.baseHasSameAPStype(potPlanet.id, "col", this.ooiPriority) && !isHub && !isFort)
                     {
-                        //console.log("...removing destination " + potPlanet.id + " due to collector mission conflict");
+                        console.log("...removing destination " + potPlanet.id + " due to collector mission conflict");
                         continue;
                     }
                 }
@@ -3375,7 +3375,7 @@ function wrapper () { // wrapper for injection
 	APS.prototype.clusterSortCollection = function(collection, cluster, order, direction)
     {
         // default sorting - from low to high (ascending)
-        if (typeof direction == "undefined") direction = "asc";
+        if (typeof direction === "undefined") direction = "asc";
         // get unique categories
         var categories = [];
         for (var i = 0; i < collection.length; i++)
@@ -3400,7 +3400,7 @@ function wrapper () { // wrapper for injection
             for (var k = 0; k < collection.length; k++)
             {
                 //console.log("Category = " + categories[j] + " - collection category value = " + collection[k][cluster]);
-                if (categories[j] == collection[k][cluster])
+                if (categories[j] === collection[k][cluster])
                 {
                     clusterCollection.push(collection[k]);
                 }
@@ -3409,7 +3409,12 @@ function wrapper () { // wrapper for injection
             {
                 if (clusterCollection.length > 1)
                 {
-                    clusterCollection = autopilot.sortCollection(clusterCollection, order, direction);
+                    if (cluster === "eta" && categories[j] === 1)
+                    {
+                        clusterCollection = autopilot.sortCollection(clusterCollection, "distance", "asc");
+                    } else {
+                        clusterCollection = autopilot.sortCollection(clusterCollection, order, direction);
+                    }
                 }
                 if (newCollection.length > 0)
                 {
