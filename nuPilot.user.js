@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable semi-intelligent auto-pilots
-// @version       0.08.83
-// @date          2017-06-01
+// @version       0.08.84
+// @date          2017-06-15
 // @author        drgirasol
 // @include       http://planets.nu/*
 // @include       http://play.planets.nu/*
@@ -2977,16 +2977,8 @@ function wrapper () { // wrapper for injection
                 } else
                 {
                     console.log("...planet is no destination.");
-                    if (this.planet.id === this.base.id)
-                    {
-                        console.log("...planet is base.");
-                        this.hasToSetPotDes = true;  // will determine potDest, select destination and set next target
-                        console.log("...scheduled for potential destination determination.");
-                    } else {
-                        //
-                        console.log("...setting next Target.");
-                        this.setShipTarget(this.destination);
-                    }
+                    console.log("...setting next Target.");
+                    this.setShipTarget(this.destination);
                 }
                 this.storedData = autopilot.syncLocalStorage(configuration);
             } else
@@ -3252,6 +3244,10 @@ function wrapper () { // wrapper for injection
     APS.prototype.objectInsideWebMineField = function(object)
     {
         return this.objectInside(object, autopilot.frnnWebMinefields);
+    };
+    APS.prototype.objectInsideEnemyWebMineField = function(object)
+    {
+        return this.objectInside(object, autopilot.frnnEnemyWebMinefields);
     };
     APS.prototype.objectInsideStarCluster = function(object)
     {
@@ -3663,7 +3659,7 @@ function wrapper () { // wrapper for injection
             // reduce speed to warp 4, if we are currently inside a minefield
             if (this.objectInsideEnemyMineField( {x: this.ship.x, y: this.ship.y} ) && this.ship.engineid > 4) this.ship.warp = 4;
             // reduce speed to warp 3, if we are currently inside a web minefield
-            if (this.objectInsideWebMineField( {x: this.ship.x, y: this.ship.y} ) && this.ship.engineid > 3) this.ship.warp = 3;
+            if (this.objectInsideEnemyWebMineField( {x: this.ship.x, y: this.ship.y} ) && this.ship.engineid > 3) this.ship.warp = 3;
             // set warp 1 if we are moving into or inside warp well
             if (this.inWarpWell) this.ship.warp = 1;
         }
@@ -4432,6 +4428,9 @@ function wrapper () { // wrapper for injection
                         destination = secDest;
                     }
 
+                } else if (this.primaryFunction === "exp")
+                {
+                    ooiText = "planet";
                 }
                 note.body += funcText + " " + ooiText + " " + destination + idle;
             }
@@ -4790,6 +4789,7 @@ function wrapper () { // wrapper for injection
 		frnnOwnPlanets: [],
 		frnnEnemyMinefields: [],
         frnnWebMinefields: [],
+        frnnEnemyWebMinefields: [],
         frnnFriendlyMinefields: [],
         frnnStarClusters: [],
 		frnnEnemyShips: [],
@@ -4916,7 +4916,12 @@ function wrapper () { // wrapper for injection
                 }
                 if (minefield.isweb)
                 {
-                    autopilot.frnnWebMinefields.push( { id: minefield.id, x: minefield.x, y: minefield.y, radius: minefield.radius, owner: minefield.ownerid } );
+                    if (minefield.ownerid !== vgap.player.id && !autopilot.isFriendlyPlayer(minefield.ownerid))
+                    {
+                        autopilot.frnnEnemyWebMinefields.push( { id: minefield.id, x: minefield.x, y: minefield.y, radius: minefield.radius, owner: minefield.ownerid } );
+                    } else {
+                        autopilot.frnnWebMinefields.push( { id: minefield.id, x: minefield.x, y: minefield.y, radius: minefield.radius, owner: minefield.ownerid } );
+                    }
                 }
 			});
 		},
@@ -6073,7 +6078,7 @@ function wrapper () { // wrapper for injection
                     if (sbDefense < 1) autopilot.drawScaledQuarterCircle(planet.x, planet.y, 10, "se", markup.attr, null, 0.5, 1 - sbDefense);
                     if (sbFighters < 1) autopilot.drawScaledQuarterCircle(planet.x, planet.y, 12, "se", markup.attr, null, 0.5, 1 - sbFighters);
                     if (sbBeamTech < 1) autopilot.drawScaledQuarterCircle(planet.x, planet.y, 14, "se", markup.attr, null, 0.5, 1 - sbBeamTech);
-                    if (sbDefense === 1 && sbFighters === 1 && sbBeamTech === 1)
+                    if (sbDefense >= 1 && sbFighters >= 1 && sbBeamTech === 1)
                     {
                         markup.attr.lineWidth = 1;
                         markup.attr.stroke = "#C0C0C0";
