@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable semi-intelligent auto-pilots
-// @version       0.08.84
-// @date          2017-06-15
+// @version       0.08.86
+// @date          2017-06-24
 // @author        drgirasol
 // @include       http://planets.nu/*
 // @include       http://play.planets.nu/*
@@ -1691,11 +1691,11 @@ function wrapper () { // wrapper for injection
                 if (this.ooiPriority === "all")
                 {
                     tValue = this.getBalancedMineralValue(aps, futRes);
-                    console.log("...balanced Value: " + tValue);
                 } else
                 {
                     tValue = futRes[aps.moveables[this.ooiPriority]];
                 }
+                // if (tValue > aps.hull.cargo) tValue = aps.hull.cargo; // does not make a difference...
             } else
             {
                 // cla, sup, mcs
@@ -1752,6 +1752,7 @@ function wrapper () { // wrapper for injection
                 newRes.buildRes -= newRes.molybdenum;
             }
         }
+        //console.log("...balanced Value: " + newRes.buildRes);
         return newRes.buildRes;
     };
 	collectorAPS.prototype.isMineralCollector = function()
@@ -1891,7 +1892,7 @@ function wrapper () { // wrapper for injection
 			if (aps.atBase) // we are at base (sink)
 			{
 				aps.unloadCargo();
-				if (this.ooiPriority == "neu") aps.unloadFuel();
+				if (this.ooiPriority === "neu") aps.unloadFuel();
 			} else // source or waypoint
 			{
 				var transCargo = this.loadCargo(aps);
@@ -1971,20 +1972,20 @@ function wrapper () { // wrapper for injection
         var curCargo = 0;
 	    if (aps.destination.id === aps.planet.id)
         {
+            // supply handling
+            if (this.ooiPriority === "sup")
+            {
+                var sups = aps.getObjectExcess(aps.planet, "sup");
+                curCargo = aps.loadObject("supplies", aps.planet, sups);
+            }
             // Supply & MC handling
-            if (this.ooiPriority === "mcs" || (this.alwaysLoadMC && this.ooiPriority !== "cla"))
+            if (this.ooiPriority === "mcs" || (this.alwaysLoadMC && this.ooiPriority !== "cla" && this.ooiPriority !== "sup"))
             {
                 if (!(this.sellSupply === "notBov" && aps.planet.nativeracename === "Bovinoid"))
                 {
                     aps.sellSupply();
                 }
                 aps.loadMegacredits(aps.planet);
-            }
-            // supply handling
-            if (this.ooiPriority === "sup")
-            {
-                var sups = aps.getObjectExcess(aps.planet, "sup");
-                curCargo = aps.loadObject("supplies", aps.planet, sups);
             }
             // colonist handling
             if (this.ooiPriority === "cla")
