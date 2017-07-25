@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable semi-intelligent auto-pilots
-// @version       0.08.86
-// @date          2017-06-24
+// @version       0.08.88
+// @date          2017-07-25
 // @author        drgirasol
 // @include       http://planets.nu/*
 // @include       http://play.planets.nu/*
@@ -4869,6 +4869,18 @@ function wrapper () { // wrapper for injection
         isChromeBrowser: false,
         realTurn: false,
         gameId: false,
+        filterFriendlyPlanets: function(planet, index, arr)
+        {
+            return (planet.ownerid === vgap.player.id || autopilot.isFriendlyPlayer(planet.ownerid));
+        },
+        filterOwnPlanets: function(planet, index, arr)
+        {
+            return (planet.ownerid === vgap.player.id);
+        },
+        filterStarbasePlanets: function(planet, index, arr)
+        {
+            return (vgap.getStarbase(planet.id));
+        },
         specialShipAtPlanet: function(planet, hullid)
         {
             var ships = vgap.shipsAt(planet.x, planet.y);
@@ -5064,6 +5076,17 @@ function wrapper () { // wrapper for injection
                 return hull.cargo;
             }
             return 0;
+        },
+        shipIsWellBouncing: function(ship)
+        {
+            // ship in orbit && warp speed > 1 && target == warp well
+            var atPlanet = vgap.planetAt(ship.x, ship.y);
+            if (atPlanet && ship.warp > 1)
+            {
+                return (autopilot.getDistance(atPlanet, { x: ship.targetx, y: ship.targety }) <= 3);
+            } else {
+                return false;
+            }
         },
         shipTargetIsSet: function(ship)
         {
@@ -6033,7 +6056,7 @@ function wrapper () { // wrapper for injection
                     lineDash: false
                 }
             };
-            if ((ship.warp === 0 || !autopilot.shipTargetIsSet(ship)) && autopilot.towedShips.indexOf(ship.id) === -1 && autopilot.chunnelShips.indexOf(ship.id) === -1)
+            if ( ( ship.warp === 0 || !autopilot.shipTargetIsSet(ship) || autopilot.shipIsWellBouncing(ship) ) && autopilot.towedShips.indexOf(ship.id) === -1 && autopilot.chunnelShips.indexOf(ship.id) === -1)
             {
                 var cfgData = autopilot.isInStorage(ship.id);
                 if ((cfgData && cfgData.shipFunction === "alc") ||
@@ -6042,7 +6065,10 @@ function wrapper () { // wrapper for injection
                     (ship.friendlycode.toLowerCase() === "lfm" && ship.engineid === 1) ||
                     ship.friendlycode.toLowerCase() === "cln")
                 {
-                    // exclude a) active alchemy ships, b) ships building fighters, c) ships being cloned
+                    // exclude
+                    //      a) active alchemy ships,
+                    //      b) ships building fighters,
+                    //      c) ships being cloned
                 } else
                 {
                     markup.attr.stroke = "#FFA500";
@@ -6124,6 +6150,21 @@ function wrapper () { // wrapper for injection
                 var intensity = 0.1 + (((claDef * -1) / 5000) * 0.9);
                 if (intensity > 1) intensity = 1;
                 autopilot.drawScaledQuarterCircle(planet.x, planet.y, 10, "ne", markup.attr, null, intensity);
+            }
+        },
+        planetLackOfFuelIndicator: function(planet)
+        {
+            var markup = {
+                attr : {
+                    fillColor : "#CC0000"
+                }
+            };
+            if (planet.neutronium < 50)
+            {
+                autopilot.drawSolidCircle(planet.x, planet.y, 20, markup.attr, null, 0.25);
+            } else if (planet.neutronium < 100)
+            {
+                autopilot.drawSolidCircle(planet.x, planet.y, 15, markup.attr, null, 0.2);
             }
         },
         apsIndicators: function()
@@ -6678,6 +6719,7 @@ function wrapper () { // wrapper for injection
                 var p = vgap.myplanets[j];
                 autopilot.planetIdleIndicator(p);
                 autopilot.fortificationIndicator(p);
+                autopilot.planetLackOfFuelIndicator(p);
                 var sb = vgap.getStarbase(p.id);
                 if (sb)
                 {
@@ -6695,6 +6737,30 @@ function wrapper () { // wrapper for injection
          * @param paperset	where to draw
          * @param alpha     alpha value to use
          */
+        drawSolidCircle : function(x, y, radius, attr, paperset, alpha) {
+            if (!vgap.map.isVisible(x, y, radius))
+                return;
+            radius *= vgap.map.zoom;
+            if (radius <= 1)
+                radius = 1;
+            if (paperset === null)
+                paperset = vgap.map.ctx;
+            var org_stroke_style = paperset.strokeStyle;
+            paperset.strokeStyle = colorToRGBA(attr.fillColor, alpha);
+            paperset.beginPath();
+            paperset.arc(vgap.map.screenX(x), vgap.map.screenY(y), radius, Math.PI * 1.15, Math.PI * 1.15, false);
+            paperset.lineTo(vgap.map.screenX(x), vgap.map.screenY(y));
+            paperset.arc(vgap.map.screenX(x), vgap.map.screenY(y), radius, Math.PI * 1.15, Math.PI * 1.35, false);
+            paperset.lineTo(vgap.map.screenX(x), vgap.map.screenY(y));
+            paperset.closePath();
+            paperset.stroke();
+            var org_fill_style = paperset.fillStyle;
+            paperset.fillStyle = colorToRGBA(attr.fillColor, alpha);
+            paperset.fill();
+            //restore previous line width
+            paperset.strokeStyle = org_stroke_style;
+            paperset.fillStyle = org_fill_style;
+        },
         drawScaledCircle : function(x, y, radius, attr, paperset, alpha) {
             if (!vgap.map.isVisible(x, y, radius))
                 return;
@@ -6703,6 +6769,7 @@ function wrapper () { // wrapper for injection
                 radius = 1;
             if (paperset === null)
                 paperset = vgap.map.ctx;
+            var org_stroke_style = paperset.strokeStyle;
             paperset.strokeStyle = colorToRGBA(attr.stroke, alpha);
             //save original line width
             var org_line_width = paperset.lineWidth;
@@ -6716,6 +6783,7 @@ function wrapper () { // wrapper for injection
             paperset.arc(vgap.map.screenX(x), vgap.map.screenY(y), radius, 0, Math.PI * 2, false);
             paperset.stroke();
             //restore previous line width
+            paperset.strokeStyle = org_stroke_style;
             paperset.lineWidth = org_line_width;
             paperset.lineCap = org_line_cap;
             paperset.setLineDash(org_dash_style);
@@ -6736,6 +6804,7 @@ function wrapper () { // wrapper for injection
                 radius = 1;
             if (paperset === null)
                 paperset = vgap.map.ctx;
+            var org_stroke_style = paperset.strokeStyle;
             paperset.strokeStyle = colorToRGBA(attr.stroke, alpha);
             //save original line width
             var org_line_width = paperset.lineWidth;
@@ -6749,6 +6818,7 @@ function wrapper () { // wrapper for injection
             paperset.arc(vgap.map.screenX(x), vgap.map.screenY(y), radius, Math.PI * zones[zone][0], Math.PI * zones[zone][1], false);
             paperset.stroke();
             //restore previous line width
+            paperset.strokeStyle = org_stroke_style;
             paperset.lineWidth = org_line_width;
             paperset.lineCap = org_line_cap;
             paperset.setLineDash(org_dash_style);
