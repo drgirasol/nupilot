@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name          nuPilot
-// @description   Planets.nu plugin to enable semi-intelligent auto-pilots
-// @version       0.08.88
-// @date          2017-07-25
+// @description   Planets.nu plugin to enable ship auto-pilots
+// @version       0.08.94
+// @date          2017-10-31
 // @author        drgirasol
 // @include       http://planets.nu/*
 // @include       http://play.planets.nu/*
@@ -5898,21 +5898,21 @@ function wrapper () { // wrapper for injection
                         //nBody.push(fortNote.join("|"));
                     }
                 }
-                if (plDefNote.length > 0)
+                if (plDefNote.length > 0 && autopilot.settings && autopilot.settings.debug)
                 {
                     var dN = ["d","{"];
                     dN = dN.concat(plDefNote);
                     dN.push("}");
-                    if (autopilot.settings && autopilot.settings.debug) nBody.push(dN.join(" "));
+                    nBody.push(dN.join(" "));
                 }
-                if (plExcNote.length > 0)
+                if (plExcNote.length > 0 && autopilot.settings && autopilot.settings.debug)
                 {
                     var eN = ["e","{"];
                     eN = eN.concat(plExcNote);
                     eN.push("}");
-                    if (autopilot.settings && autopilot.settings.debug) nBody.push(eN.join(" "));
+                    nBody.push(eN.join(" "));
                 }
-                n.body = nBody.join("|");
+                if (nBody.length) n.body = nBody.join("|");
             }
 		},
 		ownerForPlanet: function(planet)
@@ -6002,12 +6002,21 @@ function wrapper () { // wrapper for injection
                     stroke : autopilot.idColors[autopilot.objectTypeEnum.RGA],
                     lineWidth: 3,
                     lineCap: "round",
-                    lineDash: [5,5]
+                    lineDash: [5, 20]
                 }
             };
-            if (vgap.player.id === 10 && ship.mission === 8)
+            if (vgap.player.id === 10 && ship.mission === 8) // Rebel Ground Attack
             {
-                autopilot.drawScaledQuarterCircle(ship.x, ship.y, 10, "sw", markup.attr, null, 0.5);
+                var maxDash = markup.attr.lineDash[1];
+                for (var i = 0; i < maxDash; i++)
+                {
+                    markup.attr.lineDash = [ markup.attr.lineDash[0], markup.attr.lineDash[0] + i ];
+                    autopilot.drawScaledQuarterCircle(ship.targetx, ship.targety, 10 - (i * 0.5), "sw", markup.attr, null, 0.5);
+                    /*for (var j = 0; j < (maxDash * 5); j++)
+                    {
+                        autopilot.drawScaledQuarterCircle(ship.targetx, ship.targety, 10 - (i * 0.5 + (j * 0.1)), "sw", markup.attr, null, 0.5);
+                    } */
+                }
             }
         },
         shipCloakIndicator: function(ship)
@@ -6097,8 +6106,8 @@ function wrapper () { // wrapper for injection
                 sbDefense = starbase.defense / 200;
                 sbBeamTech = starbase.beamtechlevel / 10;
             }
-            if ((planet.note && planet.note.body.match(/nup:fort/)))
-            {
+            //if ((planet.note && planet.note.body.match(/nup:fort/)))
+            //{
                 if (planetDefense < 1) autopilot.drawScaledQuarterCircle(planet.x, planet.y, 8, "se", markup.attr, null, 0.5, 1 - planetDefense);
                 if (starbase)
                 {
@@ -6112,7 +6121,7 @@ function wrapper () { // wrapper for injection
                         autopilot.drawScaledCircle(planet.x, planet.y, 12, markup.attr, null, 0.5);
                     }
                 }
-            }
+            //}
         },
         starbaseIdleIndicator: function(starbase, planet)
         {
@@ -6201,7 +6210,10 @@ function wrapper () { // wrapper for injection
         {
             for (var i = 0; i < vgap.myplanets.length; i++)
             {
+
                 var planet = vgap.myplanets[i];
+                console.log("1.Note object of planet " + planet.id + ":");
+                console.log(planet.note);
                 var hasBase = vgap.getStarbase(planet.id);
                 if (hasBase)
                 {
@@ -6216,8 +6228,11 @@ function wrapper () { // wrapper for injection
                 var buildBase = (planet.note && planet.note.body.match(/nup:base/));
                 if (buildBase && hasBase)
                 {
-                    planet.note.body = planet.note.body.replace("nup:base", "");
+                    //planet.note.body = planet.note.body.replace(/nup:base/, "");
+                    console.log("removing 'nup:base' from note");
                 }
+                console.log("2.Note object of planet " + planet.id + ":");
+                console.log(planet.note);
             }
         },
 		behaviourHasToChange: function(current, future)
@@ -6629,8 +6644,7 @@ function wrapper () { // wrapper for injection
                         shipcontrol.updateNote();
                     }
                 });
-                apsControl.forEach(function(shipcontrol)
-                {
+                apsControl.forEach(function(shipcontrol) {
                     // retry idle ships
                     if (shipcontrol.isIdle)
                     {
@@ -6842,7 +6856,7 @@ function wrapper () { // wrapper for injection
             // - have this planet as next target (mainly because of fuel...)
 		},
 		/*
-         * loadstarbase: executed when a starbase is selected on dashboard or starmap
+         * loadPlanet: executed when a planet is selected on dashboard or starmap
          *
          * Inside the function "load" of vgapStarbaseScreen (vgapStarbaseScreen.prototype.load) the normal starbase screen
          * is set up. You can find the function in "nu.js" if you search for 'vgap.callPlugins("loadstarbase");'.
@@ -6874,7 +6888,7 @@ function wrapper () { // wrapper for injection
 	};
 	// register your plugin with NU
 	vgap.registerPlugin(autopilot, "autopilotPlugin");
-}; //wrapper for injection
+} //wrapper for injection
 
 var script = document.createElement("script");
 script.type = "application/javascript";
