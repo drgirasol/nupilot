@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable ship auto-pilots
-// @version       0.08.94
-// @date          2017-10-31
+// @version       0.08.98
+// @date          2018-01-07
 // @author        drgirasol
 // @include       http://planets.nu/*
 // @include       http://play.planets.nu/*
@@ -14,8 +14,216 @@
 // ==/UserScript==
 
 function wrapper () { // wrapper for injection
+    /*
+     *  PLANETSCREEN OVERWRITE
+     */
+    vgapPlanetScreen.prototype.load = function(b)
+    {
+        this.planet = b;
+        this.starbase = vgap.getStarbase(b.id);
+        this.planet.changed = 1;
+        this.hasStarbase = this.starbase != null ? 1 : 0;
+        this.ships = vgap.shipsAt(b.x, b.y);
+        this.fcodes = vgap.getPlanetCodes(this.starbase != null );
+        this.selectedpodhullid = b.podhullid;
+        this.screen = new leftContent("PlanetScreen",b.id + ": " + b.name,b,function() {
+                vgap.map.deselectPlanet()
+            }
+        );
+        this.screen.addFleetView();
+        if (vgap.player.raceid != 12) {
+            var a = new Array();
+            if (!vgap.settings.isacademy) {
+                a.push({
+                    name: nu.t.changefriendly,
+                    onclick: function() {
+                        vgap.planetScreen.changeFriendly()
+                    }
+                })
+            }
+            a.push({
+                name: nu.t.build,
+                onclick: function() {
+                    vgap.planetScreen.build()
+                }
+            });
+            this.screen.addSection("Buildings", nu.t.buildings, a, function() {
+                return vgap.planetScreen.loadBuildings()
+            })
+        }
+        var a = new Array();
+        if (this.ships.length > 0 && !vgap.settings.isacademy) {
+            a.push({
+                name: nu.t.transfer,
+                onclick: function() {
+                    vgap.planetScreen.transfer()
+                }
+            })
+        }
+        if (vgap.settings.isacademy) {
+            if (vgap.getStarbase(b.id) == null ) {
+                a.push({
+                    name: nu.t.buildstarbase,
+                    onclick: function() {
+                        vgap.planetScreen.buildStarbase()
+                    },
+                    id: "BuildBaseBar"
+                })
+            }
+            if (vgap.getStarbase(b.id) != null ) {
+                a.push({
+                    name: nu.t.starbase,
+                    onclick: function() {
+                        vgap.map.selectStarbase(b.id)
+                    }
+                })
+            }
+        } else {
+            a.push({
+                name: nu.t.notes,
+                onclick: function() {
+                    shtml.editNote(b.id, 1)
+                },
+                id: "NoteButton"
+            })
+        }
+        this.screen.addSection(vgap.settings.isacademy ? "Colony" : "Resources", nu.t.resources, a, function() {
+            return vgap.planetScreen.loadResources()
+        });
+        if (!vgap.settings.isacademy) {
+            if (b.clans > 0 || b.nativeclans > 0) {
+                var a = new Array();
+                if (vgap.player.raceid != 12) {
+                    a.push({
+                        name: nu.t.taxrates,
+                        onclick: function() {
+                            vgap.planetScreen.taxRates()
+                        }
+                    });
+                    if (vgap.getStarbase(b.id) == null )
+                    {
+                        a.push({
+                            name: nu.t.buildstarbase,
+                            onclick: function() {
+                                vgap.planetScreen.buildStarbase()
+                            },
+                            id: "BuildBaseBar"
+                        })
+                    }
+                    if (vgap.getStarbase(b.id) != null ) {
+                        a.push({
+                            name: nu.t.starbase,
+                            onclick: function() {
+                                vgap.map.selectStarbase(b.id)
+                            }
+                        })
+                    }
+                    // #############nuPilot - start##################
+                    a.push({
+                        name: "APC",
+                        onclick: function() {
+                            vgap.planetScreen.autoplanetControl(this.planet);
+                        },
+                        id: "APlCtrl"
+                    })
+                    // #############nuPilot - end##################
+                } else {
+                    a.push({
+                        name: "Allocate Workers",
+                        onclick: function() {
+                            vgap.planetScreen.allocateWorkers()
+                        }
+                    })
+                }
+                this.colony = this.screen.addSection("Colony", nu.t.colony, a, function() {
+                    return vgap.planetScreen.loadColony()
+                });
+                if (b.buildingstarbase) {
+                    $("#BuildBaseBar").html("<span>" + nu.t.buildingstarbase + "</span>")
+                }
+            }
+        } else {
+            b.colonisttaxrate = 5;
+            b.nativetaxrate = 10;
+            if (b.nativetype == 4) {
+                b.nativetaxrate = 15
+            }
+            if (b.nativetype == 5) {
+                b.nativetaxrate = 0
+            }
+        }
+        if (vgap.player.raceid == 12) {
+            var a = new Array();
+            a.push({
+                name: nu.t.build,
+                onclick: function() {
+                    vgap.planetScreen.buildPod()
+                }
+            });
+            a.push({
+                name: nu.t.speed,
+                onclick: function() {
+                    vgap.planetScreen.warpSpeed()
+                }
+            });
+            this.screen.addSection("PodLaunch", nu.t.orders, a, function() {
+                return vgap.planetScreen.loadOrders()
+            })
+        }
+        vgap.callPlugins("loadplanet");
+        this.screen.bindTopics();
+        vgap.hotkeysOn = true;
+        vgap.action()
+    };
+    vgapPlanetScreen.prototype.autoplanetControl = function(p)
+    {
+        var apcOptions = [
+            {
+                name: "Build Starbase",
+                desc: "A starbase should be constructed here.",
+                planetFlag: "bb",
+                action: false
+            },
+            {
+                name: "Fortify Planet",
+                desc: "Build a starbase with max defense and beam tech 10. Maximize planetary defense.",
+                planetFlag: "bf",
+                action: false
+            },
+            {
+                name: "Deactivate",
+                desc: "Remove flag",
+                planetFlag: "000",
+                action: "END"
+            }
+        ];
+        vgap.more.empty();
+        $("<div id='OrdersScreen'><h1>Planetary Missions</h1></div>").appendTo(vgap.more);
+        //
+        for (var a = 0; a < apcOptions.length; a++)
+        {
+            if (this.planet || apcOptions[a].action)
+            {
+                var c = apcOptions[a];
+                var setPlanetFlag = function (func, action) {
+                    return function () {
+                        var cfgData = autopilot.planetHasFlag(vgap.planetScreen.planet.id);
+                        if (action && cfgData) // action === "END" => remove planetary flag
+                        {
+                            cfgData.action = "END";
+                            autopilot.syncLocalPlanetStorage(cfgData); // will remove entry
+                        }
+                        autopilot.setPlanetFlag(func);
+                    };
+                };
+                $("<div>" + c.name + "<span>" + c.desc + "</span></div>").tclick(setPlanetFlag(c.planetFlag, c.action)).appendTo("#OrdersScreen");
+            }
+        }
+        shtml.moreBack();
+        vgap.showMore();
+    };
 	/*
-	 *
+	 *  SHIPSCREEN OVERWRITE
 	 */
 	// add APC button to ShipOrders Section
 	vgapShipScreen.prototype.load = function(c)
@@ -148,8 +356,7 @@ function wrapper () { // wrapper for injection
         this.fcodes = b;
         this.screen = new leftContent("ShipScreen",c.id + ": " + c.name,c,function() {
                 vgap.map.deselectShip()
-            }
-        );
+            } );
         this.screen.addFleetView();
         this.predictor(c);
         if (vgap.settings.isacademy) {
@@ -296,16 +503,21 @@ function wrapper () { // wrapper for injection
             this.screen.addSection("ShipMovement", nu.t.movement, a, function() {
                 return vgap.shipScreen.loadMovement();
             }, "Movement");
+            //
+            //
+            //
             if (c.hullid < 200 || c.hullid > 300) {
                 var a = new Array();
                 if (vgap.player.raceid != 12)
                 {
+                    // #############nuPilot - start##################
                     a.push({
                         name: "APC",
                         onclick: function() {
                             vgap.shipScreen.autopilotControl(this.planet);
                         }
                     });
+                    // #############nuPilot - end##################
                     a.push({
                         name: nu.t.friendly,
                         onclick: function() {
@@ -696,6 +908,9 @@ function wrapper () { // wrapper for injection
         }
         return h;
     };
+    /*
+     *  DASHBOARD OVERWRITE
+     */
 	// display NuPilot Information & Settings (Dashboard)
     vgapDashboard.prototype.showNuPilotDeficiencies = function(only)
     {
@@ -965,7 +1180,10 @@ function wrapper () { // wrapper for injection
         this.pane = $("<div class='DashPane'>Settings & Infos.</div>").appendTo(this.content);
         this.pane.jScrollPane();
     };
-	//
+    /*
+     *  ???
+     */
+    /*
     sharedContent.prototype.shipScan = function(e)
     {
         var d = vgap.getHull(e.hullid);
@@ -1002,6 +1220,8 @@ function wrapper () { // wrapper for injection
         c += "</div>";
         return c
     };
+    */
+
 	/*
      *
      *  Fixed Radius Near Neighbor (FRNN) Object
@@ -5816,6 +6036,7 @@ function wrapper () { // wrapper for injection
 			for (var i = 0; i < vgap.myplanets.length; i++)
             {
                 var planet = vgap.myplanets[i];
+                // toDo: notes are used for debugging, overwriting old info! careful when turning debuggin on
                 var n = vgap.getNote(planet.id, 1);
                 var plDefNote = [];
                 var plExcNote = [];
@@ -5991,7 +6212,7 @@ function wrapper () { // wrapper for injection
             {
                 for( var i = 0; i < ships.length; i++)
                 {
-                    if (autopilot.chunnelShips.indexOf(ships[i].id) === -1) autopilot.chunnelShips.push(ships[i].id);
+                    if (autopilot.chunnelShips.indexOf(ships[i].id) === -1) autopilot.chunnelShips.push(ships[i].id); // add ship to chunnel-ship-list
                 }
             }
         },
@@ -6065,19 +6286,78 @@ function wrapper () { // wrapper for injection
                     lineDash: false
                 }
             };
-            if ( ( ship.warp === 0 || !autopilot.shipTargetIsSet(ship) || autopilot.shipIsWellBouncing(ship) ) && autopilot.towedShips.indexOf(ship.id) === -1 && autopilot.chunnelShips.indexOf(ship.id) === -1)
+            // ship is idle if
+            //      warp is set to 0
+            //      or no destination is set
+            //      or destination is set so ship will bounce back to planet
+            //      and ship is not being towed
+            //      and ship is not being sucked into a warp chunnel
+            //
+            if (ship.hullid === 56) // firecloud
+            {
+                var isReceiver = false;
+                var isInitiator = false;
+                if (ship.warp === 0 && ship.friendlycode.match(/\d\d\d/) && ship.neutronium > 49) // initiating a chunnel?
+                {
+                    // check if the receiver can be reached (warp 0, with at least 1 fuel) and is not at the same position
+                    var receiver = vgap.getShip(ship.friendlycode);
+                    if (receiver && receiver.warp === 0 && receiver.neutronium > 0 && (receiver.x !== ship.x || receiver.y !== ship.y))
+                    {
+                        autopilot.updateChunnelTraffic(ship);
+                        isInitiator = true;
+                    } else
+                    {
+                        ship.friendlycode = "00c";
+                    }
+                } else if (ship.warp === 0 && !ship.friendlycode.match(/\d\d\d/) && ship.neutronium > 0) // receiving a chunnel?
+                {
+                    var padId = String(ship.id);
+                    if (ship.id < 100)
+                    {
+                        if (ship.id < 10)
+                        {
+                            padId = "00" + ship.id;
+                        } else
+                        {
+                            padId = "0" + ship.id;
+                        }
+                    }
+                    for (var i = 0; i < vgap.myships.length; i++)
+                    {
+                        var curCS = vgap.myships[i];
+                        if (curCS.hullid === 56 && curCS.warp === 0 && curCS.friendlycode === padId)
+                        {
+                            autopilot.chunnelShips.push(ship.id);
+                            isReceiver = true;
+                        }
+                    }
+                }
+                if (!isReceiver && !isInitiator)
+                {
+                    var inList = autopilot.chunnelShips.indexOf(ship.id);
+                    if (inList > -1)
+                    {
+                        autopilot.chunnelShips.splice(inList,1);
+                        ship.friendlycode = "00c";
+                    }
+                }
+            }
+            if ( ( ship.warp === 0 || !autopilot.shipTargetIsSet(ship) || autopilot.shipIsWellBouncing(ship) ) &&
+                autopilot.towedShips.indexOf(ship.id) === -1 && autopilot.chunnelShips.indexOf(ship.id) === -1)
             {
                 var cfgData = autopilot.isInStorage(ship.id);
+                // exclude
+                //      a) active alchemy ships,
+                //      b) ships building fighters (only ships with stardrive),
+                //      c) ships being cloned
+                //
                 if ((cfgData && cfgData.shipFunction === "alc") ||
                     (ship.hullid === 104 && ship.supplies > 0 && (ship.duranium > 0 || ship.tritanium > 0 || ship.molybdenum > 0)) ||
                     (ship.hullid === 105 && ship.supplies > 0) ||
                     (ship.friendlycode.toLowerCase() === "lfm" && ship.engineid === 1) ||
                     ship.friendlycode.toLowerCase() === "cln")
                 {
-                    // exclude
-                    //      a) active alchemy ships,
-                    //      b) ships building fighters,
-                    //      c) ships being cloned
+                    //
                 } else
                 {
                     markup.attr.stroke = "#FFA500";
@@ -6573,9 +6853,28 @@ function wrapper () { // wrapper for injection
                 {
                     var ship = vgap.myships[i];
                     if (ship.mission === 6 && autopilot.towedShips.indexOf(ship.mission1target) === -1) autopilot.towedShips.push(ship.mission1target);
-                    if (ship.hullid === 56 && ship.warp === 0 && ship.friendlycode.match(/\d\d\d/))
+                    if (ship.hullid === 56 && ship.warp === 0) // Firecloud at warp 0
                     {
-                        autopilot.updateChunnelTraffic(ship);
+                        if (ship.friendlycode.match(/\d\d\d/) && ship.neutronium > 49) // initiating a chunnel ?
+                        {
+                            // check if the receiver can be reached (warp 0, with at least 1 fuel) and is not at the same position
+                            var receiver = vgap.getShip(ship.friendlycode);
+                            if (receiver && receiver.warp === 0 && receiver.neutronium > 0 && (receiver.x !== ship.x || receiver.y !== ship.y))
+                            {
+                                autopilot.updateChunnelTraffic(ship);
+                            } else
+                            {
+                                ship.friendlycode = "00c";
+                            }
+                        } else
+                        {
+                            var inList = autopilot.chunnelShips.indexOf(ship.id);
+                            if (inList > -1)
+                            {
+                                autopilot.chunnelShips.splice(inList,1);
+                                ship.friendlycode = "00c";
+                            }
+                        }
                     }
                     var cfgData = autopilot.isInStorage(ship.id);
                     if (cfgData)
@@ -6888,6 +7187,7 @@ function wrapper () { // wrapper for injection
 	};
 	// register your plugin with NU
 	vgap.registerPlugin(autopilot, "autopilotPlugin");
+	console.log("nuPilot plugin registered");
 } //wrapper for injection
 
 var script = document.createElement("script");
