@@ -16,7 +16,7 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable ship auto-pilots
-// @version       0.10.15
+// @version       0.10.17
 // @date          2018-04-22
 // @author        drgirasol
 // @include       http://planets.nu/*
@@ -2030,7 +2030,7 @@ function wrapper () { // wrapper for injection
         if (this.planet && this.isOwnPlanet)
         {
             var amount = parseInt(this.ship.neutronium);
-            if (amount > 1) amount -= 1;
+            if (amount > 1 && this.shipFunction !== "alc") amount -= 1;
             var onShip = this.unloadObject("neutronium", this.planet, amount);
         }
     };
@@ -2413,8 +2413,8 @@ alchemyAPS.prototype.setSources = function(aps)
 alchemyAPS.prototype.isSource = function(aps)
 {
     var c = new Colony(aps.planet.id);
-    if (c.balance.supplies > 0) return true;
-    return false;
+    if (aps.objectOfInterest === "neu") return (c.balance.supplies > 0 && (c.balance.duranium > 0 || c.balance.tritanium > 0 || c.balance.molybdenum > 0));
+    return (c.balance.supplies > 0);
 };
 alchemyAPS.prototype.setSecondaryDestination = function(aps)
 {
@@ -2447,16 +2447,16 @@ alchemyAPS.prototype.evaluateMissionDestinations = function(aps)
 };
 alchemyAPS.prototype.updateFC = function(aps)
 {
-    if (this.ooiPriority == "all")
+    if (aps.objectOfInterest === "all")
     {
         aps.ship.friendlycode = "abc"; // toDo: random FC
-    } else if (this.ooiPriority == "dur")
+    } else if (aps.objectOfInterest === "dur")
     {
         aps.ship.friendlycode = "ald";
-    } else if (this.ooiPriority == "tri")
+    } else if (aps.objectOfInterest === "tri")
     {
         aps.ship.friendlycode = "alt";
-    } else if (this.ooiPriority == "mol")
+    } else if (aps.objectOfInterest === "mol")
     {
         aps.ship.friendlycode = "alm";
     }
@@ -2466,7 +2466,11 @@ alchemyAPS.prototype.handleCargo = function (aps)
     if (aps.planet)
     {
         aps.unloadCargo();
-        var loaded = aps.loadObject("supplies");
+        if (aps.objectOfInterest === "neu")
+        {
+            aps.unloadFuel();
+        }
+        var loaded = this.loadCargo(aps);
         console.log("Cargo load summary: " + loaded);
     }
 };
@@ -2476,7 +2480,54 @@ alchemyAPS.prototype.setDemand = function (aps)
 };
 alchemyAPS.prototype.loadCargo = function(aps)
 {
-
+    var loaded = 0;
+    if (aps.objectOfInterest === "neu")
+    {
+        var c = new Colony(aps.planet.id);
+        var bc = [
+            {
+                mineral: "tritanium",
+                value: c.balance.tritanium
+            },
+            {
+                mineral: "duranium",
+                value: c.balance.duranium
+            },
+            {
+                mineral: "molybdenum",
+                value: c.balance.molybdenum
+            }
+        ];
+        bc = autopilot.sortCollection(bc, "value", "desc");
+        var halfCap = Math.floor(aps.hull.cargo * 0.5);
+        if (c.planet.supplies >= halfCap)
+        {
+            if (bc[0].value >= halfCap)
+            {
+                loaded += aps.loadObject(bc[0].mineral, aps.planet, halfCap);
+                loaded += aps.loadObject("supplies", aps.planet, halfCap);
+            } else
+            {
+                loaded += aps.loadObject(bc[0].mineral, aps.planet, bc[0].value);
+                loaded += aps.loadObject("supplies", aps.planet, bc[0].value);
+            }
+        } else
+        {
+            if (bc[0].value >= c.planet.supplies)
+            {
+                loaded += aps.loadObject(bc[0].mineral, aps.planet, c.planet.supplies);
+                loaded += aps.loadObject("supplies", aps.planet, c.planet.supplies);
+            } else
+            {
+                loaded += aps.loadObject(bc[0].mineral, aps.planet, bc[0].value);
+                loaded += aps.loadObject("supplies", aps.planet, bc[0].value);
+            }
+        }
+    } else
+    {
+        loaded += aps.loadObject("supplies");
+    }
+    return loaded;
 };/*
  *
  * Autopilot - Distributor Module
@@ -10405,15 +10456,6 @@ Colony.prototype.drawTaxMissionIndicator = function()
                 hullId: 0
             },
 			{
-				name: "Alchemy",
-                nameActive: "<strong>> Brewing</strong>",
-				desc: "Load supply and unload products",
-				shipFunction: "alc",
-				ooiOptions: [ "all", "dur", "tri", "mol" ],
-                action: false,
-				hullId: 0
-			},
-			{
 				name: "Colonize",
                 nameActive: "<strong>> Colonizing</strong>",
 				desc: "Colonize unowned planets",
@@ -10440,6 +10482,24 @@ Colony.prototype.drawTaxMissionIndicator = function()
                 action: false,
                 hullId: 0
             },
+            {
+                name: "Alchemy",
+                nameActive: "<strong>> Brewing</strong>",
+                desc: "Load supply and unload products",
+                shipFunction: "alc",
+                ooiOptions: [ "all", "dur", "tri", "mol" ],
+                action: false,
+                hullId: 105
+            },
+            {
+                name: "Refinery",
+                nameActive: "<strong>> Cooking</strong>",
+                desc: "Load supply and minerals and unload fuel",
+                shipFunction: "alc",
+                ooiOptions: [ "neu" ],
+                action: false,
+                hullId: 104
+            },
 			{
 				name: "Deactivate",
                 nameActive: "Deactivate",
@@ -10463,8 +10523,12 @@ Colony.prototype.drawTaxMissionIndicator = function()
                 var c = apcOptions[a];
                 var cName = c.name;
                 if (isAPS && isAPS.shipFunction === c.shipFunction) cName = c.nameActive;
+                //
                 // ALCHEMY - only show alchemy module if its an alchemy ship
-                if (vgap.shipScreen.ship.hullid !== 105 && c.shipFunction === "alc") continue;
+                // REFINERY - only show refinery module if its a refinery ship
+                if (c.hullId && vgap.shipScreen.ship.hullid !== c.hullId) continue;
+                //
+                if (vgap.shipScreen.ship.hullid !== 104 && c.shipFunction === "alc") continue;
                 // TERRAFORM - only show terraform module if its an terraform ship
                 if (!vgap.getHull(vgap.shipScreen.ship.hullid).special.match("Terraform Ship") && c.shipFunction === "ter") continue;
                 // HIZZZ - only show hizzzer module if it ship has capability
