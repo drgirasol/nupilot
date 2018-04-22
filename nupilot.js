@@ -16,8 +16,8 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable ship auto-pilots
-// @version       0.10.12
-// @date          2018-04-21
+// @version       0.10.15
+// @date          2018-04-22
 // @author        drgirasol
 // @include       http://planets.nu/*
 // @include       http://play.planets.nu/*
