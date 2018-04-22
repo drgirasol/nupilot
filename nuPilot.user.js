@@ -1,15 +1,15 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable ship auto-pilots
-// @version       0.09.10
+// @version       0.09.11
 // @date          2018-01-17
 // @author        drgirasol
 // @include       http://planets.nu/*
 // @include       http://play.planets.nu/*
 // @include       http://test.planets.nu/*
 // @resource	  Documentation https://github.com/drgirasol/nupilot/wiki
-// @updateURL     https://greasyfork.org/scripts/26189-nupilot/code/nuPilot.user.js
-// @downloadURL   https://greasyfork.org/scripts/26189-nupilot/code/nuPilot.user.js
+// @updateURL     https://greasyfork.org/scripts/26189-nupilot/code/nuPilot.js
+// @downloadURL   https://greasyfork.org/scripts/26189-nupilot/code/nuPilot.js
 
 // ==/UserScript==
 
