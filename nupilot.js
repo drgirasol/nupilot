@@ -16,8 +16,8 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable ship auto-pilots
-// @version       0.10.17
-// @date          2018-04-22
+// @version       0.10.18
+// @date          2018-04-23
 // @author        drgirasol
 // @include       http://planets.nu/*
 // @include       http://play.planets.nu/*
@@ -3272,12 +3272,88 @@ collectorAPS.prototype.isMineralCollector = function(aps)
 {
     return (aps.objectOfInterest === "all" || aps.objectOfInterest === "dur" || aps.objectOfInterest === "tri" || aps.objectOfInterest === "mol");
 };
+collectorAPS.prototype.getCapacitySources = function(aps, targetsInRange)
+{
+    var sources = [];
+    var maxSources = [];
+    var minSources = [];
+    var lowSources = [];
+    targetsInRange.forEach(function (pS) {
+        var p = vgap.planetAt(pS.x, pS.y);
+        var c = new Colony(p.id);
+        var obj = aps.moveables[aps.objectOfInterest];
+        if (c.balance[obj] >= aps.maxCapacity)
+        {
+            maxSources.push(
+                {
+                    x: p.x,
+                    y: p.y,
+                    pid: p.id,
+                    value: c.balance[obj],
+                    distance: aps.getDistance(p.x, p.y),
+                    eta: aps.getETA(p),
+                    mcs: c.balance.megacredits
+                }
+            );
+        } else if (c.balance[obj] >= aps.minCapacity)
+        {
+            minSources.push(
+                {
+                    x: p.x,
+                    y: p.y,
+                    pid: p.id,
+                    value: c.balance[obj],
+                    distance: aps.getDistance(p.x, p.y),
+                    eta: aps.getETA(p),
+                    mcs: c.balance.megacredits
+                }
+            );
+        } else
+        {
+            lowSources.push(
+                {
+                    x: p.x,
+                    y: p.y,
+                    pid: p.id,
+                    value: c.balance[obj],
+                    distance: aps.getDistance(p.x, p.y),
+                    eta: aps.getETA(p),
+                    mcs: c.balance.megacredits
+                }
+            );
+        }
+    });
+    console.log("Found " + maxSources.length + " full capacity sources, " + minSources.length + " minimum capacity sources and " + lowSources.length + " sources with insufficient resources.");
+    var etaRange = Math.floor(aps.scopeRange / aps.simpleRange);
+    console.log("ETA range = " + etaRange);
+    console.log(maxSources.filter(function(s) { return s.eta === 1 }));
+    for (var i = 1; i <= etaRange; i++)
+    {
+        if (maxSources.length > 0) sources = sources.concat(maxSources.filter(function(s) { return s.eta === i }));
+        if (minSources.length > 0) sources = sources.concat(minSources.filter(function(s) { return s.eta === i }));
+    }
+    if (sources.length < 1 && lowSources.length > 0)
+    {
+        for (var i = 1; i <= etaRange; i++)
+        {
+            sources = sources.concat(minSources.filter(function(s) { return s.eta === i }));
+        }
+    }
+    return sources;
+};
 collectorAPS.prototype.setSources = function(aps)
 {
     // toDo: decide which strategy to use
     //  -> scopeRange: the range for source selection is defined by how many collectors are active within a range of the base
     //  - fixedRange: the range is fixed for each base (e.g. 2-turn radius)
     this.setScopeRange(aps);
+    var targetsInRange = aps.getTargetsInRange(autopilot.frnnOwnPlanets, aps.base.x, aps.base.y, aps.scopeRange);
+    console.log("... targets in range: " + targetsInRange.length);
+    if (targetsInRange.length > 0)
+    {
+        this.sources = this.getCapacitySources(aps, targetsInRange);
+    }
+    /*
     var sortBy = "value";
     var c = new Colony(aps.base.id);
     if (c)
@@ -3322,7 +3398,7 @@ collectorAPS.prototype.setSources = function(aps)
             }
         }
         this.sources = aps.clusterSortCollection(potential, "eta", sortBy, "desc");
-    }
+    } */
     //this.sources = autopilot.sortCollection(potential, "distance");
 };
 collectorAPS.prototype.setSecondaryDestination = function(aps)
@@ -10433,7 +10509,7 @@ Colony.prototype.drawTaxMissionIndicator = function()
                 nameActive: "<strong>> Collecting Resources</strong>",
 			 	desc: "Collect resources and deliver them to the current planet.",
 				shipFunction: "col",
-				ooiOptions: [ "all", "neu", "dur", "tri", "mol", "cla", "mcs", "sup" ],
+				ooiOptions: [ "neu", "dur", "tri", "mol", "cla", "mcs", "sup" ],
                 action: false,
 				hullId: 0
 			},
