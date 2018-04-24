@@ -16,8 +16,8 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable ship auto-pilots
-// @version       0.10.18
-// @date          2018-04-23
+// @version       0.10.19
+// @date          2018-04-24
 // @author        drgirasol
 // @include       http://planets.nu/*
 // @include       http://play.planets.nu/*
@@ -279,8 +279,8 @@ function wrapper () { // wrapper for injection
     APS.prototype.setConventionalShipMission = function(cfg)
     {
         this.oShipMission = cfg.oShipMission;
-        if (this.oShipMission !== this.ship.mission) this.ship.mission = this.oShipMission; // reset mission to original setting (= when autopilot was activated)
-        if (vgap.player.raceid === 2 && this.ship.beams > 0) { this.ship.mission = 8; } // if lizard, set HISS mission
+        if (this.oShipMission && this.oShipMission !== this.ship.mission) this.ship.mission = this.oShipMission; // reset mission to original setting (= when autopilot was activated)
+        //if (vgap.player.raceid === 2 && this.ship.beams > 0) { this.ship.mission = 8; } // if lizard, set HISS mission
         if (this.hull.cancloak) this.ship.mission = 9; // cloak if possible
     };
     APS.prototype.isMakingTorpedoes = function()
@@ -1736,7 +1736,8 @@ function wrapper () { // wrapper for injection
     APS.prototype.confirmMission = function()
     {
         //
-        if (this.planet && this.isOwnPlanet) this.functionModule.handleCargo(this);
+        if (this.planet && this.isOwnPlanet && this.destination) this.functionModule.handleCargo(this);
+        if (typeof this.functionModule.confirmMission === "function") this.functionModule.confirmMission(this);
         // Do we have a target?
         if (this.targetIsSet())
         {
@@ -2135,9 +2136,9 @@ function wrapper () { // wrapper for injection
             if (object === "fuel") object = "neutronium";
             // ALCHEMY BALANCE EXCEPTION
             if (object === "supplies" && this.primaryFunction === "alc") excess = from.supplies; // overwrite balance
-            // EXPANDER BALANCE EXCEPTIONS
-            if (object === "supplies" && this.primaryFunction === "exp" && c.hasStarbase) excess = from.supplies - autopilot.settings.defSupRetention; // overwrite balance
-            if (object === "megacredits" && this.primaryFunction === "exp" && c.hasStarbase) excess = from.megacredits - autopilot.settings.defMcsRetention; // overwrite balance
+            // EXPANDER & BUILDER BALANCE EXCEPTIONS
+            if (object === "supplies" && (this.primaryFunction === "exp" || this.primaryFunction === "bld") && c.hasStarbase) excess = from.supplies - autopilot.settings.defSupRetention; // overwrite balance
+            if (object === "megacredits" && (this.primaryFunction === "exp" || this.primaryFunction === "bld") && c.hasStarbase) excess = from.megacredits - autopilot.settings.defMcsRetention; // overwrite balance
             //
             if (excess <= 0) return 0;
             //
@@ -4869,16 +4870,19 @@ expanderAPS.prototype.transferCargo = function(aps)
             }
         } else
         {
-            var popGrowth = aps.planet.temp * aps.planet.temp / 4000 * maxAmounts[1] / 20 * 5 / 5;
-            if (popGrowth < 1)
+            if (aps.planet.temp > 15 && aps.planet.temp < 84)
             {
-                var newAmount = maxAmounts[1];
-                while (popGrowth < 1)
+                var popGrowth = aps.planet.temp * aps.planet.temp / 4000 * maxAmounts[1] / 20 * 5 / 5;
+                if (popGrowth < 1)
                 {
-                    newAmount += 1;
-                    popGrowth = aps.planet.temp * aps.planet.temp / 4000 * newAmount / 20 * 5 / 5;
+                    var newAmount = maxAmounts[1];
+                    while (popGrowth < 1)
+                    {
+                        newAmount += 1;
+                        popGrowth = aps.planet.temp * aps.planet.temp / 4000 * newAmount / 20 * 5 / 5;
+                    }
+                    if (newAmount > maxAmounts[1]) maxAmounts[1] = newAmount;
                 }
-                if (newAmount > maxAmounts[1]) maxAmounts[1] = newAmount;
             }
         }
         //
@@ -4987,7 +4991,7 @@ hizzzAPS.prototype.setSources = function(aps)
         if (c.isOwnPlanet && !c.isBuildingBase) // we don't suck other future starbases dry
         {
             var distance = Math.floor(autopilot.getDistance({x: sP.x, y: sP.y}, {x:aps.ship.x ,y:aps.ship.y}));
-            var excess = c.getRevenue();
+            var excess = c.getRevenue(c.taxation);
             if (excess === 0) continue;
             if (sP.nativeclans > 0 && sP.nativeracename === "Amorphous")
             {
@@ -5152,6 +5156,11 @@ hizzzAPS.prototype.handleCargo = function (aps)
             console.log("Cargo summary: " + transCargo);
         }
     }
+};
+hizzzAPS.prototype.confirmMission = function (aps)
+{
+    console.log("Setting ship " + aps.ship.id + " mission: Hizzz!");
+    aps.ship.mission = 8;
 };
 hizzzAPS.prototype.setDemand = function (aps)
 {
@@ -7342,7 +7351,7 @@ var autopilot = {
                         shipcontrol.functionModule.setPotentialDestinations(shipcontrol);
                         if (shipcontrol.potDest.length > 0)
                         {
-                            console.warn("SET MISSION DESTINSTION: APS " + shipcontrol.ship.id);
+                            console.warn("SET MISSION DESTINATION: APS " + shipcontrol.ship.id);
                             shipcontrol.setMissionDestination();
                         }
                     }
@@ -7754,6 +7763,7 @@ function Colony(pid, build)
     };
     this.pid = pid;
     this.planet = vgap.getPlanet(pid);
+    this.taxation = false;
     //
     if (!autopilot.planetIsInStorage(pid)) autopilot.syncLocalPlaneteerStorage({ pid: pid }); // make sure we have a default entry for the colony
     //
@@ -8627,9 +8637,25 @@ Colony.prototype.setStarbaseDeficiency = function()
 /*
     POPULATIONS, TAXES and MEGACREDITS
  */
-Colony.prototype.getRevenue = function()
+Colony.prototype.getRevenue = function(taxation)
 {
-    return Math.floor(this.getIncomeFromNatives() + this.getIncomeFromColonists());
+    if (typeof taxation !== "undefined" && (taxation === "default" || taxation === "growth"))
+    {
+        var revenue = 0;
+        if (taxation === "default")
+        {
+            revenue += this.getIncomeFromColonists(this.getMaxHappyColonistTaxRate());
+            if (this.planet.nativeclans > 0) revenue += this.getIncomeFromNatives(this.getMaxHappyNativeTaxRate());
+        } else if (taxation === "growth")
+        {
+            revenue += this.getIncomeFromColonists(this.getMinHappyColonistTaxRate());
+            if (this.planet.nativeclans > 0) revenue += this.getIncomeFromNatives(this.getMinHappyNativeTaxRate());
+        }
+        return revenue;
+    } else
+    {
+        return Math.floor(this.getIncomeFromNatives() + this.getIncomeFromColonists());
+    }
 };
 Colony.prototype.setTargetMegacredits = function()
 {
@@ -8662,8 +8688,8 @@ Colony.prototype.setTaxes = function()
     if (this.isSqueezingPopulations()) this.squeezeTaxes(); // colonists and natives
     if (this.isDoomed()) p.colonisttaxrate = 100;
     if (this.isDoomed() && p.nativeclans > 0 && p.nativeracename !== "Amorphous") p.nativetaxrate = 100;
-    if (this.isTaxingByDefault()) this.setDefaultTaxrate();
-    if (this.isTaxing4Growth()) this.setGrowthTaxrate();
+    if (this.isTaxingByDefault()) { this.taxation = "default"; this.setDefaultTaxrate(); }
+    if (this.isTaxing4Growth()) { this.taxation = "growth"; this.setGrowthTaxrate(); }
 };
 //  NATIVES
 Colony.prototype.getNativeGrowth = function(taxrate)
@@ -10509,6 +10535,7 @@ Colony.prototype.drawTaxMissionIndicator = function()
                 nameActive: "<strong>> Collecting Resources</strong>",
 			 	desc: "Collect resources and deliver them to the current planet.",
 				shipFunction: "col",
+                shipMission: false,
 				ooiOptions: [ "neu", "dur", "tri", "mol", "cla", "mcs", "sup" ],
                 action: false,
 				hullId: 0
@@ -10518,6 +10545,7 @@ Colony.prototype.drawTaxMissionIndicator = function()
                 nameActive: "<strong>> Distributing</strong>",
 				desc: "Distribute resources from sources to sinks.",
 				shipFunction: "dis",
+                shipMission: false,
 				ooiOptions: [ "neu", "cla" ],
                 action: false,
 				hullId: 0
@@ -10527,6 +10555,7 @@ Colony.prototype.drawTaxMissionIndicator = function()
                 nameActive: "<strong>> Building</strong>",
                 desc: "Builds starbases (bab) or develops planets (stb)",
                 shipFunction: "bld",
+                shipMission: false,
                 ooiOptions: [ "bab", "stb" ],
                 action: false,
                 hullId: 0
@@ -10536,6 +10565,7 @@ Colony.prototype.drawTaxMissionIndicator = function()
                 nameActive: "<strong>> Colonizing</strong>",
 				desc: "Colonize unowned planets",
 				shipFunction: "exp",
+                shipMission: false,
 				ooiOptions: [ "slw", "fst" ],
                 action: false,
 				hullId: 0
@@ -10545,6 +10575,7 @@ Colony.prototype.drawTaxMissionIndicator = function()
                 nameActive: "<strong>> Terraforming</strong>",
                 desc: "Terraform planets",
                 shipFunction: "ter",
+                shipMission: false,
                 ooiOptions: [ "cla" ],
                 action: false,
                 hullId: 0
@@ -10554,6 +10585,7 @@ Colony.prototype.drawTaxMissionIndicator = function()
                 nameActive: "<strong>> Hizzzzzing</strong>",
                 desc: "MCs Collector using Hizzz",
                 shipFunction: "hiz",
+                shipMission: 8,
                 ooiOptions: [ "mcs" ],
                 action: false,
                 hullId: 0
@@ -10563,6 +10595,7 @@ Colony.prototype.drawTaxMissionIndicator = function()
                 nameActive: "<strong>> Brewing</strong>",
                 desc: "Load supply and unload products",
                 shipFunction: "alc",
+                shipMission: false,
                 ooiOptions: [ "all", "dur", "tri", "mol" ],
                 action: false,
                 hullId: 105
@@ -10572,6 +10605,7 @@ Colony.prototype.drawTaxMissionIndicator = function()
                 nameActive: "<strong>> Cooking</strong>",
                 desc: "Load supply and minerals and unload fuel",
                 shipFunction: "alc",
+                shipMission: false,
                 ooiOptions: [ "neu" ],
                 action: false,
                 hullId: 104
@@ -10581,6 +10615,7 @@ Colony.prototype.drawTaxMissionIndicator = function()
                 nameActive: "Deactivate",
 				desc: "Deactivate auto-pilot",
 				shipFunction: "000",
+                shipMission: false,
 				ooiOptions: [ false ],
                 action: "END",
 				hullId: 0
@@ -10610,8 +10645,10 @@ Colony.prototype.drawTaxMissionIndicator = function()
                 // HIZZZ - only show hizzzer module if it ship has capability
                 if ((vgap.player.raceid !== 2 || vgap.shipScreen.ship.beams < 1) && c.shipFunction === "hiz") continue;
                 //
-                var setShipFunction = function (func, ooiPriority, action) {
+                var setShipFunction = function (func, ooiPriority, action, shipMission) {
                     return function () {
+                        var oShipMission = vgap.shipScreen.ship.mission;
+                        if (shipMission) oShipMission = shipMission;
                         var cfgData = {};
                         if (action) // action === "END" => stop APS function
                         {
@@ -10632,15 +10669,15 @@ Colony.prototype.drawTaxMissionIndicator = function()
                                     sid: vgap.shipScreen.ship.id,
                                     base: baseId,
                                     shipFunction: func,
-                                    oShipMission: vgap.shipScreen.ship.mission,
+                                    oShipMission: oShipMission,
                                     ooiPriority: ooiPriority
                                 };
                                 var newAPS = new APSdata(data);
-                                autopilot.setupAPS(vgap.shipScreen.ship.id, newAPS.getData());
+                                autopilot.setupAPS(vgap.shipScreen.ship.id, newAPS.getData()); // runs ALL PHASES
                             } else {
                                 cfgData.newFunction = func;
                                 cfgData.newOoiPriority = ooiPriority;
-                                autopilot.setupAPS(vgap.shipScreen.ship.id, cfgData);
+                                autopilot.setupAPS(vgap.shipScreen.ship.id, cfgData); // runs ALL PHASES
                             }
                         }
                         vgap.shipScreen.selectMission(curMission);
@@ -10649,8 +10686,10 @@ Colony.prototype.drawTaxMissionIndicator = function()
                 if (c.ooiOptions.length > 1) {
                     $("<div>" + cName + "<span>" + c.desc + "<br/>Priority: <b id='ooiPriority" + c.shipFunction + "'></b></span></div>").tclick(setShipFunction(false, false, false)).appendTo("#OrdersScreen");
                     for (var j = 0; j < c.ooiOptions.length; j++) {
-                        var setShipFunctionOoi = function (func, ooiPriority) {
+                        var setShipFunctionOoi = function (func, ooiPriority, shipMission) {
                             return function () {
+                                var oShipMission = vgap.shipScreen.ship.mission;
+                                if (shipMission) oShipMission = shipMission;
                                 var cfgData = autopilot.isInStorage(vgap.shipScreen.ship.id);
                                 if (!cfgData) {
                                     var baseId = 0;
@@ -10660,7 +10699,7 @@ Colony.prototype.drawTaxMissionIndicator = function()
                                         sid: vgap.shipScreen.ship.id,
                                         base: baseId,
                                         shipFunction: func,
-                                        oShipMission: vgap.shipScreen.ship.mission,
+                                        oShipMission: oShipMission,
                                         ooiPriority: ooiPriority
                                     };
                                     var newAPS = new APSdata(data);
@@ -10673,10 +10712,10 @@ Colony.prototype.drawTaxMissionIndicator = function()
                                 return false;
                             };
                         };
-                        $("<a style='color:cyan;font-size: 10px;'>" + c.ooiOptions[j] + " </a>").tclick(setShipFunctionOoi(c.shipFunction, c.ooiOptions[j])).appendTo("#ooiPriority" + c.shipFunction);
+                        $("<a style='color:cyan;font-size: 10px;'>" + c.ooiOptions[j] + " </a>").tclick(setShipFunctionOoi(c.shipFunction, c.ooiOptions[j], c.shipMission)).appendTo("#ooiPriority" + c.shipFunction);
                     }
                 } else {
-                    $("<div>" + cName + "<span>" + c.desc + "</span></div>").tclick(setShipFunction(c.shipFunction, c.ooiOptions[0], c.action)).appendTo("#OrdersScreen");
+                    $("<div>" + cName + "<span>" + c.desc + "</span></div>").tclick(setShipFunction(c.shipFunction, c.ooiOptions[0], c.action, c.shipMission)).appendTo("#OrdersScreen");
                 }
             }
         }
