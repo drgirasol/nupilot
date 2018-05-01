@@ -16,8 +16,8 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable ship auto-pilots
-// @version       0.10.24
-// @date          2018-04-28
+// @version       0.10.27
+// @date          2018-05-01
 // @author        drgirasol
 // @include       http://planets.nu/*
 // @include       http://play.planets.nu/*
@@ -2544,7 +2544,8 @@ builderAPS.prototype.handleCargo = function (aps) // called once on initializati
                 }
             } else
             {
-                aps.destination = aps.planet; // no demand left, set secondary destination as destination so we can determine a new destination
+                aps.secondaryDestination = false; // no demand left, set secondary destination to false, so we can continue to destination
+                if (aps.curCapacity === aps.maxCapacity) aps.destination = aps.planet; // if we don't have any cargo, set destination to current planet, since destination doesn't need anything
             }
         } else
         {
@@ -2556,7 +2557,7 @@ builderAPS.prototype.handleCargo = function (aps) // called once on initializati
                 }
             } else
             {
-                aps.destination = aps.planet; // no demand left, set current planet as destination so we can determine a new destination
+                if (aps.curCapacity === aps.maxCapacity) aps.destination = aps.planet; // if we don't have any cargo, set destination to current planet, since destination doesn't need anything
             }
         }
         this.setDemand(aps);
@@ -2571,7 +2572,7 @@ builderAPS.prototype.setDemand = function (aps, destination) // demand = what we
     if (destination) dC = new Colony(destination.id);
     if (dC)
     {
-        var cD = dC.getBuilderDemand(aps.objectOfInterest);
+        var cD = dC.getBuilderDemand(aps);
         cD.forEach(
             function (d, index) {
                 if (aps.ship[d.item] < d.value)
@@ -2612,8 +2613,7 @@ builderAPS.prototype.setPotentialDestinations = function(aps)
 };
 builderAPS.prototype.setSecondaryDestination = function(aps)
 {
-    this.setDemand(aps);
-    // make sure we took all we can get from current planet
+    // make sure we took all we can get from current planet, updates demand of destination
     this.loadCargo(aps);
     // do we need a secondary destination?
     if (aps.getCargoCapacity() < 1) {
@@ -2746,6 +2746,7 @@ builderAPS.prototype.loadCargo = function(aps) // never called when destination 
                 loaded += aps.loadObject(demand.item, aps.planet, demand.value);
             }
         );
+        this.setDemand(aps);
         return loaded;
     } else
     {
@@ -2790,7 +2791,7 @@ builderAPS.prototype.getPlanetsToDevelop = function(aps)
     for (var i = 0; i < vgap.myplanets.length; i++)
     {
         var c = new Colony(vgap.myplanets[i].id);
-        if (c.isBuildingStructures && c.getBuilderDemand(aps.objectOfInterest).length > 0)
+        if (c.isBuildingStructures && c.getBuilderDemand(aps).length > 0)
         {
             c.distance2APS = aps.getDistance(c.planet.x, c.planet.y);
             potSites.push(c);
@@ -2811,7 +2812,7 @@ builderAPS.prototype.getSource = function(aps, site)
     var potColonies = [];
     var curDistTurns = Math.ceil(aps.getDistance(site.planet.x, site.planet.y, false) / Math.pow(aps.ship.engineid, 2));
     console.log("Distance (turns) to site: " + curDistTurns);
-    if (aps.planet.id === site.planet.id)
+    if (aps.planet.id === site.planet.id || curDistTurns <= 2)
     {
         // only b), since we are at the site
         var targetsInRange = aps.getTargetsInRange(autopilot.frnnOwnPlanets, aps.ship.x, aps.ship.y, (2 * Math.pow(aps.ship.engineid,2)));
@@ -2832,21 +2833,16 @@ builderAPS.prototype.getSource = function(aps, site)
     {
         vgap.myplanets.forEach(
             function (p, index) {
-                if (p.id === aps.planet.id) return; // skip current planet
+                if (p.id === aps.planet.id || p.id === site.id) return; // skip current and destination planet
                 var src2siteDistTurns = Math.ceil(autopilot.getDistance( { x: p.x, y: p.y }, { x: site.planet.x, y: site.planet.y }, false ) / Math.pow(aps.ship.engineid, 2));
                 console.log("Distance (turns) from this source (" + p.id + ") to site: " + src2siteDistTurns);
                 var curC = new Colony(p.id);
                 curC.distance2APS = aps.getDistance(curC.planet.x, curC.planet.y);
-                if (curDistTurns > 2) // if we are further away than 2 turns, only use sources that are closer than current position
-                {
-                    if (src2siteDistTurns < curDistTurns && aps.isSource(curC)) potColonies.push( curC );
-                } else // else, also use sources that are located within the same turn distance as current postion
-                {
-                    if (src2siteDistTurns <= curDistTurns && aps.isSource(curC)) potColonies.push( curC );
-                }
+                if (src2siteDistTurns <= curDistTurns && aps.isSource(curC)) potColonies.push( curC );
             }
         );
     }
+    console.log(potColonies);
     if (potColonies.length > 0)
     {
         if (potColonies.length > 1)
@@ -2884,61 +2880,6 @@ builderAPS.prototype.setConstructionSites = function(aps)
 /*
     INTERNAL METHODS
  */
-builderAPS.prototype.getPotentialSources = function(aps, sink, ooi)
-{
-    if (typeof sink === "undefined") // toDo: when is this the case?
-    {
-        sink = { pid: aps.planet.id, x: aps.planet.x, y: aps.planet.y, isFort: false, isBuilding: false, ooi: this.curOoi, deficiency: 100, resources: 1000 };
-    }
-    var potSources = [];
-    for (var i = 0; i < vgap.myplanets.length; i++)
-    {
-        var cCol = new Colony(vgap.myplanets[i].id);
-        var excess = cCol.getDistributorCargo(ooi);
-        if (excess > 0) potSources.push( cCol );
-    }
-    return potSources;
-};
-builderAPS.prototype.prioritizeSinks = function(aps, sinks)
-{
-    if (sinks.length > 1)
-    {
-        if (this.ooiPriority === "cla")
-        {
-            sinks = aps.getDevidedCollection(sinks, "government", 5, "eta", "asc");
-        } else if (this.ooiPriority === "sup")
-        {
-            sinks = aps.getDevidedCollection(sinks, "resources", 4000, "eta", "asc");
-        } else if (this.ooiPriority === "mcs")
-        {
-            sinks = aps.getDevidedCollection(sinks, "resources", 4000, "eta", "asc");
-        } else
-        {
-            sinks = aps.getDevidedCollection(sinks, "eta", 2, "deficiency", "asc");
-            //sinks = autopilot.sortCollection(sinks, "eta", "asc");
-        }
-    }
-    return sinks;
-};
-builderAPS.prototype.addLastResortSink = function(aps, collection)
-{
-    if (collection.length > 0) // add one outside scope sink as last resort
-    {
-        // use the closest ooSSink to get the next ETA target and set that target as potential sink (regardless if it is a sink),
-        // there, we will try again (set new destination)
-        collection = autopilot.sortCollection(collection, "distance", "asc");
-        // aps.setWaypoints(aps.ship, collection[0]);
-        var lRplanet = vgap.getPlanet(collection[0].pid);
-        var lR = aps.getEtaWaypoint(lRplanet);
-        if (lR)
-        {
-            var lRdist = Math.floor(autopilot.getDistance({x: lR.x, y: lR.y}, {x:aps.ship.x ,y:aps.ship.y}));
-            console.log("...last Resort Planet:");
-            console.log(lR);
-            this.sinks.push( { pid: lR.id, x: lR.x, y: lR.y, isFort: false, government: 0, deficiency: 0, distance: lRdist, lR: true } );
-        }
-    }
-};
 builderAPS.prototype.getObjectDeficiency = function(object, ooi)
 {
     if (typeof ooi === "undefined") ooi = this.ooiPriority;
@@ -2957,95 +2898,6 @@ builderAPS.prototype.getObjectDeficiency = function(object, ooi)
         return autopilot.getMcDeficiency(object);
     }
     return false;
-};
-builderAPS.prototype.getCutOffBySinkDeficiency = function(planet)
-{
-    if (this.ooiPriority == "cla")
-    {
-        return autopilot.getClanDeficiency(planet);
-    } else if (this.ooiPriority == "neu")
-    {
-        return autopilot.getFuelDeficiency(planet);
-    } else if (this.ooiPriority == "sup")
-    {
-        return autopilot.getSupDeficiency(planet);
-    } else if (this.ooiPriority == "mcs")
-    {
-        return autopilot.getMcDeficiency(planet);
-    }
-    return false;
-};
-builderAPS.prototype.getSpecificSources = function(aps)
-{
-    //var destDef = Math.floor(this.getObjectDeficiency(aps.destination) * 1.2);
-    var needed = (destDef * -1) - aps.ship[aps.moveables[this.ooiPriority]];
-    console.log("...needs " + this.ooiPriority + ": " + needed);
-    var fSources = []; // filtered specific (satisfy deficiency) sources
-    for (var i = 0; i < autopilot.frnnOwnPlanets.length; i++)
-    {
-        var cP = vgap.getPlanet(autopilot.frnnOwnPlanets[i].pid);
-        if (cP.id === aps.destination.id) continue; // exclude destination
-        var value = aps.getObjectExcess(cP);
-        if ((value >= needed || value >= aps.maxCapacity) && !aps.planetIsSourceOfCollector(cP.id))
-        {
-            autopilot.frnnOwnPlanets[i].pid = cP.id;
-            autopilot.frnnOwnPlanets[i].value = value;
-            // use distance between destination and source, so we can approach that which is closer to the sink!
-            autopilot.frnnOwnPlanets[i].distance = Math.floor(autopilot.getDistance( {x: aps.destination.x, y: aps.destination.y}, {x: cP.x, y: cP.y} ));
-            fSources.push(autopilot.frnnOwnPlanets[i]);
-        }
-    }
-    if (fSources.length > 0)
-    {
-        console.log("...found specific source(s)!");
-        if (fSources.length > 1)
-        {
-            fSources.sort(function(a, b) {
-                var x = a.distance;
-                var y = b.distance;
-                if (x < y) {return -1;}
-                if (x > y) {return 1;}
-                return 0;
-            });
-        }
-        console.log(fSources);
-    }
-    return fSources;
-};
-builderAPS.prototype.fillLoad = function (aps, sequence)
-{
-    var curCapacity = aps.getCurCapacity("clans"); // we start with clans, since they always should be part of a sequence
-    var fuelReq = autopilot.getOptimalFuelConsumptionEstimate(aps.ship.id);
-    var fuelAva = aps.ship.neutronium + aps.planet.neutronium;
-    var cargo = [
-        aps.ship.duranium,
-        aps.ship.tritanium,
-        aps.ship.molybdenum,
-        aps.ship.supplies,
-        aps.ship.clans
-    ];
-    var trans = 0;
-    var z = 0;
-    while (curCapacity > 0 && z < 10)
-    {
-        for (var i = 0; i < sequence.length; i++)
-        {
-            var curObj = sequence[i].obj;
-            var curDef = sequence[i].toLoad;
-            if (curDef > 0)
-            {
-                var toLoad = curDef;
-                console.log("...now loading: " + curObj + ": " + toLoad);
-                cargo.push(toLoad);
-                fuelReq = autopilot.getOptimalFuelConsumptionEstimate(aps.ship.id, cargo);
-                if (fuelAva < fuelReq) break;
-                trans += aps.loadObject(curObj, aps.planet, toLoad);
-            }
-        }
-        curCapacity = aps.getCurCapacity("clans"); // we keep updating cargo capacity
-        z++;
-    }
-    return trans;
 };
 /*
  * Autopilot - Collector Module
@@ -3292,7 +3144,7 @@ collectorAPS.prototype.getSumOfOOI = function(aps, conflictAPS)
     }
     return sum;
 };
-collectorAPS.prototype.handleCargo = function(aps) // called on arrival at destination and when at owned planet
+collectorAPS.prototype.handleCargo = function(aps)  // called once on initialization and a second time with aps.confirmMission
 {
     if (aps.planet && aps.isOwnPlanet)
     {
@@ -3315,18 +3167,15 @@ collectorAPS.prototype.getLoadingSequence = function(aps)
 {
     var bSequence = [];
     var lSequence = [];
-    if (this.ooiPriority === "all")
-    {
-        bSequence = [ { res: "dur", value: parseInt(aps.base.duranium) }, { res: "tri", value: parseInt(aps.base.tritanium) }, { res: "mol", value: parseInt(aps.base.molybdenum) } ];
-    } else if (this.ooiPriority === "dur")
+    if (aps.objectOfInterest === "dur")
     {
         lSequence = ["duranium"];
         bSequence = [ { res: "mol", value: parseInt(aps.base.molybdenum) }, { res: "tri", value: parseInt(aps.base.tritanium) } ];
-    } else if (this.ooiPriority === "tri")
+    } else if (aps.objectOfInterest === "tri")
     {
         lSequence = ["tritanium"];
         bSequence = [ { res: "mol", value: parseInt(aps.base.molybdenum) }, { res: "dur", value: parseInt(aps.base.duranium) } ];
-    } else if (this.ooiPriority === "mol")
+    } else if (aps.objectOfInterest === "mol")
     {
         lSequence = ["molybdenum"];
         bSequence = [ { res: "tri", value: parseInt(aps.base.tritanium) }, { res: "dur", value: parseInt(aps.base.duranium) } ];
@@ -3386,7 +3235,7 @@ collectorAPS.prototype.loadCargo = function(aps) // not called at BASE
     if (this.alwaysLoadMC)
     {
         // are we transforming supplies to MCs first?
-        if (this.sellSupply)
+        if (this.sellSupply === true || (this.sellSupply === "notBov" && aps.planet.nativeracename !== "Bovinoid"))
         {
             aps.sellSupply();
         }
@@ -9103,28 +8952,23 @@ Colony.prototype.setDefaultNativeTaxrate = function()
     // - no taxation if there are less than 40 happypoints
     //
     var p = this.planet;
+    p.nativetaxrate = 1;
     //
     if (parseInt(p.nativehappypoints) > 40)
     {
         var happyEquiTaxRate = Math.floor(this.getMaxHappyNativeTaxRate());
-        var nativeTaxMcs = this.getIncomeFromNatives(happyEquiTaxRate);
+        var modIncome = this.getIncomeFromNatives(happyEquiTaxRate);
+
         //
-        while (nativeTaxMcs > p.clans) // get taxrate that fits the availability of colonists
+        while (modIncome > p.clans) // get taxrate that fits the availability of colonists
         {
             happyEquiTaxRate--;
-            nativeTaxMcs = this.getIncomeFromNatives(happyEquiTaxRate);
+            modIncome = this.getIncomeFromNatives(happyEquiTaxRate);
         }
-        var curIncome = this.getIncomeFromNatives(happyEquiTaxRate);
-        if (happyEquiTaxRate > 0 && curIncome > 99)
+        if (happyEquiTaxRate > 0 && modIncome > 99)
         {
             p.nativetaxrate = happyEquiTaxRate;
-        } else
-        {
-            p.nativetaxrate = 0;
         }
-    } else
-    {
-        p.nativetaxrate = 0;
     }
 };
 Colony.prototype.setDefaultColonistTaxrate = function()
@@ -9298,27 +9142,43 @@ Colony.prototype.getBuilderCargo = function (ooi)
     }
     return 0;
 };
-Colony.prototype.getBuilderDemand = function (ooi)
+Colony.prototype.getBuilderDemand = function (aps)
 {
     var demand = [];
     var b = this.balance;
-    if (typeof ooi === "undefined") return false;
+    if (typeof aps.objectOfInterest === "undefined") return false;
     {
-        if (ooi === "bub")
+        if (aps.objectOfInterest === "bab")
         {
             if (b.duranium < 0) demand.push({ item: "duranium", value: (b.duranium * -1)});
             if (b.tritanium < 0) demand.push({ item: "tritanium", value: (b.tritanium * -1)});
             if (b.molybdenum < 0) demand.push({ item: "molybdenum", value: (b.molybdenum * -1)});
-        } else if (ooi === "stb")
+        } else if (aps.objectOfInterest === "stb")
         {
             var s = this.structures;
             if (s.factories.def > 0 || s.mines.def > 0 || s.defense.def > 0)
             {
+                var cash = 0;
+                var supplies = 0;
+                var clans = 0;
                 // supplies
-                if (s.factories.production - s.factories.def - s.mines.def - s.defense.def < 0) demand.push({ item: "supplies", value: (s.factories.production - s.factories.def - s.mines.def - s.defense.def) * -1 });
+                if (s.factories.production - s.factories.def - s.mines.def - s.defense.def < 0)
+                {
+                    cash = (s.factories.def * 3) + (s.mines.def * 4) + (s.defense.def * 10);
+                    supplies = (s.factories.production - s.factories.def - s.mines.def - s.defense.def) * -1;
+                }
                 // clans
-
-                if (b.clans < 0) demand.push({ item: "clans", value: (b.clans * -1)});
+                if (b.clans < 0)
+                {
+                    clans += (b.clans * -1);
+                }
+                var cargo = supplies + clans;
+                if (cargo >= 0.5 * aps.minCapacity || cash >= 500)
+                {
+                    if (clans > 0) demand.push({ item: "clans", value: clans });
+                    if (supplies > 0) demand.push({ item: "supplies", value: supplies });
+                    if (cash > 0) demand.push({ item: "megacredits", value: cash });
+                }
             }
         }
     }
