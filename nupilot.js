@@ -6373,6 +6373,7 @@ let autopilot = {
                 let tF = planet.targetfactories;
                 let ratioM = f / mF;
                 let ratioT = f / tF;
+                let ratio = 0;
                 if (tF < mF) {
                     ratio = ratioM;
                 } else {
@@ -6392,8 +6393,8 @@ let autopilot = {
                 let m = planet.mines;
                 let mM = c.maxColPop;
                 let tM = planet.targetmines;
-                ratio1 = m / mM;
-                ratio2 = m / tM;
+                let ratio1 = m / mM;
+                let ratio2 = m / tM;
                 if (planet.mines === 0) {
                     markup.attr.stroke = "#FF4500"; // orangered
                     autopilot.drawHorizontalLine(planet.x, planet.y, 3, "se", markup.attr, null, 0.3, 1, 10);
@@ -6407,7 +6408,7 @@ let autopilot = {
                 // clans
                 let clans = c.planet.clans;
                 let maxCla = c.maxColPop;
-                let ratio = clans / maxCla;
+                ratio = clans / maxCla;
                 markup.attr.lineWidth = 6;
                 markup.attr.stroke = "#778899"; // lightslategray
                 autopilot.drawHorizontalLine(planet.x, planet.y, 4, "se", markup.attr, null, 0.5, ratio, 10);
