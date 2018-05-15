@@ -4617,7 +4617,7 @@ expanderAPS.prototype.transferCargo = function(aps)
             maxAmounts = [ 10, 10, 30]; // fast colonization kit
             if (aps.planet.nativeracename === "Amorphous") return; // don't transfer to amorphous planets
         }
-        // calculate clans for population growth and adapt trasfer to that
+        // calculate clans for population growth and adapt transfer to that
         if (vgap.player.raceid === 7) // crystals
         {
             let popGrowth = aps.planet.temp / 100 * maxAmounts[1] / 20 * 5 / 5;
@@ -5494,6 +5494,18 @@ let autopilot = {
             }
         };
     },
+    getAboveKpercentileMean: function(values, k)
+    {
+        let thresh = autopilot.getKpercentileThresh(values, k);
+        let threshAndAboveValues = values.filter(function (val) {
+            return val >= thresh;
+        });
+        let sum = 0;
+        threshAndAboveValues.forEach(function (val) {
+            sum += val;
+        });
+        return Math.round(sum / threshAndAboveValues.length);
+    },
     getKpercentileThresh: function(values, k)
     {
         if (k > 100) k = 100;
@@ -5866,23 +5878,23 @@ let autopilot = {
     syncLocalPlaneteerStorage: function(data)
     {
         // load data
-        let storedGameData = autopilot.loadPlaneteerData(data);
-        if (!storedGameData) // error
+        let storedPlaneteerData = autopilot.loadPlaneteerData(data);
+        if (!storedPlaneteerData) // error
         {
             console.error("Mandatory field empty!");
             return false;
         } else
         {
             // storage available...
-            for(let i = 0; i < storedGameData.length; i++)
+            for(let i = 0; i < storedPlaneteerData.length; i++)
             {
                 // ...look for entry of planet
-                if (storedGameData[i].pid === data.pid)
+                if (storedPlaneteerData[i].pid === data.pid)
                 {
                     // TURN-OFF routines
                     //
                     // taxation off
-                    if (data.taxation === "off" && storedGameData[i].taxation !== "off")
+                    if (data.taxation === "off" && storedPlaneteerData[i].taxation !== "off")
                     {
                         let p = vgap.getPlanet(data.pid);
                         p.colonisttaxrate = 0;
@@ -5890,17 +5902,19 @@ let autopilot = {
                     }
                     //
                     let syncedData = new APPdata(data); // synchronize stored data
-                    storedGameData[i] = syncedData.getData();
-                    autopilot.savePlaneteerData(storedGameData);
-                    return storedGameData[i];
+                    storedPlaneteerData[i] = syncedData.getData();
+                    autopilot.savePlaneteerData(storedPlaneteerData);
+                    return storedPlaneteerData[i];
                 }
             }
             // if planet is not stored yet, add to storage
-            let gdo = new APPdata(data);
-            let gameData = gdo.getData();
-            storedGameData.push(gameData);
-            autopilot.savePlaneteerData(storedGameData);
-            return gameData;
+            console.log(storedPlaneteerData);
+            console.log(data);
+            let p = new APPdata(data);
+            let pData = p.getData();
+            storedPlaneteerData.push(pData);
+            autopilot.savePlaneteerData(storedPlaneteerData);
+            return pData;
         }
     },
     /*
@@ -5928,17 +5942,18 @@ let autopilot = {
         vgap.minefields.forEach(function(minefield) {
             if (minefield.ownerid !== vgap.player.id && !autopilot.isFriendlyPlayer(minefield.ownerid))
             {
-                autopilot.frnnEnemyMinefields.push( { id: minefield.id, x: minefield.x, y: minefield.y, radius: minefield.radius, owner: minefield.ownerid } );
-            } else {
-                autopilot.frnnFriendlyMinefields.push( { id: minefield.id, x: minefield.x, y: minefield.y, radius: minefield.radius, owner: minefield.ownerid } );
-            }
-            if (minefield.isweb)
-            {
-                if (minefield.ownerid !== vgap.player.id && !autopilot.isFriendlyPlayer(minefield.ownerid))
+                if (minefield.isweb)
                 {
                     autopilot.frnnEnemyWebMinefields.push( { id: minefield.id, x: minefield.x, y: minefield.y, radius: minefield.radius, owner: minefield.ownerid } );
                 } else {
+                    autopilot.frnnEnemyMinefields.push( { id: minefield.id, x: minefield.x, y: minefield.y, radius: minefield.radius, owner: minefield.ownerid } );
+                }
+            } else {
+                if (minefield.isweb)
+                {
                     autopilot.frnnWebMinefields.push( { id: minefield.id, x: minefield.x, y: minefield.y, radius: minefield.radius, owner: minefield.ownerid } );
+                } else {
+                    autopilot.frnnFriendlyMinefields.push( { id: minefield.id, x: minefield.x, y: minefield.y, radius: minefield.radius, owner: minefield.ownerid } );
                 }
             }
         });
@@ -7116,18 +7131,18 @@ let autopilot = {
     processload: function() {
         console.log(vgap);
         // autopilot.scanReports();
+        autopilot.setupStorage(); // local storage setup
         // Settings
         autopilot.loadGameSettings();
         //
-        if (!autopilot.realTurn || autopilot.realTurn < vgap.game.turn || autopilot.gameId !== vgap.game.id)
+        if (autopilot.gameId !== vgap.game.id)
         {
-            autopilot.realTurn = vgap.game.turn; // this is the current turn
             autopilot.gameId = vgap.game.id; // toDo: ??
         }
         //
-        if (autopilot.realTurn === vgap.game.turn) // only act, when we are in the present
+        console.log("Now Turn = %s - Game Turn %s", vgap.nowTurn, vgap.game.turn);
+        if (typeof vgap.nowTurn === "undefined" || vgap.nowTurn === vgap.game.turn) // only act, when we are in the present
         {
-            autopilot.setupStorage(); // local storage setup
             autopilot.scanReports(); // check reports for destroyed vessels
             autopilot.populateFrnnCollections();
             autopilot.populateShipCollections();
@@ -7628,6 +7643,7 @@ function Colony(pid, build)
     this.curNatPopGrowth = this.getNativeGrowth();
     this.maxColPop = this.getMaxColPop();
     this.minColPop = this.getMinColPop(); // minimum for growth
+    this.minGrowthColPop = this.getMinGrowthColPop(); // minimum population for growth
     this.squeezeColPop = this.getSqueezeColPop(); // population to be able to squeeze max (max. 5000)
     this.maxNatPop = this.getMaxNatPop();
     //
@@ -8165,9 +8181,11 @@ Colony.prototype.adjustTargetMines = function()
         // special cases:
         // - do not use maxNow as limit. Thus will result in population demand for builders or local collectors
         let specialCase = false;
+        console.log(autopilot.globalMinerals);
         autopilot.minerals.forEach(function (m) {
-            let threeQ = autopilot.getKpercentileThresh(autopilot.globalMinerals.ground.values[m], 75);
-            if (p["ground" + m] >= threeQ)
+            let aboveThreshMean = autopilot.getAboveKpercentileMean(autopilot.globalMinerals.ground.values[m], 75);
+            //console.log("AboveThreshMean of %s = %s.", m, aboveThreshMean);
+            if (p["ground" + m] >= aboveThreshMean)
             {
                 specialCase = m;
             }
@@ -8767,6 +8785,12 @@ Colony.prototype.getSqueezeColPop = function()
 };
 Colony.prototype.getMinColPop = function()
 {
+    let optLabor = this.getOptLabor();
+    if (optLabor > 0) return optLabor;
+    return 1;
+};
+Colony.prototype.getMinGrowthColPop = function()
+{
     let p = this.planet;
     // check minimum colonist population to achieve population growth under current circumstances (ignores happiness!)
     let race = autopilot.ownerForPlanet(p);
@@ -8881,13 +8905,13 @@ Colony.prototype.getIncomeFromColonists = function(taxRate)
 Colony.prototype.setTargetClans = function()
 {
     let p = this.planet;
-    if (this.maxColPop < 100)
+    if (this.maxColPop < 100 && this.maxColPop > 0)
     {
         this.target.clans = this.maxColPop;
     } else
     {
         let targets = [ 100, this.optLabor ];
-        //if (this.isSetToGrow) targets.push(this.minColPop);
+        if (this.minColPop) targets.push(this.minColPop);
         if (p.nativeracename === "Bovinoid") targets.push(this.optBovSupClans);
         //if (autopilot.hizzzerPlanets.indexOf(p.id) > -1) targets.push(this.maxColPop); // maximize colonist population on hizzzer planets, although optNatTaxClans should be enough!
         if (this.isFort && this.hasStarbase && p.clans < this.maxColPop) targets.push(this.maxColPop); // fortification: maximize colonist population (if a starbase is present)
