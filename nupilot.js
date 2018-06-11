@@ -16,8 +16,8 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable ship auto-pilots
-// @version       0.12.10
-// @date          2018-06-03
+// @version       0.12.22
+// @date          2018-06-11
 // @author        drgirasol
 // @include       http://planets.nu/*
 // @include       http://play.planets.nu/*
@@ -1519,7 +1519,7 @@ function wrapper () { // wrapper for injection
             }
         }
         //
-        if (dP && (this.planet || this.inWarpWell))
+        if (dP)
         {
             this.setShipTarget(dP);
             this.setWarp();
@@ -2785,6 +2785,7 @@ CollectorAPS.prototype.handleCargo = function(aps)  // called once on initializa
             if (aps.objectOfInterest === "neu") aps.unloadFuel();
         } else // source or waypoint
         {
+            if (!aps.isMakingTorpedoes()) aps.unloadCargo(); // unload prior to loading
             let transCargo = this.loadCargo(aps);
             console.log("Cargo load summary: " + transCargo);
         }
@@ -3059,7 +3060,9 @@ CollectorAPS.prototype.getLoadingSequence = function(aps)
         bSequence = [ { res: "tri", value: parseInt(aps.base.tritanium) }, { res: "dur", value: parseInt(aps.base.duranium) } ];
     }
     // determine the (remaining) loading sequence by what is needed at base (sink)
-    bSequence = autopilot.sortCollection(bSequence, "value", "asc");
+    bSequence.sort(function (a, b) {
+        return a.value - b.value;
+    });
     bSequence.forEach(function(seq){ lSequence.push(aps.moveables[seq.res]); });
     return lSequence;
 };
@@ -3099,11 +3102,11 @@ CollectorAPS.prototype.loadCargo = function(aps) // not called at BASE
 {
     let loaded = 0;
     // mineral handling
-    if (this.isMineralCollector(aps))
+    if (this.isMineralCollector(aps) && aps.getCurCapacity() > 0)
     {
         console.log("...loading minerals...");
         loaded = this.loadMinerals(aps);
-    } else
+    } else if (aps.getCurCapacity(aps.moveables[aps.objectOfInterest]) > 0)
     {
         console.log("...loading other stuff...");
         loaded = aps.loadObject(aps.moveables[aps.objectOfInterest], aps.planet);
@@ -4153,7 +4156,7 @@ HizzzAPS.prototype.setPotentialDestinations = function(aps)
         aps.potDest = this.sinks;
     } else
     {
-        aps.potDest = [ aps.base ];
+        aps.potDest = [ new Colony(aps.base.id) ];
     }
     if (aps.potDest.length === 0)
     {
@@ -4177,18 +4180,12 @@ HizzzAPS.prototype.setPotentialWaypoints = function(aps)
 };
 HizzzAPS.prototype.evaluateMissionDestinations = function(aps)
 {
-    let filteredDest = [];
     console.log("...filtering HIZZER destinations: " + aps.potDest.length);
-    for (let i = 0; i < aps.potDest.length; i++)
-    {
-        if (aps.potDest[i].pid !== aps.base.id)
-        {
-            let c = new Colony(aps.potDest[i].pid);
-            if (c.isBuildingBase || c.hasStarbase) continue;
-        }
-        filteredDest.push(aps.potDest[i]);
-    }
-    aps.potDest = filteredDest;
+    console.log(aps.potDest);
+    aps.potDest = aps.potDest.filter(function (c) {
+        if (c.planet.id !== aps.base.id) return !c.isBuildingBase && !c.hasStarbase;
+        return true;
+    });
 };
 HizzzAPS.prototype.hasMissionConflict = function(aps, potPlanet)
 {
