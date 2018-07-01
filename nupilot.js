@@ -16,8 +16,8 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable ship auto-pilots
-// @version       0.12.22
-// @date          2018-06-11
+// @version       0.12.29
+// @date          2018-07-01
 // @author        drgirasol
 // @include       http://planets.nu/*
 // @include       http://play.planets.nu/*
@@ -256,7 +256,10 @@ function wrapper () { // wrapper for injection
     APS.prototype.setConventionalShipMission = function(cfg)
     {
         this.oShipMission = cfg.oShipMission;
-        if (this.oShipMission && this.oShipMission !== this.ship.mission) this.ship.mission = this.oShipMission; // reset mission to original setting (= when autopilot was activated)
+        if (this.oShipMission && this.oShipMission !== this.ship.mission)
+        {
+            if (this.ship.mission !== 8 && this.ship.mission !== 2) this.ship.mission = this.oShipMission;
+        } // reset mission to original setting (= when autopilot was activated) if ship is not set to (web)mine laying
         //if (vgap.player.raceid === 2 && this.ship.beams > 0) { this.ship.mission = 8; } // if lizard, set HISS mission
         if (this.hull.cancloak) this.ship.mission = 9; // cloak if possible
     };
@@ -518,9 +521,6 @@ function wrapper () { // wrapper for injection
             //console.log("...no APS assigned to planet!");
             return false;
         }
-
-        console.log("destinationHasSameAPStype");
-        console.log(pool);
         let conflictAPS = [];
         for (let i = 0; i < pool[pid].length; i++)
         {
@@ -537,6 +537,8 @@ function wrapper () { // wrapper for injection
             }
         }
         if (conflictAPS.length > 0) {
+            console.log("destinationHasSameAPStype");
+            console.log(conflictAPS);
             return conflictAPS;
         } else
         {
@@ -2218,12 +2220,12 @@ AlchemyAPS.prototype.missionCompleted = function(aps)
 AlchemyAPS.prototype.setSinks = function(aps)
 {
     // as alchemist, current planet is a sink
-    this.sinks = [{ pid: aps.planet.id, x: aps.ship.x, y: aps.ship.y , distance: 0, deficiency: 0}];
+    this.sinks = [ new Colony(aps.planet.id) ];
 };
 AlchemyAPS.prototype.setSources = function(aps)
 {
     // as alchemist, current planet is a source
-    this.sources = [{ pid: aps.planet.id, x: aps.ship.x, y: aps.ship.y , distance: 0, deficiency: 0}];
+    this.sources = [ new Colony(aps.planet.id) ];
 };
 AlchemyAPS.prototype.isSource = function(aps)
 {
@@ -2968,7 +2970,7 @@ CollectorAPS.prototype.getCapacitySources = function(aps, colonies)
     //console.log("ETA range = " + etaRange);
     //console.log(maxSources.filter(function(s) { return s.eta === 1 }));
 
-    if (closer2Enemy.length > 0)
+    if (closer2Enemy.length > 0 && maxSources.length < 1)
     {
         sources = sources.concat(closer2Enemy.sort(function (a, b) {
             return a.dist2closestEnemyPlanet - b.dist2closestEnemyPlanet;
@@ -3112,8 +3114,9 @@ CollectorAPS.prototype.loadCargo = function(aps) // not called at BASE
         loaded = aps.loadObject(aps.moveables[aps.objectOfInterest], aps.planet);
     }
 
+    let curC = new Colony(aps.planet.id);
     // we generally collect megacredits if option is active
-    if (this.alwaysLoadMC)
+    if (this.alwaysLoadMC && !curC.hasStarbase || (curC.hasStarbase && curC.isFort))
     {
         // are we transforming supplies to MCs first?
         if (this.sellSupply === true || (this.sellSupply === "notBov" && aps.planet.nativeracename !== "Bovinoid"))
@@ -4385,13 +4388,19 @@ TerraformerAPS.prototype.setDemand = function (aps)
 };
 TerraformerAPS.prototype.setPotentialDestinations = function(aps)
 {
-    console.log("Terraforming status: " + this.getMissionStatus(aps));
-    if (this.getMissionStatus(aps))
-    {
-        return; // don't go anywhere as long as the optimal temperature has not been reached
-    }
     console.log("Determine potential destinations...");
     this.setSinks(aps);
+    if (this.getMissionStatus(aps) < 0)
+    {
+        console.log("Terraforming status: " + this.getMissionStatus(aps));
+        if (this.sinks.length > 0)
+        {
+            if (this.getMissionStatus(aps) <= this.sinks[0].deficiency) return; // don't go anywhere as long as current planets deficiency is greater than best other match
+        } else
+        {
+            return; // don't go anywhere as long as the optimal temperature has not been reached
+        }
+    }
     if (this.sinks.length === 0)
     {
         console.warn("...no potential destinations available!");
@@ -4460,62 +4469,38 @@ TerraformerAPS.prototype.setSinks = function(aps)
         let p = vgap.planetAt(pos.x, pos.y);
         let c = new Colony(p.id);
         c.deficiency = self.getTerraformDeficiency(aps, p);
-        if (c.deficiency !== 0) pCs.push(c);
+        if (c.deficiency < 0) pCs.push(c);
     });
     console.log("...targets in scope range: " + targetsInRange.length + " (" + (aps.scopeRange) + ")");
+    let emergencies = pCs.filter(function (c) {
+        return c.planet.temp === 0;
+    }); // extreme limiting conditions (crystalls = 0° planets))
     let withNatives = pCs.filter(function (c) {
         return c.planet.nativeclans > 0 && c.planet.nativeracename !== "Amorphous";
     });
-    let amorph = pCs.filter(function (c) {
-        return c.planet.nativeclans > 0 && c.planet.nativeracename !== "Amorphous";
+    withNatives.sort(function (a, b) {
+        return a.deficiency - b.deficiency;
     });
+    //
     let potential = pCs.filter(function (c) {
         return c.planet.nativeclans === 0;
+    });
+    potential.sort(function (a, b) {
+        return a.deficiency - b.deficiency;
+    });
+    //
+    let amorph = pCs.filter(function (c) {
+        return c.planet.nativeclans > 0 && c.planet.nativeracename !== "Amorphous";
     });
     console.log("... potential targets: " + potential.length);
     console.log("... amorph targets: " + amorph.length);
     console.log("... other native targets: " + withNatives.length);
-    potential.sort(function (a, b) {
-        return b.deficiency - a.deficiency;
-    });
-    if (potential.length > 0)
+
+    this.sinks = emergencies.concat(withNatives, potential);
+
+    if (this.sinks.length < 1 && amorph.length > 0)
     {
-        if (withNatives.length > 0)
-        {
-            // putting native planets to the top of the line...
-            withNatives.sort(function (a, b) {
-                return b.deficiency - a.deficiency;
-            });
-            potential = withNatives.concat(potential);
-        }
-        if (amorph.length > 0)
-        {
-            // putting amorph planets to the end of the line...
-            potential = potential.concat(amorph);
-        }
-        this.sinks = potential;
-    } else
-    {
-        if (withNatives.length > 0)
-        {
-            // putting native planets to the top of the line...
-            withNatives.sort(function (a, b) {
-                return b.deficiency - a.deficiency;
-            });
-            potential = withNatives;
-        }
-        if (amorph.length > 0)
-        {
-            // putting amorph planets to the end of the line...
-            if (potential.length > 0)
-            {
-                potential = potential.concat(amorph);
-            } else
-            {
-                potential = amorph;
-            }
-        }
-        this.sinks = potential;
+        this.sinks = amorph;
     }
 };
 TerraformerAPS.prototype.getTerraformDeficiency = function(aps, p)
@@ -4525,10 +4510,10 @@ TerraformerAPS.prototype.getTerraformDeficiency = function(aps, p)
     console.log("Planet temperature = %s.", p.temp);
     if (p.temp < 0) return 0; // exclude planets with unknown temperatures
     let pTemp = parseInt(p.temp);
-    if (pTemp > 50 && aps.terraCooler)
+    if (pTemp > 50 && aps.terraCooler && vgap.player.raceid !== 7)
     {
         return (50 - pTemp);
-    } else if ((pTemp < 50 && aps.terraHeater))
+    } else if (pTemp < 50 && aps.terraHeater && vgap.player.raceid !== 7)
     {
         return (pTemp - 50);
     } else if (pTemp < 100 && vgap.player.raceid === 7 && aps.terraHeater)
@@ -4545,28 +4530,7 @@ TerraformerAPS.prototype.getTerraformDeficiency = function(aps, p)
 };
 TerraformerAPS.prototype.getMissionStatus = function(aps, p)
 {
-    if (typeof p === "undefined") p = aps.planet;
-    console.log("TerraCooler: %s, TerraHeater: %s.", aps.terraCooler, aps.terraHeater);
-    console.log("Planet temperature = %s.", p.temp);
-    if (p.temp < 0) return 0; // exclude planets with unknown temperatures
-    let pTemp = parseInt(p.temp);
-    if (pTemp > 50 && aps.terraCooler)
-    {
-        return (50 - pTemp);
-    } else if ((pTemp < 50 && aps.terraHeater))
-    {
-        return (pTemp - 50);
-    } else if (pTemp < 100 && vgap.player.raceid === 7 && aps.terraHeater)
-    {
-        if (p.nativeclans > 0 && p.nativeracename !== "Siliconoid")
-        {
-            return (pTemp - 80); // toDo: chosen arbitrarily
-        } else
-        {
-            return (pTemp - 100);
-        }
-    }
-    return 0;
+    return this.getTerraformDeficiency(aps, p);
 };
 TerraformerAPS.prototype.setScopeRange = function(aps)
 {
