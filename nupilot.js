@@ -16,7 +16,7 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable ship auto-pilots
-// @version       0.13.01
+// @version       0.13.02
 // @date          2018-07-28
 // @author        drgirasol
 // @include       http://planets.nu/*
@@ -6419,9 +6419,13 @@ let autopilot = {
             }
         });
         //console.log("amounts", amounts);
-        return amounts.reduce(function (total, amount) {
-            return total + amount;
-        });
+        if (amounts.length > 0) {
+            return amounts.reduce(function (total, amount) {
+                return total + amount;
+            });
+        } else {
+            return 0;
+        }
     },
     getSumOfObjectsInRange: function(center, range)
     {
@@ -7785,6 +7789,9 @@ Colony.prototype.adjustTargetMines = function()
             }
         }
         this.updateStructures();
+    } else if (sM.target > sM.maxNow) {
+        p.targetmines = 0;
+        this.updateStructures();
     }
 };
 Colony.prototype.adjustTargetFactories = function()
@@ -7820,6 +7827,9 @@ Colony.prototype.adjustTargetFactories = function()
             }
         }
         this.updateStructures();
+    } else if (sF.target > sF.maxNow) {
+        p.targetfactories = 0;
+        this.updateStructures();
     }
 };
 Colony.prototype.adjustTargetDefense = function()
@@ -7842,6 +7852,9 @@ Colony.prototype.adjustTargetDefense = function()
                 p.targetdefense = dD;
             }
         }
+        this.updateStructures();
+    } else if (sD.target > sD.maxNow) {
+        p.targetdefense = 0;
         this.updateStructures();
     }
 };
