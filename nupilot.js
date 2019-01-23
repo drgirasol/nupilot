@@ -1,5 +1,5 @@
 /*
-    Copyright 2017, 2018 Thomas Horn
+    Copyright (C) 2017-2019 Thomas Horn
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation, either version 3 of the License, or
@@ -16,16 +16,20 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable ship auto-pilots
-// @version       0.14.23
+// @version       0.14.26
 // @date          2019-01-20
 // @author        drgirasol
 // @include       http://planets.nu/*
+// @include       https://planets.nu/*
 // @include       http://play.planets.nu/*
+// @include       https://play.planets.nu/*
 // @include       http://test.planets.nu/*
-// @homepageURL   https://github.com/drgirasol/nupilot/wiki
+// @include       https://test.planets.nu/*
 // @supportURL    https://github.com/drgirasol/nupilot/issues
+// @homepageURL   https://github.com/drgirasol/nupilot/wiki
 // @updateURL     https://greasyfork.org/scripts/26189-nupilot/code/nuPilot.js
 // @downloadURL   https://greasyfork.org/scripts/26189-nupilot/code/nuPilot.js
+// @grant         none
 
 // ==/UserScript==
 
@@ -2124,14 +2128,11 @@ BuilderAPS.prototype.getConstructionSites = function(aps, exclude) {
 };
 BuilderAPS.prototype.setScopeRange = function(aps) {
     aps.scopeRange = aps.simpleRange * 2;
-    if (this.scopeRange === "auto")
-    {
-        if (aps.objectOfInterest === "bab" || aps.objectOfInterest === "shb")
-        {
-            aps.scopeRange = aps.simpleRange * 4;
+    if (this.scopeRange === "auto") {
+        if (aps.objectOfInterest === "bab" || aps.objectOfInterest === "shb") {
+            aps.scopeRange = aps.simpleRange * 3; // toDo: changed 20.01.2019 (4->3)
         }
-    } else
-    {
+    } else {
         aps.scopeRange = parseInt(this.scopeRange);
     }
 };
@@ -2143,30 +2144,45 @@ BuilderAPS.prototype.getBasesToDevelop = function(aps, exclude) {
     console.log("...sbDevColonies:", sbDevColonies);
     let potSites = sbDevColonies.filter(function (c) {
         if (exclude && exclude.id === c.planet.id) return false;
-        let demand = c.getAPSDemand(aps);
+        //let demand = c.getAPSDemand(aps);
         c.distance2APS = aps.getDistance(c.planet);
-        return demand.length > 0;
+        return true;
+        //return demand.length > 0; // toDo: changed 20.01.19, demand is validated in pickBase
     });
     console.log("...potential starbase development sites:", potSites);
     return potSites;
 };
 BuilderAPS.prototype.pickBase = function(classifiedSites, aps) {
-    classifiedSites.sort(function(a, b){
+    /*classifiedSites.sort(function(a, b){
         return a.distance2APS - b.distance2APS;
+    });*/
+    let closeBuildingSites = classifiedSites.filter(function (c) {
+        return c.isBuildingBase && c.distance2APS <= aps.simpleRange * 2;
     });
-    let sbBuildingSites = classifiedSites.filter(function (c) {
-        return c.isBuildingBase;
+    let closeToFortifySites = classifiedSites.filter(function (c) {
+        return !c.isFortified && c.distance2APS <= aps.simpleRange * 2;
     });
-    if (sbBuildingSites.length > 0) {
-        classifiedSites = [].concat(sbBuildingSites, classifiedSites);
-    } // prioritize planets that are marked to build a starbase
+    if (closeBuildingSites.length > 0 && closeToFortifySites.length > 0) {
+        classifiedSites = [].concat(closeBuildingSites, closeToFortifySites, classifiedSites);
+    } else if (closeBuildingSites.length > 0) {
+        classifiedSites = [].concat(closeBuildingSites, classifiedSites);
+    } else if (closeToFortifySites.length > 0) {
+        classifiedSites = [].concat(closeToFortifySites, classifiedSites);
+    } else {
+        let sbBuildingSites = classifiedSites.filter(function (c) {
+            return c.isBuildingBase;
+        });
+        if (sbBuildingSites.length > 0) {
+            classifiedSites = [].concat(sbBuildingSites, classifiedSites);
+        } // prioritize planets that are marked to build a starbase
+    }
     let pickedBase = [];
     while (pickedBase.length === 0 && classifiedSites.length > 0) {
         let baseToValidate = classifiedSites.shift();
         baseToValidate.updateBalance();
         let demand = baseToValidate.getAPSDemand(aps);
         if (demand.filter(function (d) {
-            return d.item !== "megacredits";
+            return d.item !== "megacredits"; // toDo: should an APS transport only megacredits? fuel consumption?
         }).length > 0 && baseToValidate.determineSafety()) pickedBase.push(baseToValidate);
     }
     return pickedBase;
@@ -2202,8 +2218,8 @@ BuilderAPS.prototype.classifyBases = function(sites, aps) {
             });
         } else if (inScope.length > 0) {
             inScope.sort(function (a, b) {
-                return a.distance2APS - b.distance2APS;
-            });
+                    return a.distance2APS - b.distance2APS;
+                });
             if (outScope.length > 0) {
                 outScope.sort(function (a, b) {
                     return a.distance2APS - b.distance2APS;
@@ -2224,14 +2240,14 @@ BuilderAPS.prototype.classifyBases = function(sites, aps) {
             let molRatio = c.mineralsInRange.molybdenum / autopilot.globalMinerals.molybdenum;
             return (durRatio >= 0.25 && triRatio >= 0.25 && molRatio >= 0.25);
         });
-        console.log("richSites", richSites);
+        //console.log("richSites", richSites);
         let moderateSites = sites.filter(function (c) {
             let durRatio = c.mineralsInRange.duranium / autopilot.globalMinerals.duranium;
             let triRatio = c.mineralsInRange.tritanium / autopilot.globalMinerals.tritanium;
             let molRatio = c.mineralsInRange.molybdenum / autopilot.globalMinerals.molybdenum;
             return ((durRatio >= 0.1 && durRatio < 0.25) && (triRatio >= 0.1 && triRatio < 0.25) && (molRatio >= 0.1 && molRatio < 0.25));
         });
-        console.log("moderateSites", moderateSites);
+        //console.log("moderateSites", moderateSites);
         let richAndModerateIds = [].concat(richSites.map(function (c) {
             return c.planet.id;
         }),moderateSites.map(function (c) {
@@ -2240,7 +2256,7 @@ BuilderAPS.prototype.classifyBases = function(sites, aps) {
         let poorSites = sites.filter(function (c) {
             return richAndModerateIds.indexOf(c.planet.id) === -1;
         });
-        console.log("poorSites", poorSites);
+        //console.log("poorSites", poorSites);
         priorizedSites = [].concat(richSites, moderateSites, poorSites);
     }
     console.warn("...prioritized starbase planets", priorizedSites);
@@ -4413,28 +4429,23 @@ TerraformerAPS.prototype.setDemand = function (aps)
 {
     aps.demand = []; // reset
 };
-TerraformerAPS.prototype.setPotentialDestinations = function(aps)
-{
+TerraformerAPS.prototype.setPotentialDestinations = function(aps) {
     console.log("TerraformerAPS.setPotentialDestinations:");
     this.setSinks(aps);
-    if (this.getMissionStatus(aps) < 0)
-    {
+    if (this.getMissionStatus(aps) < 0) {
         console.log("...status: " + this.getMissionStatus(aps));
-        if (this.sinks.length > 0)
-        {
-            if (this.getMissionStatus(aps) <= this.sinks[0].deficiency) return; // don't go anywhere as long as current planets deficiency is greater than best other match
-        } else
-        {
+        if (this.sinks.length > 0) {
+            console.log("...best other target status: " + this.sinks[0].deficiency);
+            if (aps.planet.temp < 50 || this.getMissionStatus(aps) <= this.sinks[0].deficiency) return; // don't go anywhere if current planet has not reached standard conditions (50°) or if current planets deficiency is greater than best other match
+        } else {
             return; // don't go anywhere as long as the optimal temperature has not been reached
         }
     }
-    if (this.sinks.length === 0)
-    {
+    if (this.sinks.length === 0) {
         console.warn("...no potential destinations available!");
         aps.isIdle = true;
         if (aps.idleReason.indexOf("Dest") === -1) aps.idleReason.push("Dest");
-    } else
-    {
+    } else {
         aps.potDest = this.sinks;
         aps.isIdle = false;
     }
@@ -4488,15 +4499,16 @@ TerraformerAPS.prototype.getNextPrimaryDestination = function(aps, ctP)
 /*
     INTERNAL METHODS
  */
-TerraformerAPS.prototype.setSinks = function(aps)
-{
+TerraformerAPS.prototype.setSinks = function(aps) {
     // as terraformer, each planet with a temperature other than the optimal is a sink
     // and the object of interest usually is nothing else than terraform
     // however, if it would be known that there are natives (bioscan) priority could be used for those planets
     // the same goes for planets where the resources are known
-    // priority should be given to extreme planets (i.e. colder than 15° C and hotter than 84° C)
+    // priority should be given to extreme planets (i.e. colder than 15° C and hotter than 84° C) toDo: unless we are crystal... and natives are not harmed
     this.setScopeRange(aps);
+    console.log("..setting potential terraforming targets");
     let targetsInRange = autopilot.getTargetsInRange(autopilot.frnnPlanets, aps.ship.x, aps.ship.y, aps.scopeRange);
+    //targetsInRange.push(aps.planet); // add current planet
     let pCs = [];
     let self = this;
     targetsInRange.forEach(function (pos) {
@@ -4532,38 +4544,30 @@ TerraformerAPS.prototype.setSinks = function(aps)
 
     this.sinks = emergencies.concat(withNatives, potential);
 
-    if (this.sinks.length < 1 && amorph.length > 0)
-    {
+    if (this.sinks.length < 1 && amorph.length > 0) {
         this.sinks = amorph;
     }
 };
-TerraformerAPS.prototype.getTerraformDeficiency = function(aps, p)
-{
+TerraformerAPS.prototype.getTerraformDeficiency = function(aps, p) {
     if (typeof p === "undefined") p = aps.planet;
     console.log("TerraCooler: %s, TerraHeater: %s.", aps.terraCooler, aps.terraHeater);
     console.log("Planet temperature = %s.", p.temp);
     if (p.temp < 0) return 0; // exclude planets with unknown temperatures
     let pTemp = parseInt(p.temp);
-    if (pTemp > 50 && aps.terraCooler && vgap.player.raceid !== 7)
-    {
+    if (pTemp > 50 && aps.terraCooler && vgap.player.raceid !== 7) {
         return (50 - pTemp);
-    } else if (pTemp < 50 && aps.terraHeater && vgap.player.raceid !== 7)
-    {
+    } else if (pTemp < 50 && aps.terraHeater && vgap.player.raceid !== 7) {
         return (pTemp - 50);
-    } else if (pTemp < 100 && vgap.player.raceid === 7 && aps.terraHeater)
-    {
-        if (p.nativeclans > 0 && p.nativeracename !== "Siliconoid")
-        {
+    } else if (pTemp < 100 && vgap.player.raceid === 7 && aps.terraHeater) {
+        if (p.nativeclans > 0 && p.nativeracename !== "Siliconoid") {
             return (pTemp - 80); // toDo: chosen arbitrarily
-        } else
-        {
+        } else {
             return (pTemp - 100);
         }
     }
     return 0;
 };
-TerraformerAPS.prototype.getMissionStatus = function(aps, p)
-{
+TerraformerAPS.prototype.getMissionStatus = function(aps, p) {
     return this.getTerraformDeficiency(aps, p);
 };
 TerraformerAPS.prototype.setScopeRange = function(aps)
@@ -4846,11 +4850,11 @@ let autopilot = {
             return (c.isOwnPlanet && c.isBuildingStructures);
         });
     },
-    getStarbaseDevelopingColonies: function()
-    {
+    getStarbaseDevelopingColonies: function() {
         return autopilot.myColonies.filter(function (c) {
             if (c.isBuildingBase || (c. hasStarbase && c.isFort)) {
-                if (vgap.shipsAt(c.planet.x, c.planet.y).length > 0) c.updateBalance();
+                //if (vgap.shipsAt(c.planet.x, c.planet.y).length > 0)
+                c.updateBalance();
                 c.setMineralsInRange();
             }
             return c.isBuildingBase || (c. hasStarbase && c.isFort);
@@ -5450,8 +5454,7 @@ let autopilot = {
         if (!exact && destIsPlanet && dist >= 2.2) dist -= 2.2;
         return dist;
     },
-    getTargetsInRange: function(coords, x, y, r)
-    {
+    getTargetsInRange: function(coords, x, y, r) {
         let frnn = new FRNN(coords, r);
         return frnn.inRange( { x: x, y: y }, r);
     },
@@ -9543,7 +9546,7 @@ Colony.prototype.getNextBuilderCargo = function (aps, nD) {
 Colony.prototype.getBuilderDemand = function (ooi, sid) {
     let demand = [];
     let b = this.balance;
-    //console.log("Current balance:", b);
+    console.log("Get builder demand of colony:", this.pid, b);
     if (ooi === "bab") {
         if (this.hasStarbase && this.isFort && this.isFortified) {
             // collect minerals from surrounding planets
@@ -9577,6 +9580,7 @@ Colony.prototype.getBuilderDemand = function (ooi, sid) {
             if (b.molybdenum < 0) demand.push({ item: "molybdenum", value: (b.molybdenum * -1)});
             if (b.megacredits < 0) demand.push({ item: "megacredits", value: (b.megacredits * -1)});
         }
+        console.log(new autopilot.demandIndex(demand));
     } else if (ooi === "shb") {
         if (b.duranium < 0) demand.push({ item: "duranium", value: (b.duranium * -1)});
         if (b.tritanium < 0) demand.push({ item: "tritanium", value: (b.tritanium * -1)});
