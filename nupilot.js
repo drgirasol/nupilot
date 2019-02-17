@@ -16,8 +16,8 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable ship auto-pilots
-// @version       0.14.26
-// @date          2019-01-20
+// @version       0.14.29
+// @date          2019-02-17
 // @author        drgirasol
 // @include       http://planets.nu/*
 // @include       https://planets.nu/*
@@ -4409,8 +4409,7 @@ HizzzAPS.prototype.transferCargo = function(aps)
  *
  *
  */
-function TerraformerAPS()
-{
+function TerraformerAPS() {
     this.minimalCargoRatioToGo = 0.5; // in percent of cargo capacity (e.g. 0.7 = 70%)
     //this.cruiseMode = "fast"; // safe = 1-turn-connetions, fast = direct if faster, direct = always direct
     //this.energyMode = "conservative"; // conservative = use only the required amount of fuel, moderate = use 20 % above required amount, max = use complete tank capacity
@@ -4432,13 +4431,12 @@ TerraformerAPS.prototype.setDemand = function (aps)
 TerraformerAPS.prototype.setPotentialDestinations = function(aps) {
     console.log("TerraformerAPS.setPotentialDestinations:");
     this.setSinks(aps);
-    if (this.getMissionStatus(aps) < 0) {
-        console.log("...status: " + this.getMissionStatus(aps));
+    if (aps.colony.getTerraformDeficiency(aps) < 0) {
+        console.log("...status: " + aps.colony.getTerraformDeficiency(aps));
         if (this.sinks.length > 0) {
-            console.log("...best other target status: " + this.sinks[0].deficiency);
-            if (aps.planet.temp < 50 || this.getMissionStatus(aps) <= this.sinks[0].deficiency) return; // don't go anywhere if current planet has not reached standard conditions (50°) or if current planets deficiency is greater than best other match
-        } else {
-            return; // don't go anywhere as long as the optimal temperature has not been reached
+            console.log("...best other target status: " + this.sinks[0].climateDeficiency);
+            if (aps.colony.climate === "arctic" || aps.colony.climate === "desert") return; // dont't go anywhere if current planet is an extreme planet
+            if (this.sinks[0].climate !== "arctic" && this.sinks[0].climate !== "desert") return; // don't go anywhere unless best other target is a extreme planet
         }
     }
     if (this.sinks.length === 0) {
@@ -4481,12 +4479,15 @@ TerraformerAPS.prototype.postActivationHook = function (aps)
 {
 
 };
-TerraformerAPS.prototype.missionCompleted = function(aps)
-{
+TerraformerAPS.prototype.missionCompleted = function(aps) {
     // terraformer does not use secondary destination.
     // Heating or cooling of a planet is the mission
     // Thus, mission is completed, if current destination does not need cooling or heating
-    return this.getMissionStatus(aps, aps.destination) === 0;
+    if (aps.destinationColony) {
+        return aps.destinationColony.getTerraformDeficiency(aps) === 0;
+    } else {
+        return aps.colony.getTerraformDeficiency(aps) === 0;
+    }
 };
 TerraformerAPS.prototype.getNextSecondaryDestination = function(aps, ctP)
 {
@@ -4514,61 +4515,54 @@ TerraformerAPS.prototype.setSinks = function(aps) {
     targetsInRange.forEach(function (pos) {
         let p = vgap.planetAt(pos.x, pos.y);
         let c = autopilot.getColony(p.id);
-        c.deficiency = self.getTerraformDeficiency(aps, p);
-        if (c.deficiency < 0) pCs.push(c);
+        c.climateDeficiency = c.getTerraformDeficiency(aps);
+        if (c.climateDeficiency < 0) pCs.push(c);
     });
     console.log("...targets in scope range: " + targetsInRange.length + " (" + (aps.scopeRange) + ")");
+    // EMERGENCIES
     let emergencies = pCs.filter(function (c) {
-        return c.planet.temp === 0;
-    }); // extreme limiting conditions (crystalls = 0° planets))
-    let withNatives = pCs.filter(function (c) {
+        return c.climate === "arctic" || c.climate === "desert";
+    }); // extreme limiting conditions
+    if (vgap.player.raceid === 7) {
+        emergencies = pCs.filter(function (c) {
+            return c.climate === "arctic";
+        }); // crystal, only arctic planets
+    }
+    let pool = [];
+
+    if (emergencies.length > 0) {
+        pool = emergencies;
+    } else {
+        pool = pCs;
+    }
+
+    let withNatives = pool.filter(function (c) {
         return c.planet.nativeclans > 0 && c.planet.nativeracename !== "Amorphous";
     });
     withNatives.sort(function (a, b) {
-        return a.deficiency - b.deficiency;
+        return b.climateDeficiency - a.climateDeficiency;
     });
     //
     let potential = pCs.filter(function (c) {
         return c.planet.nativeclans === 0;
     });
     potential.sort(function (a, b) {
-        return a.deficiency - b.deficiency;
+        return b.climateDeficiency - a.climateDeficiency;
     });
     //
     let amorph = pCs.filter(function (c) {
         return c.planet.nativeclans > 0 && c.planet.nativeracename !== "Amorphous";
     });
+    //
+    console.log("... native targets: " + withNatives.length);
     console.log("... potential targets: " + potential.length);
     console.log("... amorph targets: " + amorph.length);
-    console.log("... other native targets: " + withNatives.length);
-
-    this.sinks = emergencies.concat(withNatives, potential);
-
+    //
+    this.sinks = withNatives.concat(potential);
     if (this.sinks.length < 1 && amorph.length > 0) {
         this.sinks = amorph;
     }
-};
-TerraformerAPS.prototype.getTerraformDeficiency = function(aps, p) {
-    if (typeof p === "undefined") p = aps.planet;
-    console.log("TerraCooler: %s, TerraHeater: %s.", aps.terraCooler, aps.terraHeater);
-    console.log("Planet temperature = %s.", p.temp);
-    if (p.temp < 0) return 0; // exclude planets with unknown temperatures
-    let pTemp = parseInt(p.temp);
-    if (pTemp > 50 && aps.terraCooler && vgap.player.raceid !== 7) {
-        return (50 - pTemp);
-    } else if (pTemp < 50 && aps.terraHeater && vgap.player.raceid !== 7) {
-        return (pTemp - 50);
-    } else if (pTemp < 100 && vgap.player.raceid === 7 && aps.terraHeater) {
-        if (p.nativeclans > 0 && p.nativeracename !== "Siliconoid") {
-            return (pTemp - 80); // toDo: chosen arbitrarily
-        } else {
-            return (pTemp - 100);
-        }
-    }
-    return 0;
-};
-TerraformerAPS.prototype.getMissionStatus = function(aps, p) {
-    return this.getTerraformDeficiency(aps, p);
+    console.log(this.sinks);
 };
 TerraformerAPS.prototype.setScopeRange = function(aps)
 {
@@ -6950,6 +6944,7 @@ function Colony(pid, build, draw)
     this.pid = pid;
     this.id = pid;
     this.planet = this.getPlanet(pid);
+    this.climate = this.getClimate(pid);
     this.settings = this.getSettings(pid);
     this.neighbours = false;
     this.owner = this.getPlanetOwner();
@@ -7133,12 +7128,23 @@ Colony.prototype.update = function(build) {
     //i
     if (autopilot.settings.planetMNG) this.setTaxes();
 };
-Colony.prototype.getPlanetOwner = function()
-{
+Colony.prototype.getPlanetOwner = function() {
     return this.planet.ownerid > 0 ? vgap.players[this.planet.ownerid - 1].raceid : vgap.player.raceid;
 };
-Colony.prototype.getFleet = function()
-{
+Colony.prototype.getClimate = function() {
+    if (this.planet.temp > 84) {
+        return "desert";
+    } else if (this.planet.temp > 60) {
+        return "tropical";
+    } else if (this.planet.temp > 39) {
+        return "warm";
+    } else if (this.planet.temp > 14) {
+        return "cool";
+    } else {
+        return "arctic";
+    }
+};
+Colony.prototype.getFleet = function() {
     let fleet = [];
     let ships = vgap.shipsAt(this.planet.x, this.planet.y);
     if (ships)
@@ -9438,10 +9444,27 @@ Colony.prototype.sellSupplies4APS = function(aps) {
     }
 };
 // HIZZZER
-Colony.prototype.isHizzzerSource = function (aps)
-{
+Colony.prototype.isHizzzerSource = function (aps) {
     //console.log("Is colony a hizzzer source? Revenue with %s taxation = %s", this.taxation, this.getRevenue(this.taxation));
     return (this.getRevenue() > 100);
+};
+// TERRAFORMER
+Colony.prototype.getTerraformDeficiency = function (aps) {
+    let p = this.planet;
+    if (p.temp < 0) return 0; // exclude planets with unknown temperatures
+    let pTemp = parseInt(p.temp);
+    if (pTemp > 50 && aps.terraCooler && vgap.player.raceid !== 7) {
+        return (50 - pTemp);
+    } else if (pTemp < 50 && aps.terraHeater && vgap.player.raceid !== 7) {
+        return (pTemp - 50);
+    } else if (pTemp < 100 && vgap.player.raceid === 7 && aps.terraHeater) {
+        if (p.nativeclans > 0 && p.nativeracename !== "Siliconoid") {
+            return (pTemp - 80); // toDo: chosen arbitrarily
+        } else {
+            return (pTemp - 100);
+        }
+    }
+    return 0;
 };
 // EXPANDER
 Colony.prototype.getExpanderKit = function(aps)
