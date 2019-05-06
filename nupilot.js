@@ -1,5 +1,5 @@
 /*
-    Copyright 2017, 2018 Thomas Horn
+    Copyright (C) 2017-2019 Thomas Horn
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation, either version 3 of the License, or
@@ -16,16 +16,20 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable ship auto-pilots
-// @version       0.14.23
-// @date          2019-01-20
+// @version       0.14.38
+// @date          2019-05-06
 // @author        drgirasol
 // @include       http://planets.nu/*
+// @include       https://planets.nu/*
 // @include       http://play.planets.nu/*
+// @include       https://play.planets.nu/*
 // @include       http://test.planets.nu/*
-// @homepageURL   https://github.com/drgirasol/nupilot/wiki
+// @include       https://test.planets.nu/*
 // @supportURL    https://github.com/drgirasol/nupilot/issues
+// @homepageURL   https://github.com/drgirasol/nupilot/wiki
 // @updateURL     https://greasyfork.org/scripts/26189-nupilot/code/nuPilot.js
 // @downloadURL   https://greasyfork.org/scripts/26189-nupilot/code/nuPilot.js
+// @grant         none
 
 // ==/UserScript==
 
@@ -1468,8 +1472,7 @@ function wrapper () { // wrapper for injection
         if (potPlanet.id === this.base.id) return false; // exclude base planet from evaluation
         return this.functionModule.hasMissionConflict(this, potPlanet);
     };
-    APS.prototype.isValidDestination = function(pid)
-    {
+    APS.prototype.isValidDestination = function(pid) {
         if (pid)
         {
             let destPlanet = vgap.getPlanet(pid);
@@ -1482,8 +1485,7 @@ function wrapper () { // wrapper for injection
         dC.updateBalance(false);
         this.demand = dC.getAPSDemand(this);
     };
-    APS.prototype.getNextMissionTarget = function(ctP)
-    {
+    APS.prototype.getNextMissionTarget = function(ctP) {
         console.log("APS.getNextMissionTarget:");
         let ctC = autopilot.getColony(ctP.id, true);
         if (this.secondaryDestination && this.secondaryDestination.id === ctP.id)
@@ -1528,8 +1530,7 @@ function wrapper () { // wrapper for injection
     /*
      *  LOADING, UNLOADING, TRANSFER of object from ship to e.g. planet
      */
-    APS.prototype.reduceCargoToProceed = function()
-    {
+    APS.prototype.reduceCargoToProceed = function() {
         console.log("...checking if reducing cargo will help.");
         if (this.isOwnPlanet)
         {
@@ -1621,8 +1622,7 @@ function wrapper () { // wrapper for injection
             c.update(true);
         }
     };
-    APS.prototype.unloadObject = function(object, to, amount)
-    {
+    APS.prototype.unloadObject = function(object, to, amount) {
         if (typeof amount === "undefined") amount = this.ship[object];
         if (amount > 0) {
             console.log("APS.unloadObject:", object, amount);
@@ -1639,8 +1639,7 @@ function wrapper () { // wrapper for injection
         }
 
     };
-    APS.prototype.transferObject = function(object, to, amount)
-    {
+    APS.prototype.transferObject = function(object, to, amount) {
         console.log("APS.transferObject:");
         let actAmount = 0;
         if (typeof amount === "undefined") {
@@ -2124,14 +2123,11 @@ BuilderAPS.prototype.getConstructionSites = function(aps, exclude) {
 };
 BuilderAPS.prototype.setScopeRange = function(aps) {
     aps.scopeRange = aps.simpleRange * 2;
-    if (this.scopeRange === "auto")
-    {
-        if (aps.objectOfInterest === "bab" || aps.objectOfInterest === "shb")
-        {
-            aps.scopeRange = aps.simpleRange * 4;
+    if (this.scopeRange === "auto") {
+        if (aps.objectOfInterest === "bab" || aps.objectOfInterest === "shb") {
+            aps.scopeRange = aps.simpleRange * 3; // toDo: changed 20.01.2019 (4->3)
         }
-    } else
-    {
+    } else {
         aps.scopeRange = parseInt(this.scopeRange);
     }
 };
@@ -2143,30 +2139,45 @@ BuilderAPS.prototype.getBasesToDevelop = function(aps, exclude) {
     console.log("...sbDevColonies:", sbDevColonies);
     let potSites = sbDevColonies.filter(function (c) {
         if (exclude && exclude.id === c.planet.id) return false;
-        let demand = c.getAPSDemand(aps);
+        //let demand = c.getAPSDemand(aps);
         c.distance2APS = aps.getDistance(c.planet);
-        return demand.length > 0;
+        return true;
+        //return demand.length > 0; // toDo: changed 20.01.19, demand is validated in pickBase
     });
     console.log("...potential starbase development sites:", potSites);
     return potSites;
 };
 BuilderAPS.prototype.pickBase = function(classifiedSites, aps) {
-    classifiedSites.sort(function(a, b){
+    /*classifiedSites.sort(function(a, b){
         return a.distance2APS - b.distance2APS;
+    });*/
+    let closeBuildingSites = classifiedSites.filter(function (c) {
+        return c.isBuildingBase && c.distance2APS <= aps.simpleRange * 2;
     });
-    let sbBuildingSites = classifiedSites.filter(function (c) {
-        return c.isBuildingBase;
+    let closeToFortifySites = classifiedSites.filter(function (c) {
+        return !c.isFortified && c.distance2APS <= aps.simpleRange * 2;
     });
-    if (sbBuildingSites.length > 0) {
-        classifiedSites = [].concat(sbBuildingSites, classifiedSites);
-    } // prioritize planets that are marked to build a starbase
+    if (closeBuildingSites.length > 0 && closeToFortifySites.length > 0) {
+        classifiedSites = [].concat(closeBuildingSites, closeToFortifySites, classifiedSites);
+    } else if (closeBuildingSites.length > 0) {
+        classifiedSites = [].concat(closeBuildingSites, classifiedSites);
+    } else if (closeToFortifySites.length > 0) {
+        classifiedSites = [].concat(closeToFortifySites, classifiedSites);
+    } else {
+        let sbBuildingSites = classifiedSites.filter(function (c) {
+            return c.isBuildingBase;
+        });
+        if (sbBuildingSites.length > 0) {
+            classifiedSites = [].concat(sbBuildingSites, classifiedSites);
+        } // prioritize planets that are marked to build a starbase
+    }
     let pickedBase = [];
     while (pickedBase.length === 0 && classifiedSites.length > 0) {
         let baseToValidate = classifiedSites.shift();
         baseToValidate.updateBalance();
         let demand = baseToValidate.getAPSDemand(aps);
         if (demand.filter(function (d) {
-            return d.item !== "megacredits";
+            return d.item !== "megacredits"; // toDo: should an APS transport only megacredits? fuel consumption?
         }).length > 0 && baseToValidate.determineSafety()) pickedBase.push(baseToValidate);
     }
     return pickedBase;
@@ -2202,8 +2213,8 @@ BuilderAPS.prototype.classifyBases = function(sites, aps) {
             });
         } else if (inScope.length > 0) {
             inScope.sort(function (a, b) {
-                return a.distance2APS - b.distance2APS;
-            });
+                    return a.distance2APS - b.distance2APS;
+                });
             if (outScope.length > 0) {
                 outScope.sort(function (a, b) {
                     return a.distance2APS - b.distance2APS;
@@ -2224,14 +2235,14 @@ BuilderAPS.prototype.classifyBases = function(sites, aps) {
             let molRatio = c.mineralsInRange.molybdenum / autopilot.globalMinerals.molybdenum;
             return (durRatio >= 0.25 && triRatio >= 0.25 && molRatio >= 0.25);
         });
-        console.log("richSites", richSites);
+        //console.log("richSites", richSites);
         let moderateSites = sites.filter(function (c) {
             let durRatio = c.mineralsInRange.duranium / autopilot.globalMinerals.duranium;
             let triRatio = c.mineralsInRange.tritanium / autopilot.globalMinerals.tritanium;
             let molRatio = c.mineralsInRange.molybdenum / autopilot.globalMinerals.molybdenum;
             return ((durRatio >= 0.1 && durRatio < 0.25) && (triRatio >= 0.1 && triRatio < 0.25) && (molRatio >= 0.1 && molRatio < 0.25));
         });
-        console.log("moderateSites", moderateSites);
+        //console.log("moderateSites", moderateSites);
         let richAndModerateIds = [].concat(richSites.map(function (c) {
             return c.planet.id;
         }),moderateSites.map(function (c) {
@@ -2240,7 +2251,7 @@ BuilderAPS.prototype.classifyBases = function(sites, aps) {
         let poorSites = sites.filter(function (c) {
             return richAndModerateIds.indexOf(c.planet.id) === -1;
         });
-        console.log("poorSites", poorSites);
+        //console.log("poorSites", poorSites);
         priorizedSites = [].concat(richSites, moderateSites, poorSites);
     }
     console.warn("...prioritized starbase planets", priorizedSites);
@@ -3494,6 +3505,7 @@ DistributorAPS.prototype.getSources = function(aps, pdC) {
     if ((aps.planet && aps.planet.id === pdC.planet.id) || here2sinkTurnDist <= scopeTurnDist) {
         this.setScopeRange(aps);
         let targetsInRange = autopilot.getTargetsInRange(autopilot.frnnOwnPlanets, aps.ship.x, aps.ship.y, aps.scopeRange);
+        if (aps.planet) targetsInRange.push(aps.planet); // include current planet
         console.log("...found %s potential sources within %s lys:", targetsInRange.length, aps.scopeRange, targetsInRange);
         //
         if (targetsInRange.length > 0) {
@@ -4087,8 +4099,7 @@ function HizzzAPS()
 /*
     GENERAL REQUIRED METHODS
  */
-HizzzAPS.prototype.handleCargo = function (aps)
-{
+HizzzAPS.prototype.handleCargo = function (aps) {
     console.log("HizzzAPS.handleCargo:");
     if (aps.planet && aps.isOwnPlanet)
     {
@@ -4121,40 +4132,34 @@ HizzzAPS.prototype.handleCargo = function (aps)
                     }
                 });
                 let otherHizzerShips = otherHizzerShipsByBase[aps.base.id];
-                console.log("...other Hizzers:", otherHizzerShips);
-                if (otherHizzerShips)
-                {
+                if (otherHizzerShips) {
+                    console.log("...other Hizzers:", otherHizzerShips);
                     let engineids = otherHizzerShips.map(function (s) {
                         return s.engineid;
                     });
                     engineids.push(aps.ship.engineid);
                     let uniqueEngines = [...new Set(engineids)];
                     //console.log("uniqueEngines", uniqueEngines);
-                    if (uniqueEngines.length > 1)
-                    {
+                    if (uniqueEngines.length > 1) {
                         otherHizzerShips.sort(function (a, b) {
                             return b.engineid - a.engineid;
                         });
                         //console.log("sorted other Hizzers", otherHizzerShips);
-                        if (otherHizzerShips[0].engineid > aps.ship.engineid)
-                        {
+                        if (otherHizzerShips[0].engineid > aps.ship.engineid) {
                             weLoad = false;
-                        } else
-                        {
+                        } else {
                             // current Hizzer belongs to the fastest hizzers
                             let fastestHizzers = otherHizzerShips.filter(function (s) {
                                 return s.engineid === aps.ship.engineid;
                             });
-                            if (fastestHizzers.length > 0)
-                            {
+                            if (fastestHizzers.length > 0) {
                                 fastestHizzers.sort(function (a, b) {
                                     return a.id - b.id;
                                 });
                                 if (fastestHizzers[0].id < aps.ship.id) weLoad = false;
                             }
                         }
-                    } else
-                    {
+                    } else {
                         // all Hizzers are equally fast
                         otherHizzerShips.sort(function (a, b) {
                             return a.id - b.id;
@@ -4163,18 +4168,14 @@ HizzzAPS.prototype.handleCargo = function (aps)
                     }
                 }
             }
-            if (weLoad)
-            {
+            if (weLoad) {
                 let loadLog = this.loadCargo(aps, uniqueBaseIds.length);
                 console.log("...we are loading:", loadLog);
-                if (aps.planet.id === aps.destination.id && this.missionCompleted(aps))
-                {
+                if (aps.planet.id === aps.destination.id && this.missionCompleted(aps)) {
                     aps.destination = aps.base;
                 }
-            } else
-            {
-                if (weUnload)
-                {
+            } else {
+                if (weUnload) {
                     console.log("...we are unloading");
                     aps.unload();
                 }
@@ -4182,12 +4183,10 @@ HizzzAPS.prototype.handleCargo = function (aps)
         }
     }
 };
-HizzzAPS.prototype.setDemand = function (aps)
-{
+HizzzAPS.prototype.setDemand = function (aps) {
     aps.demand = []; // reset
 };
-HizzzAPS.prototype.setPotentialDestinations = function(aps)
-{
+HizzzAPS.prototype.setPotentialDestinations = function(aps) {
     console.log("Determine potential destinations...");
     // by planet.id sorted sinks (deficiencies)
     if (this.sinks.length === 0) this.setSinks(aps);
@@ -4212,12 +4211,10 @@ HizzzAPS.prototype.setPotentialDestinations = function(aps)
         console.log(aps.potDest);
     }
 };
-HizzzAPS.prototype.setSecondaryDestination = function(aps)
-{
+HizzzAPS.prototype.setSecondaryDestination = function(aps) {
     //aps.secondaryDestination = false;
 };
-HizzzAPS.prototype.setPotentialWaypoints = function(aps)
-{
+HizzzAPS.prototype.setPotentialWaypoints = function(aps) {
     aps.potentialWaypoints = autopilot.frnnOwnPlanets;
 };
 HizzzAPS.prototype.validateMissionDestinations = function(aps) {
@@ -4228,8 +4225,7 @@ HizzzAPS.prototype.validateMissionDestinations = function(aps) {
         return true;
     });
 };
-HizzzAPS.prototype.hasMissionConflict = function(aps, potPlanet)
-{
+HizzzAPS.prototype.hasMissionConflict = function(aps, potPlanet) {
     let conflictAPS = aps.destinationHasSameAPStype(potPlanet.id); // returns stored data for APS that also visit potPlanet with the same mission
     if (conflictAPS) {
         console.log("There are %s Hizzzer at planet %s", conflictAPS.length, potPlanet.id);
@@ -4245,13 +4241,11 @@ HizzzAPS.prototype.hasMissionConflict = function(aps, potPlanet)
         return (conflictAPS.length >= 12);
     }
 };
-HizzzAPS.prototype.confirmMission = function (aps)
-{
+HizzzAPS.prototype.confirmMission = function (aps) {
     console.log("Setting ship " + aps.ship.id + " mission: Hizzz!");
     aps.ship.mission = 8;
 };
-HizzzAPS.prototype.postActivationHook = function (aps)
-{
+HizzzAPS.prototype.postActivationHook = function (aps) {
     console.log("Setting ship " + aps.ship.id + " mission: Hizzz!");
     // colony taxation
     aps.ship.mission = 8;
@@ -4260,8 +4254,7 @@ HizzzAPS.prototype.postActivationHook = function (aps)
         autopilot.getColony(aps.planet.id);
     }
 };
-HizzzAPS.prototype.missionCompleted = function(aps)
-{
+HizzzAPS.prototype.missionCompleted = function(aps) {
     // hizzer does not use secondary destination.
     // Collecting MCs after hizzing or just hizzing the base planet is the mission
     // Thus,
@@ -4273,41 +4266,34 @@ HizzzAPS.prototype.missionCompleted = function(aps)
         return aps.ship.megacredits >= aps.minCapacity || this.hasMissionConflict(aps, aps.planet);
     }
 };
-HizzzAPS.prototype.getNextSecondaryDestination = function(aps, ctP)
-{
+HizzzAPS.prototype.getNextSecondaryDestination = function(aps, ctP) {
     return false;
 };
-HizzzAPS.prototype.getNextPrimaryDestination = function(aps, ctP)
-{
+HizzzAPS.prototype.getNextPrimaryDestination = function(aps, ctP) {
    return false;
 };
 /*
     INTERNAL METHODS
  */
-HizzzAPS.prototype.loadCargo = function(aps, devisor)
-{
+HizzzAPS.prototype.loadCargo = function(aps, devisor) {
     console.log("HizzzAPS.loadCargo:");
-    if (aps.destination.id === aps.planet.id || aps.planet.id === aps.lastDestination.id) // destination = planet that is being hizzed
-    {
+    if (aps.destination.id === aps.planet.id || aps.planet.id === aps.lastDestination.id) { // destination = planet that is being hizzed
         if (typeof devisor === "undefined") devisor = 1;
         let curC = autopilot.getColony(aps.planet.id, true);
         if (this.sellSupply === true || (this.sellSupply === "notBov" && aps.planet.nativeracename !== "Bovinoid")) curC.sellSupply(true);
         //
         let toLoad = Math.floor(curC.balance.megacredits / devisor);
-        if (devisor > 1 && aps.megacredits >= aps.minCapacity || aps.targetIsSet()) // don't load if we already have minCapacity reached or if we are already going back to base (and thus have loaded during initialization and no longer are registered as APS with same target)
-        {
+        if (devisor > 1 && aps.megacredits >= aps.minCapacity || aps.targetIsSet()) {
             toLoad = 0;
-        }
+        } // don't load if we already have minCapacity reached or if we are already going back to base (and thus have loaded during initialization and no longer are registered as APS with same target)
         console.log("...loading:", toLoad);
         let loaded = aps.loadObject("megacredits", aps.planet, toLoad);
         return { item: "megacredits", value: loaded };
-    } else
-    {
+    } else {
         // always collect cash from intermediate stops, as long as there is no starbase
         // toDo: not all starbases need cash...?
         let curC = autopilot.getColony(aps.planet.id, true);
-        if (!curC.hasStarbase)
-        {
+        if (!curC.hasStarbase) {
             if (this.sellSupply === true || (this.sellSupply === "notBov" && aps.planet.nativeracename !== "Bovinoid")) curC.sellSupply(true);
             let loaded = aps.loadObject("megacredits", aps.planet, curC.balance.megacredits);
             return { item: "megacredits", value: loaded };
@@ -4332,6 +4318,8 @@ HizzzAPS.prototype.getBetterPotentialSources = function(aps) {
     let self = this;
     return this.sources.filter(function (ps) {
         let newRevenue = ps.getRevenue(ps.taxation, false, 1); // true revenue with one more hizzer
+        console.log("true revenue with one more hizzer: ", newRevenue);
+        console.log("actual revenue of current planet: ", aps.colony.revenue);
         return ps.determineSafety() && ps.planet.id !== aps.planet.id && newRevenue > aps.colony.revenue && !self.hasMissionConflict(aps, ps.planet);
     });
 };
@@ -4354,8 +4342,7 @@ HizzzAPS.prototype.getSources = function(aps) {
     console.log("...potential targets:", potColonies);
     return potColonies;
 };
-HizzzAPS.prototype.setSources = function(aps)
-{
+HizzzAPS.prototype.setSources = function(aps) {
     console.log("HizzzAPS.setSources:");
     // as hizzzer, each planet with taxable population is a source
     // and the object of interest is to produce MCs and transport them to the base
@@ -4379,13 +4366,11 @@ HizzzAPS.prototype.setSources = function(aps)
     this.sources = [].concat(maxIncome, others);
     console.log("...sources:", this.sources);
 };
-HizzzAPS.prototype.isSource = function(planet)
-{
+HizzzAPS.prototype.isSource = function(planet) {
     let c = autopilot.getColony(planet.id);
     return (c.getRevenue() > 100);
 };
-HizzzAPS.prototype.transferCargo = function(aps)
-{
+HizzzAPS.prototype.transferCargo = function(aps) {
 
 };
 /*
@@ -4393,8 +4378,7 @@ HizzzAPS.prototype.transferCargo = function(aps)
  *
  *
  */
-function TerraformerAPS()
-{
+function TerraformerAPS() {
     this.minimalCargoRatioToGo = 0.5; // in percent of cargo capacity (e.g. 0.7 = 70%)
     //this.cruiseMode = "fast"; // safe = 1-turn-connetions, fast = direct if faster, direct = always direct
     //this.energyMode = "conservative"; // conservative = use only the required amount of fuel, moderate = use 20 % above required amount, max = use complete tank capacity
@@ -4413,28 +4397,22 @@ TerraformerAPS.prototype.setDemand = function (aps)
 {
     aps.demand = []; // reset
 };
-TerraformerAPS.prototype.setPotentialDestinations = function(aps)
-{
+TerraformerAPS.prototype.setPotentialDestinations = function(aps) {
     console.log("TerraformerAPS.setPotentialDestinations:");
     this.setSinks(aps);
-    if (this.getMissionStatus(aps) < 0)
-    {
-        console.log("...status: " + this.getMissionStatus(aps));
-        if (this.sinks.length > 0)
-        {
-            if (this.getMissionStatus(aps) <= this.sinks[0].deficiency) return; // don't go anywhere as long as current planets deficiency is greater than best other match
-        } else
-        {
-            return; // don't go anywhere as long as the optimal temperature has not been reached
+    if (aps.colony.getTerraformDeficiency(aps) < 0) {
+        console.log("...status: " + aps.colony.getTerraformDeficiency(aps));
+        if (this.sinks.length > 0) {
+            console.log("...best other target status: " + this.sinks[0].climateDeficiency);
+            if (aps.colony.climate === "arctic" || aps.colony.climate === "desert") return; // dont't go anywhere if current planet is an extreme planet
+            if (this.sinks[0].climate !== "arctic" && this.sinks[0].climate !== "desert") return; // don't go anywhere unless best other target is a extreme planet
         }
     }
-    if (this.sinks.length === 0)
-    {
+    if (this.sinks.length === 0) {
         console.warn("...no potential destinations available!");
         aps.isIdle = true;
         if (aps.idleReason.indexOf("Dest") === -1) aps.idleReason.push("Dest");
-    } else
-    {
+    } else {
         aps.potDest = this.sinks;
         aps.isIdle = false;
     }
@@ -4470,12 +4448,15 @@ TerraformerAPS.prototype.postActivationHook = function (aps)
 {
 
 };
-TerraformerAPS.prototype.missionCompleted = function(aps)
-{
+TerraformerAPS.prototype.missionCompleted = function(aps) {
     // terraformer does not use secondary destination.
     // Heating or cooling of a planet is the mission
     // Thus, mission is completed, if current destination does not need cooling or heating
-    return this.getMissionStatus(aps, aps.destination) === 0;
+    if (aps.destinationColony) {
+        return aps.destinationColony.getTerraformDeficiency(aps) === 0;
+    } else {
+        return aps.colony.getTerraformDeficiency(aps) === 0;
+    }
 };
 TerraformerAPS.prototype.getNextSecondaryDestination = function(aps, ctP)
 {
@@ -4488,83 +4469,69 @@ TerraformerAPS.prototype.getNextPrimaryDestination = function(aps, ctP)
 /*
     INTERNAL METHODS
  */
-TerraformerAPS.prototype.setSinks = function(aps)
-{
+TerraformerAPS.prototype.setSinks = function(aps) {
     // as terraformer, each planet with a temperature other than the optimal is a sink
     // and the object of interest usually is nothing else than terraform
     // however, if it would be known that there are natives (bioscan) priority could be used for those planets
     // the same goes for planets where the resources are known
-    // priority should be given to extreme planets (i.e. colder than 15° C and hotter than 84° C)
+    // priority should be given to extreme planets (i.e. colder than 15° C and hotter than 84° C) toDo: unless we are crystal... and natives are not harmed
     this.setScopeRange(aps);
+    console.log("..setting potential terraforming targets");
     let targetsInRange = autopilot.getTargetsInRange(autopilot.frnnPlanets, aps.ship.x, aps.ship.y, aps.scopeRange);
+    //targetsInRange.push(aps.planet); // add current planet
     let pCs = [];
     let self = this;
     targetsInRange.forEach(function (pos) {
         let p = vgap.planetAt(pos.x, pos.y);
         let c = autopilot.getColony(p.id);
-        c.deficiency = self.getTerraformDeficiency(aps, p);
-        if (c.deficiency < 0) pCs.push(c);
+        c.climateDeficiency = c.getTerraformDeficiency(aps);
+        if (c.climateDeficiency < 0) pCs.push(c);
     });
     console.log("...targets in scope range: " + targetsInRange.length + " (" + (aps.scopeRange) + ")");
+    // EMERGENCIES
     let emergencies = pCs.filter(function (c) {
-        return c.planet.temp === 0;
-    }); // extreme limiting conditions (crystalls = 0° planets))
-    let withNatives = pCs.filter(function (c) {
+        return c.climate === "arctic" || c.climate === "desert";
+    }); // extreme limiting conditions
+    if (vgap.player.raceid === 7) {
+        emergencies = pCs.filter(function (c) {
+            return c.climate === "arctic";
+        }); // crystal, only arctic planets
+    }
+    let pool = [];
+
+    if (emergencies.length > 0) {
+        pool = emergencies;
+    } else {
+        pool = pCs;
+    }
+
+    let withNatives = pool.filter(function (c) {
         return c.planet.nativeclans > 0 && c.planet.nativeracename !== "Amorphous";
     });
     withNatives.sort(function (a, b) {
-        return a.deficiency - b.deficiency;
+        return b.climateDeficiency - a.climateDeficiency;
     });
     //
     let potential = pCs.filter(function (c) {
         return c.planet.nativeclans === 0;
     });
     potential.sort(function (a, b) {
-        return a.deficiency - b.deficiency;
+        return b.climateDeficiency - a.climateDeficiency;
     });
     //
     let amorph = pCs.filter(function (c) {
         return c.planet.nativeclans > 0 && c.planet.nativeracename !== "Amorphous";
     });
+    //
+    console.log("... native targets: " + withNatives.length);
     console.log("... potential targets: " + potential.length);
     console.log("... amorph targets: " + amorph.length);
-    console.log("... other native targets: " + withNatives.length);
-
-    this.sinks = emergencies.concat(withNatives, potential);
-
-    if (this.sinks.length < 1 && amorph.length > 0)
-    {
+    //
+    this.sinks = withNatives.concat(potential);
+    if (this.sinks.length < 1 && amorph.length > 0) {
         this.sinks = amorph;
     }
-};
-TerraformerAPS.prototype.getTerraformDeficiency = function(aps, p)
-{
-    if (typeof p === "undefined") p = aps.planet;
-    console.log("TerraCooler: %s, TerraHeater: %s.", aps.terraCooler, aps.terraHeater);
-    console.log("Planet temperature = %s.", p.temp);
-    if (p.temp < 0) return 0; // exclude planets with unknown temperatures
-    let pTemp = parseInt(p.temp);
-    if (pTemp > 50 && aps.terraCooler && vgap.player.raceid !== 7)
-    {
-        return (50 - pTemp);
-    } else if (pTemp < 50 && aps.terraHeater && vgap.player.raceid !== 7)
-    {
-        return (pTemp - 50);
-    } else if (pTemp < 100 && vgap.player.raceid === 7 && aps.terraHeater)
-    {
-        if (p.nativeclans > 0 && p.nativeracename !== "Siliconoid")
-        {
-            return (pTemp - 80); // toDo: chosen arbitrarily
-        } else
-        {
-            return (pTemp - 100);
-        }
-    }
-    return 0;
-};
-TerraformerAPS.prototype.getMissionStatus = function(aps, p)
-{
-    return this.getTerraformDeficiency(aps, p);
+    console.log(this.sinks);
 };
 TerraformerAPS.prototype.setScopeRange = function(aps)
 {
@@ -4846,14 +4813,14 @@ let autopilot = {
             return (c.isOwnPlanet && c.isBuildingStructures);
         });
     },
-    getStarbaseDevelopingColonies: function()
-    {
+    getStarbaseDevelopingColonies: function() {
         return autopilot.myColonies.filter(function (c) {
-            if (c.isBuildingBase || (c. hasStarbase && c.isFort)) {
-                if (vgap.shipsAt(c.planet.x, c.planet.y).length > 0) c.updateBalance();
+            if (c.isBuildingBase || (c.hasStarbase && c.isFort)) {
+                //if (vgap.shipsAt(c.planet.x, c.planet.y).length > 0)
+                c.updateBalance();
                 c.setMineralsInRange();
             }
-            return c.isBuildingBase || (c. hasStarbase && c.isFort);
+            return c.isBuildingBase || (c.hasStarbase && c.isFort);
         });
     },
     getSinkColonies: function(aps)
@@ -5357,8 +5324,7 @@ let autopilot = {
             }
         }
     },
-    shipIdleIndicator: function(ship)
-    {
+    shipIdleIndicator: function(ship) {
         if (autopilot.settings.shipGFX) {
             let markup = {
                 attr: {
@@ -5374,6 +5340,7 @@ let autopilot = {
             //      or destination is set so ship will bounce back to planet
             //      and ship is not being towed
             //      and ship is not being sucked into a warp chunnel
+            //      and ship has not the mission to disassemble (5)
             //
             if (ship.hullid === 56) {
                 let isReceiver = false;
@@ -5415,7 +5382,11 @@ let autopilot = {
                 }
             } // firecloud
             //console.log("ship %s is being towed", ship.id, autopilot.myShips.getTowedIds().indexOf(ship.id));
-            if ((ship.warp === 0 || !autopilot.shipTargetIsSet(ship) || autopilot.shipIsWellBouncing(ship)) && autopilot.myShips.getTowedIds().indexOf(ship.id) === -1 && autopilot.myShips.getChunneldIds().indexOf(ship.id) === -1) {
+            let shipIsIdle = (ship.warp === 0 || !autopilot.shipTargetIsSet(ship) || autopilot.shipIsWellBouncing(ship))
+                && autopilot.myShips.getTowedIds().indexOf(ship.id) === -1
+                && autopilot.myShips.getChunneldIds().indexOf(ship.id) === -1
+                && ship.mission !== 5;
+            if (shipIsIdle) {
                 let cfgData = autopilot.shipIsAps(ship.id);
                 // exclude
                 //      a) active alchemy ships,
@@ -5426,7 +5397,9 @@ let autopilot = {
                     (ship.hullid === 104 && ship.supplies > 0 && (ship.duranium > 0 || ship.tritanium > 0 || ship.molybdenum > 0)) ||
                     (ship.hullid === 105 && ship.supplies > 0) ||
                     (ship.friendlycode.toLowerCase() === "lfm" && ship.engineid === 1) ||
-                    ship.friendlycode.toLowerCase() === "cln") {
+                    (ship.friendlycode.toLowerCase() === "cln" && vgap.planetAt(ship.x, ship.y) && vgap.starbases.find(function (sb) {
+                        return sb.planetid === vgap.planetAt(ship.x, ship.y).id;
+                    }))) {
                     //
                 } else {
                     markup.attr.stroke = "#FFA500";
@@ -5450,8 +5423,7 @@ let autopilot = {
         if (!exact && destIsPlanet && dist >= 2.2) dist -= 2.2;
         return dist;
     },
-    getTargetsInRange: function(coords, x, y, r)
-    {
+    getTargetsInRange: function(coords, x, y, r) {
         let frnn = new FRNN(coords, r);
         return frnn.inRange( { x: x, y: y }, r);
     },
@@ -6947,6 +6919,7 @@ function Colony(pid, build, draw)
     this.pid = pid;
     this.id = pid;
     this.planet = this.getPlanet(pid);
+    this.climate = this.getClimate(pid);
     this.settings = this.getSettings(pid);
     this.neighbours = false;
     this.owner = this.getPlanetOwner();
@@ -7130,12 +7103,23 @@ Colony.prototype.update = function(build) {
     //i
     if (autopilot.settings.planetMNG) this.setTaxes();
 };
-Colony.prototype.getPlanetOwner = function()
-{
+Colony.prototype.getPlanetOwner = function() {
     return this.planet.ownerid > 0 ? vgap.players[this.planet.ownerid - 1].raceid : vgap.player.raceid;
 };
-Colony.prototype.getFleet = function()
-{
+Colony.prototype.getClimate = function() {
+    if (this.planet.temp > 84) {
+        return "desert";
+    } else if (this.planet.temp > 60) {
+        return "tropical";
+    } else if (this.planet.temp > 39) {
+        return "warm";
+    } else if (this.planet.temp > 14) {
+        return "cool";
+    } else {
+        return "arctic";
+    }
+};
+Colony.prototype.getFleet = function() {
     let fleet = [];
     let ships = vgap.shipsAt(this.planet.x, this.planet.y);
     if (ships)
@@ -8134,13 +8118,11 @@ Colony.prototype.buildDefense = function(n) {
     this.updateStructures();
     let sD = this.structures.defense;
     for (let i = 0; i < n; i++) {
-        if (p.megacredits < cost.megacredits && p.supplies > cost.megacredits)
-        {
+        if (p.megacredits < cost.megacredits && p.supplies > cost.megacredits) {
             let mcDef = cost.megacredits - p.megacredits;
-            this.sellSupply(true, false, mcDef);
+            this.sellSupply(true, true, mcDef);
         }
-        if (p.supplies >= cost.supplies && p.megacredits >= cost.megacredits && p.defense < sD.maxNow)
-        {
+        if (p.supplies >= cost.supplies && p.megacredits >= cost.megacredits && p.defense < sD.maxNow) {
             p.supplies -= cost.supplies;
             p.megacredits -= cost.megacredits;
             p.defense += 1;
@@ -8667,32 +8649,28 @@ Colony.prototype.getOptNatTaxClans = function(taxrate) {
     if (optClans > this.maxColPop) optClans = this.maxColPop;
     return optClans;
 };
-Colony.prototype.getNativeHappinessChange = function(taxrate, bonus) // returns -/0/+ amount of happynesspoints = change in happiness using taxrate
-{
+Colony.prototype.getNativeHappinessChange = function(taxrate, bonus) {
     let p = this.planet;
     let nativeRaceBonus = p.nativeracename === "Avian" ? 10 : 0;
     let nebulaBonus = 0; // toDo: get nebulaBonus // The Nebula Bonus is 5 if the planet is in a nebula and has less than 50 light-years visibility.
     let addHappyness = 0;
     if (typeof bonus !== "undefined") addHappyness = bonus;
-    if (vgap.player.raceid === 2) // Lizards
-    {
+    if (vgap.player.raceid === 2) {
         let ships = vgap.shipsAt(p.x, p.y);
-        if (ships.length > 0)
-        {
+        if (ships.length > 0) {
             ships.forEach(function (s) {
                 if (s.mission === 8) addHappyness += 5; // Hisssss
             });
             //if (addHappyness) console.log("Ships are hissing planet %s: + %s native Happiness", p.id, addHappyness);
         }
-    }
-    let happychange = (Math.round( (1000 - Math.sqrt(p.nativeclans) - 85 * taxrate - Math.round( (p.mines + p.factories) / 2 ) - 50 * (10 - p.nativegovernment)) ) / 100) + nativeRaceBonus + nebulaBonus;
+    } // Lizards
+    let happychange = (Math.floor( (1000 - Math.sqrt(p.nativeclans) - 85 * taxrate - Math.round( (p.mines + p.factories) / 2 ) - 50 * (10 - p.nativegovernment)) ) / 100) + nativeRaceBonus + nebulaBonus;
     let maxAddHappyness = 100 - (p.nativehappypoints + happychange) ;
     if (addHappyness > maxAddHappyness) addHappyness = maxAddHappyness;
     return happychange + addHappyness;
 
-};
-Colony.prototype.getMaxHappyNativeTaxRate = function(bonus) // returns taxrate at which no negative change in happynesspoints occurs (negative approach)
-{
+}; // returns -/0/+ amount of happynesspoints = change in happiness using taxrate
+Colony.prototype.getMaxHappyNativeTaxRate = function(bonus) {
     for (let i=50; i>0; i--) {
         let happinessChange = this.getNativeHappinessChange(i, bonus);
         if (happinessChange > -1) {
@@ -8700,21 +8678,17 @@ Colony.prototype.getMaxHappyNativeTaxRate = function(bonus) // returns taxrate a
         }
     }
     return 0;
-};
-Colony.prototype.getMinHappyNativeTaxRate = function(bonus) // returns taxrate at which no negative change in happynesspoints occurs (positive approach)
-{
-    for (let i = 1; i < 50; i++)
-    {
+}; // returns taxrate at which no negative change in happynesspoints occurs (negative approach)
+Colony.prototype.getMinHappyNativeTaxRate = function(bonus) {
+    for (let i = 1; i < 50; i++) {
         let happinessChange = this.getNativeHappinessChange(i, bonus);
-        if (happinessChange < 1)
-        {
+        if (happinessChange < 1) {
             return i;
         }
     }
     return 0;
-};
-Colony.prototype.getMaxIncomeFromNatives = function()
-{
+}; // returns taxrate at which no negative change in happynesspoints occurs (positive approach)
+Colony.prototype.getMaxIncomeFromNatives = function() {
     let p = this.planet;
     if (p.nativeclans > 0) {
         let taxrate = 100;
@@ -8740,12 +8714,17 @@ Colony.prototype.getIncomeFromNatives = function(taxRate, potential) {
         if (race !== 12 && p.nativeracename === "Amorphous") income = 0;
         if (race === 12 && p.nativeracename === "Siliconoid") income = 0;
         if (potential) return income;
-        if (!potential && p.clans < income) return p.clans;
+        if (!potential) {
+            if (p.clans < income) {
+                return p.clans;
+            } else {
+                return income;
+            }
+        }
     }
     return 0;
 };
-Colony.prototype.nativesAreTecRace = function()
-{
+Colony.prototype.nativesAreTecRace = function() {
     let p = this.planet;
     return (p.nativeracename === "Ghipsoldal" ||
         p.nativeracename === "Amphibian" ||
@@ -9324,8 +9303,7 @@ Colony.prototype.setFortDeficiency = function()
 {
     let p = this.planet;
 };
-Colony.prototype.sellSupply = function(force, useBalance, amount)
-{
+Colony.prototype.sellSupply = function(force, useBalance, amount) {
     let p = this.planet;
     if (typeof useBalance === "undefined") useBalance = true;
     if (typeof amount === "undefined") amount = p.supplies;
@@ -9334,8 +9312,7 @@ Colony.prototype.sellSupply = function(force, useBalance, amount)
     if (useBalance && this.balance.supplies < p.supplies) available = this.balance.supplies;
     if (available <= 0) return false;
     if (amount > available) amount = available;
-    if (this.isSellingSupply || force)
-    {
+    if (this.isSellingSupply || force) {
         //console.log("Planet %s sells %s supplies", this.planet.id, amount);
         p.supplies -= amount;
         this.balance.supplies -= amount; // update balance
@@ -9435,10 +9412,27 @@ Colony.prototype.sellSupplies4APS = function(aps) {
     }
 };
 // HIZZZER
-Colony.prototype.isHizzzerSource = function (aps)
-{
-    //console.log("Is colony a hizzzer source? Revenue with %s taxation = %s", this.taxation, this.getRevenue(this.taxation));
+Colony.prototype.isHizzzerSource = function (aps) {
+    //console.log("Is colony %s a hizzzer source? Revenue with %s taxation and taxrate %s = %s", this.planet.id, this.taxation, this.getRevenue(this.taxation));
     return (this.getRevenue() > 100);
+};
+// TERRAFORMER
+Colony.prototype.getTerraformDeficiency = function (aps) {
+    let p = this.planet;
+    if (p.temp < 0) return 0; // exclude planets with unknown temperatures
+    let pTemp = parseInt(p.temp);
+    if (pTemp > 50 && aps.terraCooler && vgap.player.raceid !== 7) {
+        return (50 - pTemp);
+    } else if (pTemp < 50 && aps.terraHeater && vgap.player.raceid !== 7) {
+        return (pTemp - 50);
+    } else if (pTemp < 100 && vgap.player.raceid === 7 && aps.terraHeater) {
+        if (p.nativeclans > 0 && p.nativeracename !== "Siliconoid") {
+            return (pTemp - 80); // toDo: chosen arbitrarily
+        } else {
+            return (pTemp - 100);
+        }
+    }
+    return 0;
 };
 // EXPANDER
 Colony.prototype.getExpanderKit = function(aps)
@@ -9543,7 +9537,7 @@ Colony.prototype.getNextBuilderCargo = function (aps, nD) {
 Colony.prototype.getBuilderDemand = function (ooi, sid) {
     let demand = [];
     let b = this.balance;
-    //console.log("Current balance:", b);
+    console.log("Get builder demand of colony:", this.pid, b);
     if (ooi === "bab") {
         if (this.hasStarbase && this.isFort && this.isFortified) {
             // collect minerals from surrounding planets
@@ -9577,6 +9571,7 @@ Colony.prototype.getBuilderDemand = function (ooi, sid) {
             if (b.molybdenum < 0) demand.push({ item: "molybdenum", value: (b.molybdenum * -1)});
             if (b.megacredits < 0) demand.push({ item: "megacredits", value: (b.megacredits * -1)});
         }
+        console.log(new autopilot.demandIndex(demand));
     } else if (ooi === "shb") {
         if (b.duranium < 0) demand.push({ item: "duranium", value: (b.duranium * -1)});
         if (b.tritanium < 0) demand.push({ item: "tritanium", value: (b.tritanium * -1)});
