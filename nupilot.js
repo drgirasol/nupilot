@@ -6949,11 +6949,9 @@ function Colony(pid, build, draw)
     this.mineralDepletions = false;
     this.meanMineralDepletion = false;
     //
-    if (vgap.map.canvas && draw)
-    {
+    if (vgap.map.canvas && draw) {
         this.drawIndicators(); // INDICATORS
-    } else
-    {
+    } else {
         //this.isGuarded = this.getFleet();
         this.setNeighbours();
         this.safetyStatus = false;
@@ -7796,23 +7794,18 @@ Colony.prototype.getMaxFactories = function() {
     }
     return { max: mF, maxNow: Math.floor(maxFact) };
 };
-Colony.prototype.getMaxDefense = function()
-{
+Colony.prototype.getMaxDefense = function() {
     let p = this.planet;
     let maxDefe = 0;
-    if (this.maxColPop >= 50)
-    {
+    if (this.maxColPop >= 50) {
         maxDefe = 50 + Math.sqrt(this.maxColPop - 50);
-    } else
-    {
+    } else {
         maxDefe = this.maxColPop;
     }
     let mD = Math.floor(parseInt(maxDefe));
-    if (p.clans >= 50)
-    {
+    if (p.clans >= 50) {
         maxDefe = 50 + Math.sqrt(p.clans - 50);
-    } else
-    {
+    } else {
         maxDefe = p.clans;
     }
     return { max: mD, maxNow: Math.floor(maxDefe) };
@@ -9712,11 +9705,9 @@ Colony.prototype.drawStarbaseIndicators = function() {
         }
     }
 };
-Colony.prototype.drawFortIndicators = function()
-{
+Colony.prototype.drawFortIndicators = function() {
     let p = this.planet;
-    if (autopilot.settings.planetGFX)
-    {
+    if (autopilot.settings.planetGFX) {
         let markup = {
             attr: {
                 stroke: "#C0C0C0",
@@ -9734,8 +9725,7 @@ Colony.prototype.drawFortIndicators = function()
             let sbDefense = withSb.defense / 200;
             let sbBeamTech = withSb.beamtechlevel / 10;
             // show deficiency to reach max defense
-            if (sbDefense < 1 || sbFighters < 1 || sbBeamTech < 1)
-            {
+            if (sbDefense < 1 || sbFighters < 1 || sbBeamTech < 1) {
                 markup.attr.lineWidth = 3;
                 markup.attr.stroke = autopilot.idColors[autopilot.objectTypeEnum.FORT];
                 if (sbDefense < 1) autopilot.drawScaledQuarterCircle(p.x, p.y, 12, "nw", markup.attr, null, 0.5, 1 - sbDefense);
@@ -9745,12 +9735,16 @@ Colony.prototype.drawFortIndicators = function()
                 markup.attr.lineWidth = 1;
                 markup.attr.stroke = "#C0C0C0";
                 autopilot.drawScaledCircle(p.x, p.y, 12, markup.attr, null, 0.5);
-            } else
-            {
+            } else {
                 // if max defense has been reached, draw additional starbase fortifiying circle stronger
                 markup.attr.lineWidth = 3;
                 markup.attr.stroke = "#e83080";
                 autopilot.drawScaledCircle(p.x, p.y, 12, markup.attr, null, 0.5);
+                // check if planetary defense is max
+                let maxRation = this.structures.defense.now / this.structures.defense.max;
+                console.log("p%s: defense.max %s, defense.now %s, maxRation=%s", this.planet.id, this.structures.defense.max, this.structures.defense.now, maxRation);
+                markup.attr.stroke = "#e886b0";
+                if (maxRation < 1) autopilot.drawScaledQuarterCircle(p.x, p.y, 12, "nw", markup.attr, null, 0.5, 1 - maxRation);
             }
         }
     }
