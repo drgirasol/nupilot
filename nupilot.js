@@ -16,8 +16,8 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable ship auto-pilots
-// @version       0.14.42
-// @date          2019-05-24
+// @version       0.14.44
+// @date          2019-05-27
 // @author        drgirasol
 // @include       http://planets.nu/*
 // @include       https://planets.nu/*
@@ -1853,18 +1853,20 @@ AlchemyAPS.prototype.hasMissionConflict = function(aps, potPlanet)
 AlchemyAPS.prototype.confirmMission = function (aps)
 {
     //console.log("Setting ship " + aps.ship.id + " FC!");
-    if (aps.objectOfInterest === "all")
-    {
+    if (aps.objectOfInterest === "all") {
         aps.ship.friendlycode = "abc"; // toDo: random FC
-    } else if (aps.objectOfInterest === "dur")
-    {
+    } else if (aps.objectOfInterest === "dur") {
         aps.ship.friendlycode = "ald";
-    } else if (aps.objectOfInterest === "tri")
-    {
+    } else if (aps.objectOfInterest === "tri") {
         aps.ship.friendlycode = "alt";
-    } else if (aps.objectOfInterest === "mol")
-    {
+    } else if (aps.objectOfInterest === "mol") {
         aps.ship.friendlycode = "alm";
+    } else if (aps.objectOfInterest === "nad") {
+        aps.ship.friendlycode = "nad";
+    } else if (aps.objectOfInterest === "nat") {
+        aps.ship.friendlycode = "nat";
+    } else if (aps.objectOfInterest === "nam") {
+        aps.ship.friendlycode = "nam";
     }
 };
 AlchemyAPS.prototype.postActivationHook = function (aps)
@@ -11158,7 +11160,7 @@ Colony.prototype.drawMineralDetailIndicator = function()
                 desc: "Load supply and unload minerals",
                 shipFunction: "alc",
                 shipMission: false,
-                ooiOptions: [ "all", "dur", "tri", "mol" ],
+                ooiOptions: [ "all", "dur", "tri", "mol", "nad", "nat", "nam" ],
                 action: false,
                 hullId: 105
             },
@@ -11381,6 +11383,9 @@ Colony.prototype.drawMineralDetailIndicator = function()
             dur: "Duranium",
             tri: "Tritanium",
             mol: "Molybdenum",
+            nad: "All but Duranium",
+            nat: "All but Tritanium",
+            nam: "All but Molybdenum",
             neu: "Fuel"
         };
 		let h = "";
