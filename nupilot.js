@@ -16,8 +16,8 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable ship auto-pilots
-// @version       0.14.39
-// @date          2019-05-17
+// @version       0.14.44
+// @date          2019-05-27
 // @author        drgirasol
 // @include       http://planets.nu/*
 // @include       https://planets.nu/*
@@ -147,7 +147,7 @@ function wrapper () { // wrapper for injection
      */
     APS.prototype.initializeBoardComputer = function(configuration)
     {
-        console.error("APS.initializeBoardComputer:", this.ship.id);
+       // console.log("APS.initializeBoardComputer:", this.ship.id);
         this.setPlanet();
         this.setMissionAttributes(configuration);
         this.setShipAttributes(configuration);
@@ -158,24 +158,24 @@ function wrapper () { // wrapper for injection
         this.bootFunctionModule(configuration.shipFunction);
         this.setFunctionAttributes();
         //
-        console.log("...APS:", this);
+       // console.log("...APS:", this);
         //
         if (this.destination) {
             //
-            this.setDemand(); console.log("...set demand:", this.demand);
+            this.setDemand();// console.log("...set demand:", this.demand);
             //
             if (this.planet) {
-                console.log("...at planet with destination (" + this.destination.id + ") set.");
-                if (this.secondaryDestination) console.log("...and 2ndary destination = " + this.secondaryDestination.id);
-                if (this.lastDestination.id === this.planet.id) console.log("...planet is former destination...");
+               // console.log("...at planet with destination (" + this.destination.id + ") set.");
+                if (this.secondaryDestination)// console.log("...and 2ndary destination = " + this.secondaryDestination.id);
+                if (this.lastDestination.id === this.planet.id)// console.log("...planet is former destination...");
                 //
-                this.functionModule.handleCargo(this); console.log("...handle cargo.");
+                this.functionModule.handleCargo(this);// console.log("...handle cargo.");
                 //
                 // if we are at the destination, clear destination setting
                 if (this.planet.id === this.destination.id && !this.secondaryDestination) {
-                    console.log("...planet is destination, update configuration.");
+                   // console.log("...planet is destination, update configuration.");
                     if (this.functionModule.missionCompleted(this)) {
-                        console.log("...mission completed, update configuration.");
+                       // console.log("...mission completed, update configuration.");
                         configuration.lastDestination = this.destination.id;
                         configuration.destination = false;
                         configuration.secondaryDestination = false;
@@ -194,39 +194,39 @@ function wrapper () { // wrapper for injection
                         this.setShipIdleStatus(configuration);
                         this.setMissionAttributes(configuration);
                         this.hasToSetPotDes = true; // will determine potDest, select destination and set next target
-                        console.log("...scheduled for potential destination determination.");
+                       // console.log("...scheduled for potential destination determination.");
                     } else
                     {
-                        console.log("...mission incomplete! Due for mission update.");
+                       // console.log("...mission incomplete! Due for mission update.");
                         this.functionModule.setSecondaryDestination(this);
                         if (this.secondaryDestination || this.planet.id !== this.destination.id) {
-                            console.log("...setting next Target.");
+                           // console.log("...setting next Target.");
                             this.setShipTarget();
                         }
                     }
                 } else if (this.secondaryDestination && this.planet.id === this.secondaryDestination.id)
                 {
-                    console.log("...planet is 2ndary destination, update configuration.");
+                   // console.log("...planet is 2ndary destination, update configuration.");
                     configuration.lastDestination = this.secondaryDestination.id;
                     configuration.secondaryDestination = false;
                     if (configuration.shipFunction === "exp" && this.planet.id !== this.base.id) {
                         this.hasToSetPotDes = true; // expander will set new destination after re-supplying, if it didn't return to base
                     } else {
                         this.setMissionAttributes(configuration);
-                        console.log("...setting next Target.");
+                       // console.log("...setting next Target.");
                         this.setShipTarget();
                     }
                 } else if (!this.destination) {
                     // seems destination was reset, we need to find a new one
-                    console.warn("...destination was reset by handleCargo.");
+                   // console.log("...destination was reset by handleCargo.");
                     this.hasToSetPotDes = true;
                 } else {
-                    console.log("...planet is no destination.");
+                   // console.log("...planet is no destination.");
                     if (this.getMissionConflict(this.destination)) {
-                        console.warn("...Mission conflict! Scheduled for potential destination determination.");
+                       // console.log("...Mission conflict! Scheduled for potential destination determination.");
                         this.hasToSetPotDes = true;
                     } else {
-                        console.log("...setting next Target.");
+                       // console.log("...setting next Target.");
                         this.setShipTarget();
                     }
                 }
@@ -234,14 +234,14 @@ function wrapper () { // wrapper for injection
             } else {
                 if (this.getMissionConflict(this.destination)) {
                     if (this.ship.target && this.destination.id === this.ship.target.id) {
-                        console.warn("...Mission conflict! Scheduled for potential destination determination.");
+                       // console.log("...Mission conflict! Scheduled for potential destination determination.");
                         this.hasToSetPotDes = true;
                     } else {
-                        console.warn("...Mission conflict! Proceed to target planet and re-check mission conflict.");
+                       // console.log("...Mission conflict! Proceed to target planet and re-check mission conflict.");
                     }
                 } else
                 {
-                    console.log("...in space / warp-well with destination / secondary destination set.", this.destination, this.secondaryDestination);
+                   // console.log("...in space / warp-well with destination / secondary destination set.", this.destination, this.secondaryDestination);
                     if (!this.targetIsSet()) this.setShipTarget();
                     if (this.targetIsSet())
                     {
@@ -250,15 +250,15 @@ function wrapper () { // wrapper for injection
                         if (wpP) this.waypoint = wpP;
                     } else {
                         // no target is set...
-                        console.error("...setting next Target failed.");
+                       // console.log("...setting next Target failed.");
                         //this.setShipTarget();
                     }
                 }
             }
         } else
         {
-            console.log("...no destination set.");
-            console.log("...scheduled for potential destination determination.");
+           // console.log("...no destination set.");
+           // console.log("...scheduled for potential destination determination.");
             this.hasToSetPotDes = true;  // will determine potDest, select destination and set next target
         }
     };
@@ -266,32 +266,32 @@ function wrapper () { // wrapper for injection
     {
         if (func === "col")
         {
-            console.log("...Collector Mode (" + this.objectOfInterest + ")");
+           // console.log("...Collector Mode (" + this.objectOfInterest + ")");
             this.functionModule = new CollectorAPS(this);
-            console.log(this.functionModule);
+           // console.log(this.functionModule);
         } else if (func === "dis")
         {
-            console.log("...Distributer Mode (" + this.objectOfInterest + ")");
+           // console.log("...Distributer Mode (" + this.objectOfInterest + ")");
             this.functionModule = new DistributorAPS(this);
         } else if (func === "bld")
         {
-            console.log("...Builder Mode (" + this.objectOfInterest + ")");
+           // console.log("...Builder Mode (" + this.objectOfInterest + ")");
             this.functionModule = new BuilderAPS(this);
         } else if (func === "alc")
         {
-            console.log("...Alchemy Mode (" + this.objectOfInterest + ")");
+           // console.log("...Alchemy Mode (" + this.objectOfInterest + ")");
             this.functionModule = new AlchemyAPS(this);
         } else if (func === "exp")
         {
-            console.log("...Expander Mode (" + this.objectOfInterest + ")");
+           // console.log("...Expander Mode (" + this.objectOfInterest + ")");
             this.functionModule = new ExpanderAPS(this);
         } else if (func === "ter")
         {
-            console.log("...Terraformer Mode");
+           // console.log("...Terraformer Mode");
             this.functionModule = new TerraformerAPS(this);
         } else if (func === "hiz")
         {
-            console.log("...Hizzz Mode");
+           // console.log("...Hizzz Mode");
             this.functionModule = new HizzzAPS(this);
         } else
         {
@@ -310,7 +310,7 @@ function wrapper () { // wrapper for injection
             this.planet = new Proxy(p, {
                 set: function(target, prop, value, receiver) {
                     if (self.moveables.indexOf(prop) > -1) {
-                        console.log("APS.planet proxy: update balance");
+                       // console.log("APS.planet proxy: update balance");
                         let c = autopilot.getColony(target.id, true); // update balance
                     }
                     target[prop] = value;
@@ -369,24 +369,24 @@ function wrapper () { // wrapper for injection
     };
     APS.prototype.setMissionAttributes = function(cfg)
     {
-        console.log("APS.setMissionAttributes:");
+       // console.log("APS.setMissionAttributes:");
         this.primaryFunction = cfg.shipFunction;
         if (this.primaryFunction === "hiz" && this.planet && autopilot.hizzzerPlanets.indexOf(this.planet.id) === -1) autopilot.hizzzerPlanets.push(this.planet.id);
         this.objectOfInterest = cfg.ooiPriority;
-        console.log("...cfg.destination:", cfg.destination);
+       // console.log("...cfg.destination:", cfg.destination);
         if (cfg.destination && !this.destination) {
-            console.log("...setting destination", cfg.destination);
+           // console.log("...setting destination", cfg.destination);
             this.destination = vgap.getPlanet(cfg.destination);
             this.destinationColony = autopilot.getColony(cfg.destination, true);
-            this.setDemand(); console.log("...set demand:", this.demand);
+            this.setDemand();// console.log("...set demand:", this.demand);
         } else if (!cfg.destination) {
-            console.log("...setting destination", false);
+           // console.log("...setting destination", false);
             this.destination = false;
             this.destinationColony = false;
             this.demand = false;
         }
         if (this.destination && !this.isValidDestination(this.destination.id)) {
-            console.log("...invalidating destination", this.destination.id);
+           // console.log("...invalidating destination", this.destination.id);
             this.destination = false;
             this.destinationColony = false;
             this.demand = false;
@@ -491,7 +491,7 @@ function wrapper () { // wrapper for injection
                 }
             });
             if (conflictAPS.length > 0) {
-                console.log("APS.destinationHasSameAPStype: %s", pid, conflictAPS);
+               // console.log("APS.destinationHasSameAPStype: %s", pid, conflictAPS);
                 return conflictAPS;
             }
         }
@@ -550,7 +550,7 @@ function wrapper () { // wrapper for injection
     };
     APS.prototype.isInWarpWell = function(coords)
     {
-        console.log("APS.isInWarpWell:");
+       // console.log("APS.isInWarpWell:");
         if (typeof coords === "undefined") coords = { x: this.ship.x, y: this.ship.y };
         let planet = vgap.planetAt(coords.x, coords.y);
         if (planet) return false; // if we are at planet, we are not in warp well
@@ -559,13 +559,13 @@ function wrapper () { // wrapper for injection
         {
             return autopilot.positionIsInWarpWellOfPlanet(cP.planet, coords);
         } else {
-            console.error("...no closest planet found???");
+           // console.log("...no closest planet found???");
             return false;
         }
     };
     APS.prototype.shipTargetInWarpWell = function()
     {
-        console.log("APS.shipTargetInWarpWell:");
+       // console.log("APS.shipTargetInWarpWell:");
         let s = this.ship;
         let planet = vgap.planetAt(s.targetx, s.targety);
         if (planet) return false; // target is planet
@@ -573,7 +573,7 @@ function wrapper () { // wrapper for injection
         if (cP) {
             return autopilot.positionIsInWarpWellOfPlanet(cP.planet, s);
         } else {
-            console.error("...no closest planet found???");
+           // console.log("...no closest planet found???");
             return false;
         }
     };
@@ -715,7 +715,7 @@ function wrapper () { // wrapper for injection
         {
             this.setWaypoints(tP, nextMissionTarget); // tP = next ship position
             let nWP = this.getNextWaypoint(nextMissionTarget, tP);
-            console.log("APS.estimateNextFuelConsumption: next waypoint:", nWP);
+           // console.log("APS.estimateNextFuelConsumption: next waypoint:", nWP);
             if (nWP)
             {
                 let distance = Math.ceil(autopilot.getDistance(tP, nWP));
@@ -727,12 +727,12 @@ function wrapper () { // wrapper for injection
         return nextFuel;
     };
     APS.prototype.checkFuel = function(cargo) {
-        console.log("APS.checkFuel:");
+       // console.log("APS.checkFuel:");
         //if (typeof this.planet === "undefined") return true;
         if (typeof cargo === "undefined") cargo = [];
         this.setWarp(); // set warp factor according to current circumstances
         let fuel = Math.ceil(autopilot.getOptimalFuelConsumptionEstimate(this.ship.id, cargo));
-        console.log("...need %d fuel for journey!", fuel);
+       // console.log("...need %d fuel for journey!", fuel);
         if (!fuel) return false;
         //  toDo: export to own function or merge with estimateNextFuelConsumption
         let tP = vgap.planetAt(this.ship.targetx, this.ship.targety);
@@ -743,17 +743,17 @@ function wrapper () { // wrapper for injection
                 //console.log("...required fuel at next waypoint: " + nextFuel);
                 if (nextFuel > tP.neutronium) {
                     fuel += (nextFuel - tP.neutronium);
-                    console.log("...need additional %d fuel for journey!", nextFuel - tP.neutronium);
+                   // console.log("...need additional %d fuel for journey!", nextFuel - tP.neutronium);
                 }
             } else { // unowned planet (currently this means expander)
                 fuel += fuel; // provide basic fuel backup for (empty) return trip from unowned planet..
-                console.log("...need additional %d fuel for journey (unowned planet)!", fuel);
+               // console.log("...need additional %d fuel for journey (unowned planet)!", fuel);
             }
         }
         //
         //
         let diff = fuel - this.ship.neutronium;
-        console.log("...including onboard fuel, we need %d additional fuel.", diff);
+       // console.log("...including onboard fuel, we need %d additional fuel.", diff);
         if (diff <= 0) return true; // if there is enough, we don't need to load fuel
         // else, try to load
         let loadedFuel = 0;
@@ -780,7 +780,7 @@ function wrapper () { // wrapper for injection
     };
     APS.prototype.setWarp = function(warp)
     {
-        console.log("APS.setWarp:");
+       // console.log("APS.setWarp:");
         this.ship.warp = 0;
         if (typeof warp === "undefined") {
             this.ship.warp = this.ship.engineid;
@@ -791,21 +791,21 @@ function wrapper () { // wrapper for injection
             // if target is reachable within one turn set warp to mininum speed required
             if (this.ship.warp > 0 && (!this.planet && this.ship.target) || (this.planet && this.ship.target && this.ship.target.id !== this.planet.id)) {
                 let distance = autopilot.getDistance(this.ship, this.ship.target);
-                console.log("...trying to adjust warp speed for distance", distance);
+               // console.log("...trying to adjust warp speed for distance", distance);
                 let eta = Math.ceil(autopilot.getDistance(this.ship, this.ship.target) / Math.pow(this.ship.warp, 2));
-                console.log("...eta with current warp:", eta, this.ship.warp);
+               // console.log("...eta with current warp:", eta, this.ship.warp);
                 if (eta === 1 && this.ship.warp > 1) {
                     while (eta === 1 && this.ship.warp > 1) {
                         this.ship.warp -= 1;
                         eta = Math.ceil(autopilot.getDistance(this.ship, this.ship.target) / Math.pow(this.ship.warp, 2));
-                        console.log("...eta with adjusted warp:", eta, this.ship.warp);
+                       // console.log("...eta with adjusted warp:", eta, this.ship.warp);
                     }
                     if (eta > 1) {
                         this.ship.warp += 1;
                     }
                 }
             } else {
-                console.log("...ship.target:", this.ship.target);
+               // console.log("...ship.target:", this.ship.target);
             }
             // reduce speed to warp 4, if we are currently inside a minefield
             if (autopilot.objectInsideEnemyMineField( {x: this.ship.x, y: this.ship.y} ).length > 0 && this.ship.engineid > 4) this.ship.warp = 4;
@@ -825,11 +825,11 @@ function wrapper () { // wrapper for injection
     {
         if (this.inWarpWell)
         {
-            console.log("APS.escapeToWarpWell: We are in warp well...");
+           // console.log("APS.escapeToWarpWell: We are in warp well...");
             this.isIdle = true;
             // toDo: do we have to move? are there enemy ships close by?
         } else {
-            console.log("APS.escapeToWarpWell: Moving into warp well...");
+           // console.log("APS.escapeToWarpWell: Moving into warp well...");
             this.isIdle = false;
             let coords = this.getRandomWarpWellEntryPosition();
             this.ship.targetx = coords.x;
@@ -880,7 +880,7 @@ function wrapper () { // wrapper for injection
      *      and initializeBoardComputer (setup APS, update configuration, setShipTarget OR set flag to determine potential destination first)
      */
     APS.prototype.setShipTarget = function() {
-        console.log("APS.setShipTarget:");
+       // console.log("APS.setShipTarget:");
         let dP = this.destination;
         if (this.secondaryDestination) dP = this.secondaryDestination;
         if (this.planet && dP.id === this.planet.id) {
@@ -892,17 +892,17 @@ function wrapper () { // wrapper for injection
                 return true;
             }
         } // toDo: What to do?
-        console.log("...searching waypoints to " + dP.name + " (" + dP.id + ").");
+       // console.log("...searching waypoints to " + dP.name + " (" + dP.id + ").");
         this.setWaypoints(this.ship, dP);
         let potWpIds = this.potentialWaypoints.map(function (pWp) {
             return pWp.id;
         });
-        console.log("...potWpIds:", potWpIds, this.ship.target);
+       // console.log("...potWpIds:", potWpIds, this.ship.target);
         if (this.ship.target && potWpIds.indexOf(this.ship.target.id) > -1) return true; // is target is already set and a potential Waypoint, do not set another
 
         let target = this.getNextWaypoint(dP);
         if (target) {
-            console.log("...fly to " + target.id);
+           // console.log("...fly to " + target.id);
             this.ship.targetx = target.x;
             this.ship.targety = target.y;
             let wpP = vgap.planetAt(this.ship.targetx, this.ship.targety);
@@ -917,7 +917,7 @@ function wrapper () { // wrapper for injection
      */
     APS.prototype.setWaypoints = function(ship, dP)
     {
-        console.log("APS.setWaypoints:");
+       // console.log("APS.setWaypoints:");
         // toDo: warpwell minimum distance used, how to implement heading consideration (warpwell max dist = 3)
         this.functionModule.setPotentialWaypoints(this); // set the initial pool of potential waypoints specific for the current function (e.g. frnnOwnPlanets)
         let ship2dest = this.getDistance(dP, false);
@@ -930,7 +930,7 @@ function wrapper () { // wrapper for injection
             let c = autopilot.getColony(p.id);
             return c.determineSafety();
         });
-        console.log("...safe waypoints:", safeWaypoints);
+       // console.log("...safe waypoints:", safeWaypoints);
         let eta2dest = Math.ceil(ship2dest / Math.pow(this.ship.engineid, 2));
         let fWPs = [];
         let self = this;
@@ -948,11 +948,11 @@ function wrapper () { // wrapper for injection
             }
         });
         this.potentialWaypoints = fWPs;
-        console.log("...this.potentialWaypoints:", this.potentialWaypoints);
+       // console.log("...this.potentialWaypoints:", this.potentialWaypoints);
     };
     APS.prototype.getNextWaypoint = function(dP, cP, notDP)
     {
-        console.log("APS.getNextWaypoint:");
+       // console.log("APS.getNextWaypoint:");
         if (typeof notDP === "undefined") notDP = false;
         if ((typeof cP === "undefined" || cP === null) && this.planet) cP = this.planet;
         if ((typeof cP === "undefined" || cP === null) && !this.planet) cP = this.ship;
@@ -960,7 +960,7 @@ function wrapper () { // wrapper for injection
         let closeToEnemy = (this.enemyShips || this.enemyPlanets); // use "safe" planet hopping if we are close to enemy territory
         let relativelySafe = false;
         let urgendWaypoint = this.getUrgentWaypoint(dP, cP);
-        console.log("...urgendWaypoint:", urgendWaypoint);
+       // console.log("...urgendWaypoint:", urgendWaypoint);
         let pathWithinOwnMinefield = false;
         let pathWithinEnemyMinefield = false;
         let pathCloseToEnemy = false;
@@ -1021,7 +1021,7 @@ function wrapper () { // wrapper for injection
     };
     APS.prototype.getUrgentWaypoint = function(dP, origin)
     {
-        console.log("APS.getUrgentWaypoint: s%s -> p%s", origin.id, dP.id);
+       // console.log("APS.getUrgentWaypoint: s%s -> p%s", origin.id, dP.id);
         if (typeof origin === "undefined" || origin === null) origin = this.ship;
         let urgentWaypoints = this.getWaypointsByUrgency(dP, origin);
         if (urgentWaypoints.length < 1) return false;
@@ -1053,17 +1053,17 @@ function wrapper () { // wrapper for injection
                     {
                         if (inWarpWell)
                         {
-                            console.log("...orbiting waypoint:", pW.id);
+                           // console.log("...orbiting waypoint:", pW.id);
                         } else {
-                            console.log("...safe waypoint:", pW.id);
+                           // console.log("...safe waypoint:", pW.id);
                         }
                         uWP = pW; break;
                     } else
                     {
-                        console.log("...ship path not safe");
+                       // console.log("...ship path not safe");
                     }
                 } else {
-                    console.log("...planet not safe");
+                   // console.log("...planet not safe");
                 }
             }
         }
@@ -1072,7 +1072,7 @@ function wrapper () { // wrapper for injection
     };
     APS.prototype.getWaypointsByEta = function(dP, origin, not)
     {
-        console.log("APS.getWaypointsByEta:");
+       // console.log("APS.getWaypointsByEta:");
         if (typeof origin === "undefined") origin = this.ship;
         if (typeof not === "undefined") not = []; // planet ids to exclude
         if (this.potentialWaypoints.length === 0) this.setWaypoints(origin, dP); // ensure potential waypoints have been set
@@ -1084,7 +1084,7 @@ function wrapper () { // wrapper for injection
         ETAs.sort(function (a, b) {
             return a - b;
         });
-        console.log("...ETAs:", ETAs);
+       // console.log("...ETAs:", ETAs);
         let wpByEta = {};
         ETAs.forEach(function (eta) {
             wpByEta[eta] = waypoints.filter(function (p) {
@@ -1094,12 +1094,12 @@ function wrapper () { // wrapper for injection
                 return a.wayp2dPDist - b.wayp2dPDist;
             });
         });
-        console.log("...wpByEta:", wpByEta);
+       // console.log("...wpByEta:", wpByEta);
         return wpByEta;
     };
     APS.prototype.getEtaWaypoint = function(dP, origin, notDP)
     {
-        console.log("APS.getEtaWaypoint:");
+       // console.log("APS.getEtaWaypoint:");
         if (dP)
         if (typeof notDP === "undefined") notDP = false;
         if (typeof origin === "undefined" || origin === null) origin = this.ship;
@@ -1110,10 +1110,10 @@ function wrapper () { // wrapper for injection
         let minETA = ETAs[0];
         let self = this;
         ETAs.forEach(function (eta) {
-            console.log("...potential waypoints with ETA %s:", eta, waypoints[eta]);
+           // console.log("...potential waypoints with ETA %s:", eta, waypoints[eta]);
             if (eta === minETA) {
                 if (!notDP && self.destinationAmongWaypoints(dP, waypoints[eta]) && self.shipPathIsSave(dP)) {
-                    console.log("...potential waypoints contain destination!");
+                   // console.log("...potential waypoints contain destination!");
                     target = dP;
                 }
             }
@@ -1125,7 +1125,7 @@ function wrapper () { // wrapper for injection
                             // dP is not allowed to be a waypoint
                         } else if (autopilot.positionIsInWarpWellOfPlanet(wp, self.ship))
                         {
-                            console.log("...return in orbit of " + wp.id);
+                           // console.log("...return in orbit of " + wp.id);
                             target = wp;
                         } else if (self.shipPathIsSave(wp))
                         {
@@ -1135,12 +1135,12 @@ function wrapper () { // wrapper for injection
                 });
             }
         });
-        console.log("...ETA target:", target);
+       // console.log("...ETA target:", target);
         return target;
     };
     APS.prototype.thereIsACloserWaypoint = function(cWp)
     {
-        console.log("APS.thereIsACloserWaypoint:");
+       // console.log("APS.thereIsACloserWaypoint:");
         // toDo: this is ineffective... what if the current target is not dP but there is a closer
         this.setWaypoints(this.ship, cWp);
         let nWP = this.getNextWaypoint(cWp, null, true);
@@ -1155,7 +1155,7 @@ function wrapper () { // wrapper for injection
         return false;
     };
     APS.prototype.thereIsACloserPlanetWithEnoughFuel = function(cWp) { // toDo: !!!
-        console.log("APS.thereIsACloserPlanetWithEnoughFuel:", cWp);
+       // console.log("APS.thereIsACloserPlanetWithEnoughFuel:", cWp);
         this.setWaypoints(this.ship, cWp);
         if (this.potentialWaypoints.length > 0) {
             this.potentialWaypoints.sort(function (a, b) {
@@ -1165,7 +1165,7 @@ function wrapper () { // wrapper for injection
             while (this.potentialWaypoints.length > 0 && curPweF.neutronium < 50) {
                 curPweF = this.potentialWaypoints.shift();
             }
-            console.log("...close waypoint with enough fuel:", curPweF);
+           // console.log("...close waypoint with enough fuel:", curPweF);
             if (curPweF.neutronium >= 50) {
                 this.ship.targetx = curPweF.x;
                 this.ship.targety = curPweF.y;
@@ -1317,20 +1317,20 @@ function wrapper () { // wrapper for injection
         let avoidDest = this.potDest.filter(function (c) {
             return !c.determineSafety();
         });
-        console.log("APS.evaluateMissionDestinations: Valid destinations = %s, avoided = %s", filteredDest.length, avoidDest.length);
+       // console.log("APS.evaluateMissionDestinations: Valid destinations = %s, avoided = %s", filteredDest.length, avoidDest.length);
         if (avoidDest.length > 0) {
             if (filteredDest.length > 0) {
-                console.log("...appending avoided-destinations");
+               // console.log("...appending avoided-destinations");
                 filteredDest.concat(avoidDest);
             } else {
-                console.log("...using avoided-destinations only");
+               // console.log("...using avoided-destinations only");
                 filteredDest = avoidDest;
             }
         }
         this.potDest = filteredDest;
     };
     APS.prototype.setMissionDestination = function() {
-        console.log("APS.setMissionDestination:");
+       // console.log("APS.setMissionDestination:");
         if (this.destination) this.lastDestination = this.destination;
         this.destination = false;
         this.destinationColony = false;
@@ -1340,7 +1340,7 @@ function wrapper () { // wrapper for injection
             this.evaluateMissionDestinations();
             if (this.potDest.length > 0) {
                 this.setDestination(this.potDest[0]);
-                console.log("...mission destination: ", this.destination.id);
+               // console.log("...mission destination: ", this.destination.id);
                 if (!this.colony.isOwnPlanet && this.primaryFunction === "exp") this.functionModule.handleCargo(this);
                 // if no secondary destination is set, check if one is necessary
                 if (!this.secondaryDestination) this.functionModule.setSecondaryDestination(this);
@@ -1354,10 +1354,10 @@ function wrapper () { // wrapper for injection
         }
         if (this.destination === false) {
             if (this.planet && this.planet.id !== this.base.id) {
-                console.warn("...ship returning to base! => no destination acquired");
+               // console.log("...ship returning to base! => no destination acquired");
                 this.setDestination(this.baseColony);
             } else { // idle
-                console.warn("...ship idle! => no destination acquired");
+               // console.log("...ship idle! => no destination acquired");
                 this.ship.targetx = this.ship.x;
                 this.ship.targety = this.ship.y;
                 this.setShipIdleStatus( { isIdle: true, idleReason: "dest", idleTurns: 0 } );
@@ -1374,35 +1374,35 @@ function wrapper () { // wrapper for injection
      */
     APS.prototype.considerFuelStatus = function() {
         if (this.checkFuel()) {
-            console.log("...checkFuel ok.");
+           // console.log("...checkFuel ok.");
             this.setShipIdleStatus( { isIdle: false, idleReason: false, idleTurns: false } );
         } else {
             this.setShipIdleStatus( { isIdle: true, idleReason: "fuel", idleTurns: 0 } );
-            console.warn("...checkfuel failed.");
+           // console.log("...checkfuel failed.");
             if (this.waypoint && this.thereIsACloserWaypoint(this.waypoint)) {
                 // true = we can reach another possible waypoint with the available fuel
-                console.info("...but we can reach another waypoint.");
+              // console.log("...but we can reach another waypoint.");
                 this.setShipIdleStatus( { isIdle: false, idleReason: false, idleTurns: 0 } );
             } else if (this.thereIsACloserPlanetWithEnoughFuel(this.waypoint)) {
                 // true = a planet closer to the current position and farther away from the destination / actual waypoint with enough fuel
                 // to support the travel to the actual waypoint can be approached
-                console.info("...but we can reach another planet with enough fuel.");
+              // console.log("...but we can reach another planet with enough fuel.");
                 this.setShipIdleStatus( { isIdle: false, idleReason: false, idleTurns: 0 } );
             } else if (this.planet && this.getCargoCapacity() !== this.hull.cargo && this.reduceCargoToProceed() && this.primaryFunction !== "exp") {
                 // true = reduction of cargo helped to continue
                 // this can be limited to a certain degree (maximum reduction, wait at least one turn or not)
-                console.info("...but we can reach target with reduced cargo.");
+              // console.log("...but we can reach target with reduced cargo.");
                 this.setShipIdleStatus( { isIdle: false, idleReason: false, idleTurns: 0 } );
             } else {
-                console.warn("...are we in warpwell? " + this.inWarpWell);
+               // console.log("...are we in warpwell? " + this.inWarpWell);
                 if (this.inWarpWell) {
                     // try returning to planet
                     let cP = autopilot.getClosestPlanet({ x: this.ship.x, y: this.ship.y }, 1, true);
-                    console.warn("...in warpwell around " + cP.planet.id);
+                   // console.log("...in warpwell around " + cP.planet.id);
                     if (cP) {
                         this.ship.targetx = cP.planet.x;
                         this.ship.targety = cP.planet.y;
-                        console.warn("...approaching standard orbit.");
+                       // console.log("...approaching standard orbit.");
                         this.setWarp();
                         this.setShipIdleStatus( { isIdle: false, idleReason: false, idleTurns: 0 } );
                     }
@@ -1415,28 +1415,28 @@ function wrapper () { // wrapper for injection
                     }
                 } else {
                     // in space
-                    console.warn("...idle in space!");
+                   // console.log("...idle in space!");
                 }
             }
         }
     };
     APS.prototype.confirmMission = function() {
-        console.log("APS.confirmMission:");
+       //// console.log("APS.confirmMission:");
         if (this.destination) {
             if (this.planet && this.isOwnPlanet) {
-                console.log("...handle cargo");
+               //// console.log("...handle cargo");
                 this.functionModule.handleCargo(this);
             }
             this.functionModule.confirmMission(this);
             // Do we have a target?
             if (this.targetIsSet()) {
-                console.log("...target acquired.");
+               // console.log("...target acquired.");
                 this.considerFuelStatus();
             } else {
                 // target not set!
                 if (this.planet) {
                     if (this.destination.id !== this.planet.id) {
-                        console.warn("...no target acquired (idle).");
+                       // console.log("...no target acquired (idle).");
                         this.setShipIdleStatus( { isIdle: true, idleReason: "target", idleTurns: 0 } );
                         let cC = autopilot.getColony(this.planet.id);
                         if (!cC.determineSafety()) {
@@ -1486,14 +1486,14 @@ function wrapper () { // wrapper for injection
         this.demand = dC.getAPSDemand(this);
     };
     APS.prototype.getNextMissionTarget = function(ctP) {
-        console.log("APS.getNextMissionTarget:");
+       // console.log("APS.getNextMissionTarget:");
         let ctC = autopilot.getColony(ctP.id, true);
         if (this.secondaryDestination && this.secondaryDestination.id === ctP.id)
         {
             this.setDemand();
             if (ctC.getAPSCargo(this) >= this.getCurCapacity() || ctC.satisfiesAPSDemand(this, this.demand))
             {
-                console.log("...next target is destination", this.destination);
+               // console.log("...next target is destination", this.destination);
                 return this.destination;
             } else
             {
@@ -1501,11 +1501,11 @@ function wrapper () { // wrapper for injection
                 let nextSecondaryDestination = this.functionModule.getNextSecondaryDestination(this, ctP);
                 if (nextSecondaryDestination)
                 {
-                    console.log("...next target is new secondary destination", nextSecondaryDestination);
+                   // console.log("...next target is new secondary destination", nextSecondaryDestination);
                     return nextSecondaryDestination;
                 } else
                 {
-                    console.log("...next target is destination", this.destination);
+                   // console.log("...next target is destination", this.destination);
                     return this.destination;
                 }
             }
@@ -1515,7 +1515,7 @@ function wrapper () { // wrapper for injection
             let nextSecondaryDestination = this.functionModule.getNextSecondaryDestination(this, ctP);
             if (nextSecondaryDestination)
             {
-                console.log("...next target is new secondary destination", nextSecondaryDestination);
+               // console.log("...next target is new secondary destination", nextSecondaryDestination);
                 return nextSecondaryDestination;
             } else
             {
@@ -1531,7 +1531,7 @@ function wrapper () { // wrapper for injection
      *  LOADING, UNLOADING, TRANSFER of object from ship to e.g. planet
      */
     APS.prototype.reduceCargoToProceed = function() {
-        console.log("...checking if reducing cargo will help.");
+       // console.log("...checking if reducing cargo will help.");
         if (this.isOwnPlanet)
         {
             // check how long we have been idle
@@ -1554,7 +1554,7 @@ function wrapper () { // wrapper for injection
                 }
                 fraction -= 0.1;
             }
-            console.log("...to continue, we would need to reduce our cargo to " + (fraction*100) + "%");
+           // console.log("...to continue, we would need to reduce our cargo to " + (fraction*100) + "%");
             if (fraction > 0.7)
             {
                 // unload
@@ -1589,27 +1589,27 @@ function wrapper () { // wrapper for injection
         this.unloadFuel();
     };
     APS.prototype.unloadFuel = function() {
-        console.log("APS.unloadFuel:");
+       // console.log("APS.unloadFuel:");
         let unloaded = 0;
         if (this.planet && this.isOwnPlanet) {
             let amount = parseInt(this.ship.neutronium);
             if (amount > 1 && this.shipFunction !== "alc") amount -= 1; // leave 1 neutronium on board
             unloaded = this.unloadObject("neutronium", this.planet, amount);
-            console.log("...unloaded:", unloaded);
+           // console.log("...unloaded:", unloaded);
         }
     };
     APS.prototype.unloadMegacredits = function() {
-        console.log("APS.unloadMegacredits:");
+       // console.log("APS.unloadMegacredits:");
         let unloaded = 0;
         if (this.planet && this.isOwnPlanet) {
             unloaded += this.unloadObject("megacredits", this.planet, parseInt(this.ship.megacredits));
-            console.log("...unloaded:", unloaded);
+           // console.log("...unloaded:", unloaded);
             let c = autopilot.getColony(this.planet.id, true);
             c.update(true);
         }
     };
     APS.prototype.unloadCargo = function(cargo) {
-        console.log("APS.unloadCargo:");
+       // console.log("APS.unloadCargo:");
         if (typeof cargo === "undefined") cargo = this.cargo;
         let unloaded = 0;
         let self = this;
@@ -1617,7 +1617,7 @@ function wrapper () { // wrapper for injection
             cargo.forEach(function (obj) {
                 if (obj !== "neutronium") unloaded += self.unloadObject(obj, self.planet, parseInt(self.ship[obj]));
             });
-            console.log("...unloaded:", unloaded);
+           // console.log("...unloaded:", unloaded);
             let c = autopilot.getColony(this.planet.id, true);
             c.update(true);
         }
@@ -1625,7 +1625,7 @@ function wrapper () { // wrapper for injection
     APS.prototype.unloadObject = function(object, to, amount) {
         if (typeof amount === "undefined") amount = this.ship[object];
         if (amount > 0) {
-            console.log("APS.unloadObject:", object, amount);
+           // console.log("APS.unloadObject:", object, amount);
             // ...amount is more than what is available, then only unload the latter amount
             if (amount > this.ship[object]) amount = this.ship[object];
             // now unload, planets have unlimited cpacity... no need to check
@@ -1640,7 +1640,7 @@ function wrapper () { // wrapper for injection
 
     };
     APS.prototype.transferObject = function(object, to, amount) {
-        console.log("APS.transferObject:");
+       // console.log("APS.transferObject:");
         let actAmount = 0;
         if (typeof amount === "undefined") {
             // if amount is not defined, unload all
@@ -1652,7 +1652,7 @@ function wrapper () { // wrapper for injection
             if (amount > this.ship[object]) actAmount = this.ship[object];
         }
         // now set to transfer, planets have unlimited cpacity... no need to check
-        console.log("...TRANSFERRING" + actAmount + " of " + object + " to planet.");
+       // console.log("...TRANSFERRING" + actAmount + " of " + object + " to planet.");
         this.ship[object] -= actAmount;
         this.ship["transfer" + object] += actAmount;
         this.ship.transfertargetid = to.id;
@@ -1670,7 +1670,7 @@ function wrapper () { // wrapper for injection
      *      *requestAmount is safe, as long as Colony data is accurate
      */
     APS.prototype.loadObject = function(object, from, requestAmount) {
-        console.log("APS.loadObject:");
+       // console.log("APS.loadObject:");
         if (typeof from === "undefined") from = this.planet;
         //let c = autopilot.getColony(from.id, true);
         let c = autopilot.getColony(from.id);
@@ -1748,14 +1748,14 @@ function wrapper () { // wrapper for injection
                 }
                 c.updateBalance();
             }
-            console.log("...loaded " + actAmount + " " + object + " from planet " + from.id);
+           // console.log("...loaded " + actAmount + " " + object + " from planet " + from.id);
             return actAmount;
         }
         return false;
     };
     // local storage
     APS.prototype.updateStoredData = function() {
-        console.log("APS.updateStoredData:");
+       // console.log("APS.updateStoredData:");
         let destination = false;
         if (this.destination) destination = this.destination.id;
         let sDestination = false;
@@ -1778,9 +1778,9 @@ function wrapper () { // wrapper for injection
             idleTurns: this.idleTurns
         };
         if (!storedData.destination && !storedData.idle) {
-            console.error("...APS without destination and idle = false!");
+           // console.log("...APS without destination and idle = false!");
         } else {
-            console.log("...data:", storedData);
+           // console.log("...data:", storedData);
             autopilot.apsShips.update(this.ship.id, storedData);
             autopilot.apsShips.save();
         }
@@ -1807,7 +1807,7 @@ AlchemyAPS.prototype.handleCargo = function (aps) {
     if (aps.planet) {
         aps.unloadAll();
         let loaded = this.loadCargo(aps);
-        console.log("Cargo load summary: " + loaded);
+        //console.log("Cargo load summary: " + loaded);
     }
 };
 AlchemyAPS.prototype.setDemand = function (aps)
@@ -1825,7 +1825,7 @@ AlchemyAPS.prototype.setPotentialWaypoints = function(aps)
 AlchemyAPS.prototype.setPotentialDestinations = function(aps)
 {
     if (aps.destination) return;
-    console.log("Determine potential destinations...");
+    //console.log("Determine potential destinations...");
     // by planet.id sorted sinks (deficiencies)
     if (this.sinks.length === 0) this.setSinks(aps);
     // by planet.id sorted sources (two piles -high/low value- by distance)
@@ -1834,12 +1834,12 @@ AlchemyAPS.prototype.setPotentialDestinations = function(aps)
     aps.potDest = this.sinks;
 
     if (aps.potDest.length === 0) {
-        console.log("...no destinations available!");
+        //console.log("...no destinations available!");
         aps.isIdle = true;
         if (aps.idleReason.indexOf("Dest") === -1) aps.idleReason.push("Dest");
     } else {
         aps.isIdle = false;
-        console.log(aps.potDest);
+        //console.log(aps.potDest);
     }
 };
 AlchemyAPS.prototype.validateMissionDestinations = function(aps)
@@ -1852,19 +1852,21 @@ AlchemyAPS.prototype.hasMissionConflict = function(aps, potPlanet)
 };
 AlchemyAPS.prototype.confirmMission = function (aps)
 {
-    console.log("Setting ship " + aps.ship.id + " FC!");
-    if (aps.objectOfInterest === "all")
-    {
+    //console.log("Setting ship " + aps.ship.id + " FC!");
+    if (aps.objectOfInterest === "all") {
         aps.ship.friendlycode = "abc"; // toDo: random FC
-    } else if (aps.objectOfInterest === "dur")
-    {
+    } else if (aps.objectOfInterest === "dur") {
         aps.ship.friendlycode = "ald";
-    } else if (aps.objectOfInterest === "tri")
-    {
+    } else if (aps.objectOfInterest === "tri") {
         aps.ship.friendlycode = "alt";
-    } else if (aps.objectOfInterest === "mol")
-    {
+    } else if (aps.objectOfInterest === "mol") {
         aps.ship.friendlycode = "alm";
+    } else if (aps.objectOfInterest === "nad") {
+        aps.ship.friendlycode = "nad";
+    } else if (aps.objectOfInterest === "nat") {
+        aps.ship.friendlycode = "nat";
+    } else if (aps.objectOfInterest === "nam") {
+        aps.ship.friendlycode = "nam";
     }
 };
 AlchemyAPS.prototype.postActivationHook = function (aps)
@@ -1964,21 +1966,21 @@ BuilderAPS.prototype.initialLoading = function(aps) {
         if (aps.demand.getApsDemand(aps).length > 0) {
             this.loadCargo(aps); // load cargo
         } else {
-            console.error("No demand at destination!");
+           // console.log("No demand at destination!");
             return -1;
         }
     }
     return aps.demand.getApsDemand(aps);
 };
 BuilderAPS.prototype.handleCargo = function (aps) { // called once on initialization and a second time with aps.confirmMission
-    console.log("BuilderAPS.handleCargo:");
+  // console.log("BuilderAPS.handleCargo:");
     if (aps.planet && aps.isOwnPlanet) {
         if (aps.destination.id === aps.planet.id) { // unload cargo when at destination
             aps.unloadAll();
         } else if (aps.secondaryDestination && aps.secondaryDestination.id === aps.planet.id) { // load cargo if we are at secondary destination
             aps.colony.updateBalance();
             if (this.initialLoading(aps) === -1) {
-                console.warn("...at secondary destination, with no demand left!");
+               // console.log("...at secondary destination, with no demand left!");
                 aps.lastDestination = aps.secondaryDestination;
                 aps.secondaryDestination = false;
                 aps.destination = false;
@@ -2007,12 +2009,12 @@ BuilderAPS.prototype.handleCargo = function (aps) { // called once on initializa
 BuilderAPS.prototype.loadCargo = function(aps) {
     let loaded = 0;
     if (aps.planet && aps.planet.id !== aps.destination.id) { // toDo: no loading if at destination planet since ship builders demand is not yet integrated into colony balance!!!
-        console.log("BuilderAPS.loadCargo:");
-        console.log("...current demands:", aps.demand);
+      // console.log("BuilderAPS.loadCargo:");
+      // console.log("...current demands:", aps.demand);
         let capacityDemand = aps.demand.getApsDemand(aps);
         if (capacityDemand.length > 0) {
             // check if megecredits are demanded
-            console.log("...capacity demand:", capacityDemand);
+          // console.log("...capacity demand:", capacityDemand);
             aps.colony.updateBalance();
             if (aps.demand.findByResourceName("megacredits") > 0) aps.colony.sellSupplies4APS(aps);
             capacityDemand.forEach(
@@ -2020,7 +2022,7 @@ BuilderAPS.prototype.loadCargo = function(aps) {
                     loaded += aps.loadObject(demand.item, aps.planet, demand.value);
                 }
             );
-            console.log("APS %s with minCapacity of %s has current capacity %s", aps.ship.id, aps.minCapacity, aps.getCurCapacity());
+          // console.log("APS %s with minCapacity of %s has current capacity %s", aps.ship.id, aps.minCapacity, aps.getCurCapacity());
             //
             if (aps.objectOfInterest === "stb" && aps.getCurCapacity() > aps.minCapacity && (aps.demand.findByResourceName("supplies") > 0 || aps.demand.findByResourceName("clans") > 0)) { // try to load to minCapacity
                 let furtherLoad = true;
@@ -2050,7 +2052,7 @@ BuilderAPS.prototype.setPotentialDestinations = function(aps) {
     if (aps.potDest.length === 0) {
         aps.potDest = this.getConstructionSites(aps);
         if (aps.potDest < 1) {
-            console.warn("No construction sites available!");
+           // console.log("No construction sites available!");
             aps.setShipIdleStatus( { isIdle: true, idleReason: "Dest", idleTurns: 0 } );
         } else {
             aps.setShipIdleStatus( { isIdle: false, idleReason: false, idleTurns: 0 } );
@@ -2063,10 +2065,10 @@ BuilderAPS.prototype.validateMissionDestinations = function(aps) {
 BuilderAPS.prototype.getNextPrimaryDestination = function(aps, ctP) {
     let cSites = this.getConstructionSites(aps, ctP);
     if (cSites.length > 0) {
-        console.log("...next target is new destination", cSites[0].planet);
+      // console.log("...next target is new destination", cSites[0].planet);
         return cSites[0].planet;
     } else {
-        console.log("...next target is BASE", aps.base);
+      // console.log("...next target is BASE", aps.base);
         return aps.base;
     }
 }; // called by APS
@@ -2077,7 +2079,7 @@ BuilderAPS.prototype.hasMissionConflict = function(aps, potPlanet, secondary) {
 BuilderAPS.prototype.confirmMission = function (aps) {
     if (aps.planet && aps.destination.id === aps.planet.id && !aps.secondaryDestination) {
         if (aps.objectOfInterest !== "fib") {
-            console.warn("BuilderAPS.confirmMission: WE ARE AT DESTINATION PLANET WITHOUT SECONDARY DESTINATION SET...!");
+           // console.log("BuilderAPS.confirmMission: WE ARE AT DESTINATION PLANET WITHOUT SECONDARY DESTINATION SET...!");
             // it appears that the destination has no demand left... search for another destination...
         }
     }
@@ -2097,13 +2099,13 @@ BuilderAPS.prototype.missionCompleted = function(aps) {
     return (demandCargo < aps.minCapacity);
 }; // called by APS
 BuilderAPS.prototype.getConstructionSites = function(aps, exclude) {
-    console.log("BuilderAPS.getConstructionSites:");
+  // console.log("BuilderAPS.getConstructionSites:");
     if (typeof exclude === "undefined") exclude = false;
     this.setScopeRange(aps);
     let sites = [];
     if (aps.objectOfInterest === "bab") {
         sites = this.pickBase(this.classifyBases(this.getBasesToDevelop(aps, exclude), aps), aps);
-        console.log("...pickedBase:", sites);
+      // console.log("...pickedBase:", sites);
     } else if (aps.objectOfInterest === "stb") {
         sites = this.classifyDevelopmentSites(this.getPlanetsToDevelop(aps, exclude), aps);
     } else if (aps.objectOfInterest === "fib") {
@@ -2118,7 +2120,7 @@ BuilderAPS.prototype.getConstructionSites = function(aps, exclude) {
             sites = this.classifyBases(this.getPlanetsWithStarbase(aps, exclude), aps);
         }
     }
-    console.log("...construction sites:", sites);
+  // console.log("...construction sites:", sites);
     return sites;
 };
 BuilderAPS.prototype.setScopeRange = function(aps) {
@@ -2133,10 +2135,10 @@ BuilderAPS.prototype.setScopeRange = function(aps) {
 };
 // BASE BUILDER
 BuilderAPS.prototype.getBasesToDevelop = function(aps, exclude) {
-    console.log("BuilderAPS.getBasesToDevelop:");
+  // console.log("BuilderAPS.getBasesToDevelop:");
     if (typeof exclude === "undefined") exclude = false;
     let sbDevColonies = autopilot.getStarbaseDevelopingColonies();
-    console.log("...sbDevColonies:", sbDevColonies);
+  // console.log("...sbDevColonies:", sbDevColonies);
     let potSites = sbDevColonies.filter(function (c) {
         if (exclude && exclude.id === c.planet.id) return false;
         //let demand = c.getAPSDemand(aps);
@@ -2144,7 +2146,7 @@ BuilderAPS.prototype.getBasesToDevelop = function(aps, exclude) {
         return true;
         //return demand.length > 0; // toDo: changed 20.01.19, demand is validated in pickBase
     });
-    console.log("...potential starbase development sites:", potSites);
+  // console.log("...potential starbase development sites:", potSites);
     return potSites;
 };
 BuilderAPS.prototype.pickBase = function(classifiedSites, aps) {
@@ -2184,7 +2186,7 @@ BuilderAPS.prototype.pickBase = function(classifiedSites, aps) {
 };
 // BASE SHIP-BUILDER
 BuilderAPS.prototype.getPlanetsWithStarbase = function(aps, exclude) {
-    console.log("BuilderAPS.getPlanetsWithStarbase:");
+    //console.log("BuilderAPS.getPlanetsWithStarbase:");
     if (typeof exclude === "undefined") exclude = false;
     let sbColonies = autopilot.getStarbaseColonies();
     let potSites = sbColonies.filter(function (c) {
@@ -2193,11 +2195,11 @@ BuilderAPS.prototype.getPlanetsWithStarbase = function(aps, exclude) {
         c.distance2APS = aps.getDistance(c.planet);
         return demand.length > 0;
     });
-    console.log("...potential starbases:", potSites);
+    //console.log("...potential starbases:", potSites);
     return potSites;
 };
 BuilderAPS.prototype.classifyBases = function(sites, aps) {
-    console.log("BuilderAPS.classifyBases:");
+    //console.log("BuilderAPS.classifyBases:");
     let priorizedSites = [];
     if (sites.length > 0) {
         let inScope = sites.filter(function (c) {
@@ -2227,7 +2229,7 @@ BuilderAPS.prototype.classifyBases = function(sites, aps) {
             }
             sites = inScope;
         }
-        console.log("...potential starbase planets", sites);
+        //console.log("...potential starbase planets", sites);
         // classify according to resources within range
         let richSites = sites.filter(function (c) {
             let durRatio = c.mineralsInRange.duranium / autopilot.globalMinerals.duranium;
@@ -2254,27 +2256,27 @@ BuilderAPS.prototype.classifyBases = function(sites, aps) {
         //console.log("poorSites", poorSites);
         priorizedSites = [].concat(richSites, moderateSites, poorSites);
     }
-    console.warn("...prioritized starbase planets", priorizedSites);
+   // console.log("...prioritized starbase planets", priorizedSites);
     return priorizedSites;
 };
 // STRUCTURE BUILDER
 BuilderAPS.prototype.getPlanetsToDevelop = function(aps, exclude) {
-    console.log("BuilderAPS.getPlanetsToDevelop:");
+    //console.log("BuilderAPS.getPlanetsToDevelop:");
     if (typeof exclude === "undefined") exclude = false;
     this.setScopeRange(aps);
     let sbColonies = autopilot.getStructureBuildingColonies();
     let potSites = sbColonies.filter(function (c) {
         if (exclude && exclude.id === c.planet.id) return false;
         let demand = c.getAPSDemand(aps);
-        console.log("...colony builder demand:", c.id, demand);
+        //console.log("...colony builder demand:", c.id, demand);
         c.distance2APS = aps.getDistance(c.planet);
         return demand.length > 0 && c.distance2APS <= aps.scopeRange;
     });
-    console.log("...potential construction sites:", potSites);
+    //console.log("...potential construction sites:", potSites);
     return potSites;
 };
 BuilderAPS.prototype.classifyDevelopmentSites = function(potSites, aps) {
-    console.log("BuilderAPS.classifyDevelopmentSites:");
+    //console.log("BuilderAPS.classifyDevelopmentSites:");
     if (potSites.length > 1) {
         let inScope = potSites.filter(function (c) {
             return c.distance2APS <= aps.scopeRange;
@@ -2316,7 +2318,7 @@ BuilderAPS.prototype.classifyDevelopmentSites = function(potSites, aps) {
         return c.k75Minerals.length === 0 && c.k50Minerals.length === 0;
     });
     let priorizedSites = [].concat(resRichSites, resModerateSites, resLessSites);
-    console.log("...prioritized construction sites:", priorizedSites);
+    //console.log("...prioritized construction sites:", priorizedSites);
     let potentialSites = [];
     let allIds = [];
     priorizedSites.forEach(function (c) {
@@ -2327,7 +2329,7 @@ BuilderAPS.prototype.classifyDevelopmentSites = function(potSites, aps) {
 };
 // FIGHTER BUILDER
 BuilderAPS.prototype.getProductionSites = function(aps, exclude) {
-    console.log("BuilderAPS.getProductionSites:");
+    //console.log("BuilderAPS.getProductionSites:");
     if (typeof exclude === "undefined") exclude = false;
     let potSites = [];
     let resources = ["tritanium", "molybdenum", "supplies"];
@@ -2346,7 +2348,7 @@ BuilderAPS.prototype.getProductionSites = function(aps, exclude) {
             potSites.push(c);
         }
     }
-    console.log("...potential production sites:", potSites);
+    //console.log("...potential production sites:", potSites);
     return potSites;
 };
 BuilderAPS.prototype.getFillWithFighterCosts = function(aps, capacity, pThresh, turns) {
@@ -2372,7 +2374,7 @@ BuilderAPS.prototype.getFillWithFighterCosts = function(aps, capacity, pThresh, 
     return costs;
 };
 BuilderAPS.prototype.classifyProductionSites = function(sites, aps) {
-    console.log("BuilderAPS.classifyProductionSites:");
+  // console.log("BuilderAPS.classifyProductionSites:");
     let priorizedSites = [];
     if (sites.length > 0)
     {
@@ -2407,7 +2409,7 @@ BuilderAPS.prototype.classifyProductionSites = function(sites, aps) {
             }
             sites = inScope;
         }
-        console.log("...potential production sites", sites);
+       //console.log("...potential production sites", sites);
         // classify according to production potential
         let fillCosts = this.getFillWithFighterCosts(aps, aps.getCurCapacity());
         let resources = ["tritanium", "molybdenum", "supplies"];
@@ -2419,7 +2421,7 @@ BuilderAPS.prototype.classifyProductionSites = function(sites, aps) {
             });
             return ready4fullProduction;
         });
-        console.log("richSites", richSites);
+       //console.log("richSites", richSites);
         let richSitesIds = [];
         if (richSites.length > 0)
         {
@@ -2440,7 +2442,7 @@ BuilderAPS.prototype.classifyProductionSites = function(sites, aps) {
             }
             return (c.hasStarbase && c.hasStarbase.fighters < 60) || carrierCapacity > 0;
         });
-        console.log("richTransferSites", richTransferSites);
+       //console.log("richTransferSites", richTransferSites);
 
         if (richTransferSites.length > 0)
         {
@@ -2461,7 +2463,7 @@ BuilderAPS.prototype.classifyProductionSites = function(sites, aps) {
             });
             return ready4moderateProduction;
         });
-        console.log("moderateSites", moderateSites);
+       //console.log("moderateSites", moderateSites);
         let moderateSitesIds = [];
         if (richSites.length > 0)
         {
@@ -2474,41 +2476,41 @@ BuilderAPS.prototype.classifyProductionSites = function(sites, aps) {
         let poorSites = sites.filter(function (c) {
             return richAndModerateIds.indexOf(c.planet.id) === -1;
         });
-        console.log("poorSites", poorSites);
+       //console.log("poorSites", poorSites);
         priorizedSites = [].concat(richTransferSites, richSites, moderateSites, poorSites);
     }
-    console.warn("...prioritized production sites", priorizedSites);
+   // console.log("...prioritized production sites", priorizedSites);
     return priorizedSites;
 };
 
 BuilderAPS.prototype.confirmSecondaryDestination = function(aps, potSecDest) {
     if (aps.planet && aps.planet.id === aps.destination.id) return true;
     if (potSecDest.distance2APS > aps.destinationColony.getDistance(aps.ship) && aps.getCurCapacity() <= aps.minCapacity) {
-        console.warn("...we are closer to destination and have minCapacity on board, proceed to destination!");
+       // console.log("...we are closer to destination and have minCapacity on board, proceed to destination!");
     } else if (potSecDest.distance2Site > aps.destinationColony.getDistance(aps.ship) && aps.getCurCapacity(aps.objectOfInterest) <= aps.minCapacity) {
-        console.warn("...the source is further away than current position and we have minCapacity on board, proceed to destination!");
+       // console.log("...the source is further away than current position and we have minCapacity on board, proceed to destination!");
     }  else {
         return true;
     }
     return false;
 };
 BuilderAPS.prototype.setSecondaryDestination = function(aps, load) {
-    console.info("BuilderAPS.setSecondaryDestination:");
+  // console.log("BuilderAPS.setSecondaryDestination:");
     if (typeof load === "undefined") load = true;
     if (aps.planet && load) this.initialLoading(aps);
     if (aps.getCargoCapacity() === 0) return; // console.log("...full capacity reached! Proceed to destination!");
     if (!load || aps.demand.getApsDemand(aps).length > 0) {
-        console.log("...current status of demand:", aps.demand.getApsDemand(aps));
+      // console.log("...current status of demand:", aps.demand.getApsDemand(aps));
         let potSource = this.pickSource(aps);
         if (potSource && this.confirmSecondaryDestination(aps, potSource)) {
             aps.secondaryDestination = potSource.planet;
-            console.log("...secondary destination set.", aps.secondaryDestination);
+          // console.log("...secondary destination set.", aps.secondaryDestination);
         } else if (!potSource) { // no secondary destination (sufficient source) found
             if (aps.getCurCapacity() === aps.maxCapacity && aps.getCurCapacity("megacredits") === 10000) {
-                console.warn("...couldn't find an adequate secondary destination, APS idle!");
+               // console.log("...couldn't find an adequate secondary destination, APS idle!");
                 aps.setShipIdleStatus( { isIdle: true, idleReason: "Source N/A", idleTurns: 0 } );
             } else {
-                console.info("...couldn't find an adequate secondary destination, delivering cargo to destination!");
+              // console.log("...couldn't find an adequate secondary destination, delivering cargo to destination!");
             }
         }
     }
@@ -2521,17 +2523,17 @@ BuilderAPS.prototype.getNextSecondaryDestination = function(aps, ctP) {
     } else {
         let source = this.pickSource(aps, ctP, nextDemands);
         if (source) {
-            console.log("...next secondary destination:", source.planet.id);
+          // console.log("...next secondary destination:", source.planet.id);
             return source.planet;
         } else {
             // return base planet if no secondary destination could be found
-            console.log("...next secondary destination: base => ", aps.base.id);
+          // console.log("...next secondary destination: base => ", aps.base.id);
             return aps.base;
         }
     }
 }; // called by APS
 BuilderAPS.prototype.getSources = function(aps) {
-    console.log("BuilderAPS.getSources:");
+  // console.log("BuilderAPS.getSources:");
     let potColonies = [];
     let targetsInRange = vgap.myplanets; // default: all my planets are targets
     let here2siteTurnDist = Math.ceil(aps.getDistance(aps.destinationColony.planet, false) / aps.simpleRange);
@@ -2546,7 +2548,7 @@ BuilderAPS.prototype.getSources = function(aps) {
         if (aps.planet) return t.id !== aps.destinationColony.planet.id && t.id !== aps.planet.id;
         return t.id !== aps.destinationColony.planet.id;
     }); // remove current and destination planet
-    console.log("...found %s potential sources within %s lys.", targetsInRange.length, aps.scopeRange, targetsInRange);
+  // console.log("...found %s potential sources within %s lys.", targetsInRange.length, aps.scopeRange, targetsInRange);
 
     if (targetsInRange.length > 0) {
         let self = this;
@@ -2564,11 +2566,11 @@ BuilderAPS.prototype.getSources = function(aps) {
             }
         );
     }
-    console.log("...potColonies:", potColonies);
+  // console.log("...potColonies:", potColonies);
     return potColonies;
 };
 BuilderAPS.prototype.pickSource = function(aps, excludePlanet, demands) {
-    console.log("BuilderAPS.pickSource:");
+  // console.log("BuilderAPS.pickSource:");
     if (typeof excludePlanet === "undefined") excludePlanet = false;
     if (typeof demands === "undefined") demands = aps.demand.getApsDemand(aps);
     let source = false;
@@ -2576,7 +2578,7 @@ BuilderAPS.prototype.pickSource = function(aps, excludePlanet, demands) {
     if (potColonies.length > 0) {
         if (potColonies.length > 1) {
             let finalSourceCollection = this.getClassifiedSources(aps, potColonies, demands);
-            console.log("...finalSourceCollection:", finalSourceCollection);
+          // console.log("...finalSourceCollection:", finalSourceCollection);
             for (let i = 0; i < finalSourceCollection.length; i++) {
                 if (excludePlanet && excludePlanet.id === finalSourceCollection[i].planet.id) continue;
                 return finalSourceCollection[i];
@@ -2589,13 +2591,13 @@ BuilderAPS.prototype.pickSource = function(aps, excludePlanet, demands) {
     return source;
 };
 BuilderAPS.prototype.getClassifiedSources = function(aps, sources, demands) {
-    console.log("BuilderAPS.getClassifiedSources:", aps.destinationColony);
-    console.log("...builderDemands:", demands);
+  // console.log("BuilderAPS.getClassifiedSources:", aps.destinationColony);
+  // console.log("...builderDemands:", demands);
     demands.sort(function(a, b) {
         if (a.item === "megacredits") return -1;
         return b.value - a.value;
     });
-    console.log("...demands", demands);
+  // console.log("...demands", demands);
     let satisfyingMostLacking = sources.filter(function (c) {
         let relevantCapacity = aps.getCurCapacity(demands[0].item);
         if (demands[0].item !== "megacredits" && aps.getCurCapacity() === aps.hull.cargo) relevantCapacity = aps.minCapacity;
@@ -2605,7 +2607,7 @@ BuilderAPS.prototype.getClassifiedSources = function(aps, sources, demands) {
     satisfyingMostLacking.sort(function (a, b) {
         return a.distance2Site - b.distance2Site;
     });
-    console.log("...satisfyingMostLacking:", satisfyingMostLacking);
+  // console.log("...satisfyingMostLacking:", satisfyingMostLacking);
     let satisfyingAll = sources.filter(function (c) {
         let satisfying = true;
         demands.forEach(function (d) {
@@ -2616,7 +2618,7 @@ BuilderAPS.prototype.getClassifiedSources = function(aps, sources, demands) {
     satisfyingAll.sort(function (a, b) {
         return a.distance2Site - b.distance2Site;
     });
-    console.log("...satisfyingAll:", satisfyingAll);
+  // console.log("...satisfyingAll:", satisfyingAll);
     let satisfyingSome = sources.filter(function (c) {
         let satisfying = false;
         demands.forEach(function (d) {
@@ -2627,7 +2629,7 @@ BuilderAPS.prototype.getClassifiedSources = function(aps, sources, demands) {
     satisfyingSome.sort(function (a, b) {
         return a.distance2Site - b.distance2Site;
     });
-    console.log("...satisfyingSome:", satisfyingSome);
+  // console.log("...satisfyingSome:", satisfyingSome);
     let offeringMinCapacity = sources.filter(function (c) {
         let cargo = 0;
         let mcs = 0;
@@ -2653,13 +2655,13 @@ BuilderAPS.prototype.getClassifiedSources = function(aps, sources, demands) {
     offeringMinCapacity.sort(function (a, b) {
         return a.distance2Site - b.distance2Site;
     });
-    console.log("...offeringMinCapacity:", offeringMinCapacity);
+  // console.log("...offeringMinCapacity:", offeringMinCapacity);
     let concatCollections = [].concat(satisfyingMostLacking, satisfyingAll, offeringMinCapacity, satisfyingSome);
     if (concatCollections.length === 0) {
         sources.sort(function (a, b) {
             return b.balance[demands[0].item] - a.balance[demands[0].item];
         });
-        console.log("...sortedSources (fallBack):", sources);
+      // console.log("...sortedSources (fallBack):", sources);
         return sources;
     } else {
         return concatCollections;
@@ -2704,27 +2706,27 @@ function CollectorAPS()
     GENERAL REQUIRED METHODS
  */
 CollectorAPS.prototype.initialLoading = function(aps) {
-    console.log(aps.demand);
+  // console.log(aps.demand);
     if (aps.colony.isCollectorSource(aps)) { // is there something available we need?
         if (aps.getCurCapacity() < aps.maxCapacity) aps.unload();
         if (aps.demand.getApsDemand(aps).length > 0) {
             this.loadCargo(aps); // load cargo
         } else {
-            console.error("No demand at destination!");
+           // console.log("No demand at destination!");
             return -1;
         }
     }
     return aps.demand.getApsDemand(aps).length;
 };
 CollectorAPS.prototype.handleCargo = function(aps) { // called once on initialization and a second time with aps.confirmMission
-    console.log("DistributorAPS.handleCargo:");
+  // console.log("DistributorAPS.handleCargo:");
     if (aps.planet && aps.isOwnPlanet) {
         if (aps.destination.id === aps.planet.id) { // we are at base (sink)
             aps.unloadAll();
         } else if (aps.secondaryDestination && aps.secondaryDestination.id === aps.planet.id) { // load cargo if we are at secondary destination
             aps.colony.updateBalance();
             if (this.initialLoading(aps) === -1) {
-                console.warn("...at secondary destination, with no demand left!");
+                //console.warn("...at secondary destination, with no demand left!");
                 aps.lastDestination = aps.secondaryDestination;
                 aps.secondaryDestination = false;
                 aps.destination = false;
@@ -2747,37 +2749,37 @@ CollectorAPS.prototype.handleCargo = function(aps) { // called once on initializ
     }
 };
 CollectorAPS.prototype.setPotentialDestinations = function(aps) {
-    console.log("CollectorAPS.setPotentialDestinations:");
+  // console.log("CollectorAPS.setPotentialDestinations:");
     aps.potDest = [ autopilot.getColony(aps.base.id) ];
 };
 CollectorAPS.prototype.confirmSecondaryDestination = function(aps, potSecDest) {
     if (aps.planet && aps.planet.id === aps.destination.id) return true;
     if (potSecDest.distance2APS > aps.destinationColony.getDistance(aps.ship) && aps.getCurCapacity() <= aps.minCapacity) {
-        console.warn("...we are closer to destination and have minCapacity on board, proceed to destination!");
+       // console.log("...we are closer to destination and have minCapacity on board, proceed to destination!");
     } else if (potSecDest.distance2Site > aps.destinationColony.getDistance(aps.ship) && aps.getCurCapacity(aps.objectOfInterest) <= aps.minCapacity) {
-        console.warn("...the source is further away than current position and we have minCapacity on board, proceed to destination!");
+       // console.log("...the source is further away than current position and we have minCapacity on board, proceed to destination!");
     }  else {
         return true;
     }
     return false;
 };
 CollectorAPS.prototype.setSecondaryDestination = function(aps, load) {
-    console.info("CollectorAPS.setSecondaryDestination:");
+    //console.info("CollectorAPS.setSecondaryDestination:");
     if (typeof load === "undefined") load = true;
     if (aps.planet && aps.planet.id !== aps.base.id && load) this.initialLoading(aps);
     if (aps.getCargoCapacity() === 0) return; // console.log("...full capacity reached! Proceed to destination!");
     if (!load || aps.demand.getApsDemand(aps).length > 0) {
-        console.log("...current status of demand:", aps.demand.getApsDemand(aps));
+      // console.log("...current status of demand:", aps.demand.getApsDemand(aps));
         let potSource = this.pickSource(aps);
         if (potSource && this.confirmSecondaryDestination(aps, potSource)) {
             aps.secondaryDestination = potSource.planet;
-            console.log("...secondary destination set.", aps.secondaryDestination);
+          // console.log("...secondary destination set.", aps.secondaryDestination);
         }  else if (!potSource) { // no secondary destination (sufficient source) found
             if (aps.getCurCapacity() === aps.maxCapacity && aps.getCurCapacity("megacredits") === 10000) {
-                console.warn("...couldn't find an adequate secondary destination, APS idle!");
+               // console.log("...couldn't find an adequate secondary destination, APS idle!");
                 aps.setShipIdleStatus( { isIdle: true, idleReason: "Source N/A", idleTurns: 0 } );
             } else {
-                console.info("...couldn't find an adequate secondary destination, delivering cargo to destination!");
+              // console.log("...couldn't find an adequate secondary destination, delivering cargo to destination!");
             }
         }
     }
@@ -2789,7 +2791,7 @@ CollectorAPS.prototype.setPotentialWaypoints = function(aps) {
 CollectorAPS.prototype.validateMissionDestinations = function(aps)
 {
     let filteredDest = [];
-    console.log("...filtering collector destinations: " + aps.potDest.length);
+  // console.log("...filtering collector destinations: " + aps.potDest.length);
     for (let i = 0; i < aps.potDest.length; i++)
     {
         if (aps.potDest[i].pid !== aps.base.id)
@@ -2802,7 +2804,7 @@ CollectorAPS.prototype.validateMissionDestinations = function(aps)
                 // the base is employing APS of the same type (collector with priority x)
                 if (aps.baseHasSameAPStype(c.planet.id, "col", aps.objectOfInterest) && !isHub && !c.isFort)
                 {
-                    console.log("...removing destination " + c.planet.id + ": mission conflict");
+                  // console.log("...removing destination " + c.planet.id + ": mission conflict");
                     continue;
                 }
             }
@@ -2817,7 +2819,7 @@ CollectorAPS.prototype.hasMissionConflict = function(aps, potPlanet)
     if (conflictAPS)
     {
         let c = autopilot.getColony(potPlanet.id, true);
-        console.log("..." + conflictAPS.length + " other " + aps.primaryFunction + " APS approaching " + potPlanet.id);
+      // console.log("..." + conflictAPS.length + " other " + aps.primaryFunction + " APS approaching " + potPlanet.id);
         //
         // only count as conflict if there is not enough resources available
         //
@@ -2828,10 +2830,10 @@ CollectorAPS.prototype.hasMissionConflict = function(aps, potPlanet)
 };
 CollectorAPS.prototype.confirmMission = function (aps)
 {
-    console.log("CollectorAPS.confirmMission:");
+  // console.log("CollectorAPS.confirmMission:");
     if (aps.getCurCapacity(aps.objectOfInterest) === 0)
     {
-        console.log("...current capacity %s / %s", aps.getCurCapacity(aps.objectOfInterest), aps.maxCapacity);
+      // console.log("...current capacity %s / %s", aps.getCurCapacity(aps.objectOfInterest), aps.maxCapacity);
         aps.potDest = [ autopilot.getColony(aps.base.id) ];
         aps.setMissionDestination();
     }
@@ -2941,10 +2943,10 @@ CollectorAPS.prototype.getCapacitySources = function(aps, colonies)
         if (obj === "megacredits") return false;
         return (oiBalance < aps.minCapacity);
     });
-    console.log("Found %s full capacity sources.", maxSources.length);
-    console.log("Found %s minimum capacity sources.", minSources.length);
-    console.log("Found %s close2Enemy sources", closer2Enemy.length);
-    console.log("Found %s sources with insufficient resources", lowSources.length);
+  // console.log("Found %s full capacity sources.", maxSources.length);
+  // console.log("Found %s minimum capacity sources.", minSources.length);
+  // console.log("Found %s close2Enemy sources", closer2Enemy.length);
+  // console.log("Found %s sources with insufficient resources", lowSources.length);
 
     let etaRange = Math.ceil(aps.scopeRange / aps.simpleRange);
     //console.log("ETA range = " + etaRange);
@@ -2976,7 +2978,7 @@ CollectorAPS.prototype.getCapacitySources = function(aps, colonies)
     return sources;
 };
 CollectorAPS.prototype.setSources = function(aps) {
-    console.log("CollectorAPS.setSources:");
+  // console.log("CollectorAPS.setSources:");
     this.setScopeRange(aps);
     let obj = aps.moveablesMap[aps.objectOfInterest];
     let potColonies = [];
@@ -2995,7 +2997,7 @@ CollectorAPS.prototype.setSources = function(aps) {
         curC.eta2Source = Math.ceil(aps.getDistance(p) / aps.simpleRange);
         if (curC.planet.id !== aps.base.id && curC.isCollectorSource(aps)) potColonies.push(curC);
     });
-    console.log("... sources within scope:", potColonies);
+  // console.log("... sources within scope:", potColonies);
     this.sources = this.classifySources(potColonies, aps);
 };
 CollectorAPS.prototype.classifySources = function(pSources, aps) {
@@ -3012,7 +3014,7 @@ CollectorAPS.prototype.classifySources = function(pSources, aps) {
         sourceCollection.sort(function (a, b) {
             return a.distance2APS - b.distance2APS;
         });
-        console.log("...planets providing curCapacity:", sourceCollection);
+      // console.log("...planets providing curCapacity:", sourceCollection);
         if (sourceCollection.length === 0) {
             // planets providing less than curCapacity within scope sorted by eta distance
             let lessCapacitySources = pSources.filter(function (c) {
@@ -3030,7 +3032,7 @@ CollectorAPS.prototype.classifySources = function(pSources, aps) {
                     return b.balance[obj] - a.balance[obj];
                 });
             } // else, fly to closest source
-            console.log("...planets providing less than curCapacity:", sourceCollection);
+          // console.log("...planets providing less than curCapacity:", sourceCollection);
         }
     }
     return sourceCollection;
@@ -3123,7 +3125,7 @@ CollectorAPS.prototype.loadMinerals = function(aps)
         }
     } else
     {
-        console.error("Colony does not exist: " + aps.base.id + " " + aps.planet.id);
+       // console.log("Colony does not exist: " + aps.base.id + " " + aps.planet.id);
     }
     return curCargo;
 };
@@ -3131,10 +3133,10 @@ CollectorAPS.prototype.loadCargo = function(aps) { // not called at BASE
     let loaded = 0;
     // mineral handling
     if (this.isMineralCollector(aps) && aps.getCurCapacity() > 0) {
-        console.log("...loading minerals...");
+      // console.log("...loading minerals...");
         loaded = this.loadMinerals(aps);
     } else if (aps.getCurCapacity(aps.moveablesMap[aps.objectOfInterest]) > 0) {
-        console.log("...loading other stuff...");
+      // console.log("...loading other stuff...");
         if (aps.objectOfInterest === "mcs") {
             if (this.sellSupply === true || (this.sellSupply === "notBov" && aps.planet.nativeracename !== "Bovinoid")) { // are we transforming supplies to MCs first?
                 aps.colony.sellSupply(true);
@@ -3153,7 +3155,8 @@ CollectorAPS.prototype.loadCargo = function(aps) { // not called at BASE
         }
     }
     return loaded;
-};/*
+};
+/*
  * nuPilot - Distributor Module
  *
  *      https://github.com/drgirasol/nupilot/wiki/Distributor
@@ -3176,21 +3179,21 @@ DistributorAPS.prototype.initialLoading = function(aps) {
         if (aps.demand.getApsDemand(aps).length > 0) {
             this.loadCargo(aps); // load cargo
         } else {
-            console.error("No demand at destination!");
+           // console.log("No demand at destination!");
             return -1;
         }
     }
     return aps.demand.getApsDemand(aps).length;
 };
 DistributorAPS.prototype.handleCargo = function (aps) { // called once on initialization and a second time with aps.confirmMission
-    console.log("DistributorAPS.handleCargo:");
+  // console.log("DistributorAPS.handleCargo:");
     if (aps.planet && aps.isOwnPlanet) {
         if (aps.destination.id === aps.planet.id) { // unload cargo when at destination
             aps.unloadAll();
         } else if (aps.secondaryDestination && aps.secondaryDestination.id === aps.planet.id) { // load cargo if we are at secondary destination
             aps.colony.updateBalance();
             if (this.initialLoading(aps) === -1) {
-                console.warn("...at secondary destination, with no demand left!");
+               // console.log("...at secondary destination, with no demand left!");
                 aps.lastDestination = aps.secondaryDestination;
                 aps.secondaryDestination = false;
                 aps.destination = false;
@@ -3217,7 +3220,7 @@ DistributorAPS.prototype.handleCargo = function (aps) { // called once on initia
     }
 }; // called by APS
 DistributorAPS.prototype.loadCargo = function(aps) {
-    console.log("DistributorAPS.loadCargo:");
+  // console.log("DistributorAPS.loadCargo:");
     if (aps.demand.length > 0) {
         let loaded = 0;
         // calculate demand within range, load at least minCapacity
@@ -3229,7 +3232,7 @@ DistributorAPS.prototype.loadCargo = function(aps) {
             let p = vgap.planetAt(t.x, t.y);
             let c = autopilot.getColony(p.id, true);
             let demand = c.getAPSDemand(aps);
-            console.log("...target Demand:", c.id, c, demand);
+          // console.log("...target Demand:", c.id, c, demand);
             if (demand.length > 0) demandInRange += demand[0].value;
         });
         if (demandInRange > loadDemand) loadDemand = demandInRange;
@@ -3246,7 +3249,7 @@ DistributorAPS.prototype.setPotentialDestinations = function(aps) {
         this.setSinks(aps);
     }
     if (this.sinks.length < 1) {
-        console.warn("No sinks available!");
+       // console.log("No sinks available!");
         aps.setShipIdleStatus( { isIdle: true, idleReason: "Dest", idleTurns: 0 } );
     } else {
         aps.potDest = this.sinks;
@@ -3279,7 +3282,7 @@ DistributorAPS.prototype.hasMissionConflict = function(aps, potPlanet, secondary
     let conflictAPS = aps.destinationHasSameAPStype(potPlanet.id, "dis", aps.objectOfInterest, secondary);
     if (conflictAPS.length > 0)
     {
-        console.log("DistributorAPS.hasMissionConflict:");
+      // console.log("DistributorAPS.hasMissionConflict:");
         let obj = aps.moveablesMap[aps.objectOfInterest];
         if (!secondary) {
             let pdC = autopilot.getColony(potPlanet.id, true); // potential destination Colony
@@ -3301,7 +3304,7 @@ DistributorAPS.prototype.hasMissionConflict = function(aps, potPlanet, secondary
                     }
                 }
             });
-            console.log("...other APS will deliver %d for balance %d.", apsCargo, pdC.balance[obj]);
+          // console.log("...other APS will deliver %d for balance %d.", apsCargo, pdC.balance[obj]);
             return pdC.balance[obj] + apsCargo >= 0;
         } else {
             let psC = autopilot.getColony(potPlanet.id, true); // potential source Colony
@@ -3312,10 +3315,10 @@ DistributorAPS.prototype.hasMissionConflict = function(aps, potPlanet, secondary
     }
 }; // called by APS
 DistributorAPS.prototype.confirmMission = function (aps) {
-    console.log("DistributorAPS.confirmMission:");
+  // console.log("DistributorAPS.confirmMission:");
     if (aps.planet && aps.destination.id === aps.planet.id && !aps.secondaryDestination)
     {
-        console.warn("...WE ARE AT DESTINATION PLANET WITHOUT SECONDARY DESTINATION SET...!");
+       // console.log("...WE ARE AT DESTINATION PLANET WITHOUT SECONDARY DESTINATION SET...!");
     }
     if (!aps.targetIsSet())
     {
@@ -3332,20 +3335,20 @@ DistributorAPS.prototype.getNextPrimaryDestination = function(aps, ctP) {
     this.setScopeRange(aps);
     let priorityList = this.classifySinks(aps, ctP);
     if (priorityList.length > 0) {
-        console.log("...next target is new destination", priorityList[0].planet);
+      // console.log("...next target is new destination", priorityList[0].planet);
         return priorityList[0].planet;
     } else {
-        console.log("...next target is BASE", aps.base);
+      // console.log("...next target is BASE", aps.base);
         return aps.base;
     }
 }; // called by APS
 DistributorAPS.prototype.setSinks = function(aps) {
     this.setScopeRange(aps);
     this.sinks = this.classifySinks(aps);
-    console.log("FINAL SINKS >>", this.sinks);
+  // console.log("FINAL SINKS >>", this.sinks);
 };
 DistributorAPS.prototype.classifySinks = function(aps, exclude) {
-    console.log("DistributorAPS.classifySinks:");
+  // console.log("DistributorAPS.classifySinks:");
     if (typeof exclude === "undefined") exclude = false;
     let classified = [];
     let potSinks = this.getPotentialSinks(aps, exclude); // colonies
@@ -3355,28 +3358,28 @@ DistributorAPS.prototype.classifySinks = function(aps, exclude) {
             let postFeudalNativeSites = potSinks.filter(function (c) {
                 return (c.planet.nativegovernment > 5 || (c.planet.nativegovernment > 4 && c.planet.nativeracename === "Avian")) && c.distance2Aps <= aps.scopeRange;
             });
-            console.log("...postFeudalNativeSites:", postFeudalNativeSites);
+          // console.log("...postFeudalNativeSites:", postFeudalNativeSites);
             let filteredIds = postFeudalNativeSites.map(function (c) {
                 return c.planet.id;
             });
             let bovinoidNativeSites = potSinks.filter(function (c) {
                 return c.planet.nativeracename === "Bovinoid" && c.distance2Aps <= aps.scopeRange;
             });
-            console.log("...bovinoidNativeSites:", bovinoidNativeSites);
+          // console.log("...bovinoidNativeSites:", bovinoidNativeSites);
             filteredIds = filteredIds.concat(bovinoidNativeSites.map(function (c) {
                 return c.planet.id;
             }));
             let tecNativeSites = potSinks.filter(function (c) {
                 return filteredIds.indexOf(c.planet.id) === -1 && c.hasTecRace && c.distance2Aps <= aps.scopeRange;
             });
-            console.log("...tecNativeSites:", tecNativeSites);
+          // console.log("...tecNativeSites:", tecNativeSites);
             filteredIds = filteredIds.concat(tecNativeSites.map(function (c) {
                 return c.planet.id;
             }));
             let otherNativeSites = potSinks.filter(function (c) {
                 return filteredIds.indexOf(c.planet.id) === -1 && c.planet.nativegovernment <= 5 && c.distance2Aps <= aps.scopeRange;
             });
-            console.log("...otherNativeSites:", otherNativeSites);
+          // console.log("...otherNativeSites:", otherNativeSites);
             classified = [].concat(postFeudalNativeSites, bovinoidNativeSites, tecNativeSites, otherNativeSites);
         } else if (aps.objectOfInterest === "neu") {
             let withStrandedAPS = potSinks.filter(function (c) {
@@ -3410,11 +3413,11 @@ DistributorAPS.prototype.classifySinks = function(aps, exclude) {
             } // add two sinks that are outside scope range as backup
         }
     }
-    console.log("...classified sinks", classified);
+  // console.log("...classified sinks", classified);
     return classified;
 };
 DistributorAPS.prototype.getPotentialSinks = function(aps, exclude) {
-    console.log("DistributorAPS.getPotentialSinks:");
+  // console.log("DistributorAPS.getPotentialSinks:");
     if (typeof exclude === "undefined") exclude = false;
     let potSinks = [];
     for (let i = 0; i < vgap.myplanets.length; i++) {
@@ -3435,45 +3438,45 @@ DistributorAPS.prototype.getPotentialSinks = function(aps, exclude) {
             return a.distance2Aps - b.distance2Aps;
         });
     }
-    console.log("...potential sinks", potSinks);
+  // console.log("...potential sinks", potSinks);
     return potSinks;
 };
 
 DistributorAPS.prototype.confirmSecondaryDestination = function(aps, potSecDest) {
     if (aps.planet && aps.planet.id === aps.destination.id) return true;
     if (potSecDest.distance2APS > aps.destinationColony.getDistance(aps.ship) && aps.getCurCapacity() <= aps.minCapacity) {
-        console.warn("...we are closer to destination and have minCapacity on board, proceed to destination!");
+       // console.log("...we are closer to destination and have minCapacity on board, proceed to destination!");
     } else if (potSecDest.distance2Site > aps.destinationColony.getDistance(aps.ship) && aps.getCurCapacity(aps.objectOfInterest) <= aps.minCapacity) {
-        console.warn("...the source is further away than current position and we have minCapacity on board, proceed to destination!");
+       // console.log("...the source is further away than current position and we have minCapacity on board, proceed to destination!");
     }  else {
         return true;
     }
     return false;
 };
 DistributorAPS.prototype.setSecondaryDestination = function(aps, load) {
-    console.info("DistributorAPS.setSecondaryDestination:");
+  // console.log("DistributorAPS.setSecondaryDestination:");
     if (typeof load === "undefined") load = true;
     if (aps.planet && load) this.initialLoading(aps);
     if (aps.getCargoCapacity() === 0) return; // console.log("...full capacity reached! Proceed to destination!");
     if (!load || aps.demand.getApsDemand(aps).length > 0) {
-        console.log("...current status of demand:", aps.demand.getApsDemand(aps));
+      // console.log("...current status of demand:", aps.demand.getApsDemand(aps));
         let potSource = this.pickSource(aps);
         if (potSource && this.confirmSecondaryDestination(aps, potSource)) {
             aps.secondaryDestination = potSource.planet;
             aps.secondaryDestination = potSource;
-            console.log("...secondary destination set.", aps.secondaryDestination);
+          // console.log("...secondary destination set.", aps.secondaryDestination);
         } else if (!potSource) { // no secondary destination (sufficient source) found
             if (aps.getCurCapacity() === aps.maxCapacity && aps.getCurCapacity("megacredits") === 10000) {
                 if (this.confirmSecondaryDestination(aps, aps.baseColony)) {
                     aps.secondaryDestination = aps.baseColony.planet;
                     aps.secondaryDestinationColony = aps.baseColony;
-                    console.log("...secondary destination set.", aps.secondaryDestination);
+                  // console.log("...secondary destination set.", aps.secondaryDestination);
                 } else {
-                    console.warn("...couldn't find an adequate secondary destination, moving to base!");
+                   // console.log("...couldn't find an adequate secondary destination, moving to base!");
                     aps.setDestination(aps.baseColony);
                 }
             } else {
-                console.info("...couldn't find an adequate secondary destination, delivering cargo to destination!");
+              // console.log("...couldn't find an adequate secondary destination, delivering cargo to destination!");
             }
         }
     }
@@ -3486,17 +3489,17 @@ DistributorAPS.prototype.getNextSecondaryDestination = function(aps, ctP) {
     } else {
         let source = this.pickSource(aps, aps.destinationColony, ctP, nextDemands);
         if (source) {
-            console.log("...next secondary destination:", source.planet.id);
+          // console.log("...next secondary destination:", source.planet.id);
             return source.planet;
         } else {
             // return base planet if no secondary destination could be found
-            console.log("...next secondary destination: base => ", aps.base.id);
+          // console.log("...next secondary destination: base => ", aps.base.id);
             return aps.base;
         }
     }
 }; // called by APS
 DistributorAPS.prototype.getSources = function(aps, pdC) {
-    console.log("DistributorAPS.getSources:");
+  // console.log("DistributorAPS.getSources:");
     if (typeof pdC === "undefined") pdC = aps.destinationColony;
     let potColonies = [];
     let here2sinkTurnDist = Math.ceil(aps.getDistance(pdC.planet, false) / aps.simpleRange);
@@ -3506,7 +3509,7 @@ DistributorAPS.prototype.getSources = function(aps, pdC) {
         this.setScopeRange(aps);
         let targetsInRange = autopilot.getTargetsInRange(autopilot.frnnOwnPlanets, aps.ship.x, aps.ship.y, aps.scopeRange);
         if (aps.planet) targetsInRange.push(aps.planet); // include current planet
-        console.log("...found %s potential sources within %s lys:", targetsInRange.length, aps.scopeRange, targetsInRange);
+      // console.log("...found %s potential sources within %s lys:", targetsInRange.length, aps.scopeRange, targetsInRange);
         //
         if (targetsInRange.length > 0) {
             targetsInRange.forEach(
@@ -3534,9 +3537,9 @@ DistributorAPS.prototype.getSources = function(aps, pdC) {
     return potColonies;
 };
 DistributorAPS.prototype.getClassifiedSources = function(aps, sources, demands) {
-    console.log("DistributorAPS.getClassifiedSources:", aps.destinationColony);
+  // console.log("DistributorAPS.getClassifiedSources:", aps.destinationColony);
     if (typeof demands === "undefined") demands = aps.demand.getApsDemand(aps);
-    console.log("...distributor Demands:", demands);
+  // console.log("...distributor Demands:", demands);
     demands.sort(function(a, b) {
         return b.value - a.value;
     });
@@ -3547,7 +3550,7 @@ DistributorAPS.prototype.getClassifiedSources = function(aps, sources, demands) 
     satisfyingSources.sort(function (a, b) {
         return a.distance2APS - b.distance2APS;
     });
-    console.log("...satisfying sources:", satisfyingSources);
+  // console.log("...satisfying sources:", satisfyingSources);
     // NOT SATIFYING BUT > MINIMUM CAPACITY
     let minimumSources = sources.filter(function (c) {
         return c.getAPSCargo(aps) >= aps.minCapacity && !c.satisfiesAPSDemand(aps, demands);
@@ -3555,21 +3558,21 @@ DistributorAPS.prototype.getClassifiedSources = function(aps, sources, demands) 
     minimumSources.sort(function (a, b) {
         return a.distance2APS - b.distance2APS;
     });
-    console.log("...minimum capacity sources:", minimumSources);
+  // console.log("...minimum capacity sources:", minimumSources);
     return [].concat(satisfyingSources, minimumSources);
 };
 DistributorAPS.prototype.pickSource = function(aps, pdC, excludePlanet, demands) {
-    console.log("DistributorAPS.pickSource:");
+  // console.log("DistributorAPS.pickSource:");
     if (typeof pdC === "undefined") pdC = aps.destinationColony;
     if (typeof excludePlanet === "undefined") excludePlanet = false;
     if (typeof demands === "undefined") demands = aps.demand.getApsDemand(aps);
     let source = false;
     let potColonies = this.getSources(aps, pdC);
-    console.log("...potColonies:", potColonies);
+  // console.log("...potColonies:", potColonies);
     if (potColonies.length > 0) {
         if (potColonies.length > 1) {
             let finalSourceCollection = this.getClassifiedSources(aps, potColonies, demands);
-            console.log("...finalSourceCollection:", finalSourceCollection);
+          // console.log("...finalSourceCollection:", finalSourceCollection);
 
             for (let i = 0; i < finalSourceCollection.length; i++) {
                 if (this.hasMissionConflict(aps, finalSourceCollection[i].planet, true)) continue;
@@ -3593,9 +3596,9 @@ DistributorAPS.prototype.postActivationHook = function (aps) {
 }; // called by APS
 /*
  * nuPilot - Expansion Module
- * 
- *     
- *     
+ *
+ *
+ *
  */
 function ExpanderAPS()
 {
@@ -3611,24 +3614,24 @@ function ExpanderAPS()
     GENERAL REQUIRED METHODS
  */
 ExpanderAPS.prototype.initialLoading = function(aps) {
-    console.log(aps.demand);
+  // console.log(aps.demand);
     if (aps.colony.isAPSSource(aps)) { // is there something available we need?
         aps.unload();
         if (aps.demand.getApsDemand(aps).length > 0) {
             this.loadCargo(aps); // load cargo
         } else {
-            console.error("No demand at destination!");
+           // console.log("No demand at destination!");
             return -1;
         }
     }
     return aps.demand.getApsDemand(aps).length;
 };
 ExpanderAPS.prototype.handleCargo = function (aps) {
-    console.log("ExpanderAPS.handleCargo:");
+  // console.log("ExpanderAPS.handleCargo:");
     if (aps.planet && !aps.colony.isOwnPlanet) {
         // = new colony
         let enemyAtPlanet = autopilot.enemyShipAtPlanet(aps.planet);
-        console.log("...enemyAtPlanet: " + enemyAtPlanet);
+      // console.log("...enemyAtPlanet: " + enemyAtPlanet);
         if (!enemyAtPlanet) {
             aps.unload();
             if (!this.hasExpKit(aps)) {
@@ -3658,11 +3661,11 @@ ExpanderAPS.prototype.handleCargo = function (aps) {
 };
 ExpanderAPS.prototype.setPotentialDestinations = function(aps)
 {
-    console.log("ExpanderAPS.setPotentialDestinations:");
+  // console.log("ExpanderAPS.setPotentialDestinations:");
     this.setSinks(aps);
     if (this.sinks.length === 0)
     {
-        console.warn("...no potential destinations available!");
+       // console.log("...no potential destinations available!");
         aps.setShipIdleStatus( { isIdle: true, idleReason: "dest", idleTurns: 0 } );
     } else
     {
@@ -3670,7 +3673,7 @@ ExpanderAPS.prototype.setPotentialDestinations = function(aps)
         aps.isIdle = false;
 
     }
-    console.log("...", aps.potDest);
+  // console.log("...", aps.potDest);
 };
 ExpanderAPS.prototype.setSecondaryDestination = function(aps) {
     // check if cargo or planet contains expanderKit
@@ -3679,7 +3682,7 @@ ExpanderAPS.prototype.setSecondaryDestination = function(aps) {
         planetKit = this.planetHasExpKit(aps);
     }
     if (!this.hasExpKit(aps) && !planetKit) {
-        console.log("...insufficient cargo!");
+      // console.log("...insufficient cargo!");
         // unload remaining cargo to planet
         this.transferCargo(aps, true);
         // we are lacking something, set closest source as secondary destination
@@ -3687,10 +3690,10 @@ ExpanderAPS.prototype.setSecondaryDestination = function(aps) {
         this.setSources(aps);
         if (this.sources.length > 0) {
             aps.secondaryDestination = vgap.getPlanet(this.sources[0].pid);
-            console.log("...secondary destination (" + aps.secondaryDestination.id + ") set.");
+          // console.log("...secondary destination (" + aps.secondaryDestination.id + ") set.");
         } else {
             // no secondary destination (sufficient source) found
-            console.error("...couldn't find an adequate secondary destination.");
+           // console.log("...couldn't find an adequate secondary destination.");
             // get the next ETA waypoint
             let nextWaypoint = aps.getEtaWaypoint(aps.base); // toDo: this can be a very slow solution, since the smallest ETA is always first
             if (nextWaypoint) {
@@ -3716,20 +3719,20 @@ ExpanderAPS.prototype.validateMissionDestinations = function(aps) {
 ExpanderAPS.prototype.hasMissionConflict = function(aps, potPlanet) {
     let conflictAPS = aps.destinationHasSameAPStype(potPlanet.id); // returns stored data for APS that also visit potPlanet with the same mission
     if (conflictAPS) {
-        console.log("ExpanderAPS.hasMissionConflict:");
-        console.log("..." + conflictAPS.length + " other " + aps.primaryFunction + " APS approaching " + potPlanet.id);
+      // console.log("ExpanderAPS.hasMissionConflict:");
+      // console.log("..." + conflictAPS.length + " other " + aps.primaryFunction + " APS approaching " + potPlanet.id);
         return true;
     }
     let apsAtPlanet = autopilot.getAPSatPlanet(potPlanet);
     if (apsAtPlanet.length > 0) {
         //console.log(apsAtPlanet);
         let expanderAtPlanet = apsAtPlanet.filter(function (cfg) {
-            console.log(aps.ship.id);
+          // console.log(aps.ship.id);
             return (cfg.shipFunction === "exp" && cfg.sid !== aps.ship.id);
         });
         if (expanderAtPlanet) {
-            console.log("ExpanderAPS.hasMissionConflict:");
-            console.log("..." + expanderAtPlanet.length + " other ExpanderAPS at " + potPlanet.id);
+          // console.log("ExpanderAPS.hasMissionConflict:");
+          // console.log("..." + expanderAtPlanet.length + " other ExpanderAPS at " + potPlanet.id);
             return true;
         }
     }
@@ -3813,28 +3816,28 @@ ExpanderAPS.prototype.getOtherColonizer = function(aps, p)
     return hasColonizer;
 };
 ExpanderAPS.prototype.getClassifiedSinks = function(aps, potSinks) {
-    console.log("ExpanderAPS.getClassifiedSinks:");
+  // console.log("ExpanderAPS.getClassifiedSinks:");
     let classified = [];
     let withNatives = potSinks.filter(function (c) {
         return c.planet.nativeclans > 0 && c.planet.nativeracename !== "Amorphous";
     });
-    console.log("...withNatives:", withNatives);
+  // console.log("...withNatives:", withNatives);
     let temperate = potSinks.filter(function (c) {
         return c.planet.temp > 14 && c.planet.temp < 85 && c.planet.nativeclans === 0;
     });
-    console.log("...temperate:", temperate);
+  // console.log("...temperate:", temperate);
     let others = potSinks.filter(function (c) {
         return (c.planet.temp <= 14 || c.planet.temp >= 85) && c.planet.nativeclans === 0;
     });
-    console.log("...others:", others);
+  // console.log("...others:", others);
     let unexplored = potSinks.filter(function (c) {
         return c.planet.temp === -1;
     });
-    console.log("...unexplored:", unexplored);
+  // console.log("...unexplored:", unexplored);
     let amorphous = potSinks.filter(function (c) {
         return c.planet.nativeclans > 0 && c.planet.nativeracename === "Amorphous";
     });
-    console.log("...amorphous:", amorphous);
+  // console.log("...amorphous:", amorphous);
     if (aps.planet && aps.planet.id === aps.base.id) {
         classified = classified.concat(withNatives, temperate);
     }
@@ -3847,10 +3850,10 @@ ExpanderAPS.prototype.getClassifiedSinks = function(aps, potSinks) {
 };
 ExpanderAPS.prototype.setSinks = function(aps)
 {
-    console.log("ExpanderAPS.setSinks:");
+  // console.log("ExpanderAPS.setSinks:");
     this.setScopeRange(aps);
     let targetsInRange = autopilot.getTargetsInRange(autopilot.frnnUnownedPlanets, aps.ship.x, aps.ship.y, aps.scopeRange);
-    console.log("...targets in scope range:", targetsInRange);
+  // console.log("...targets in scope range:", targetsInRange);
     let potColonies = [];
     let self = this;
     targetsInRange.forEach(function (pos) {
@@ -3878,10 +3881,10 @@ ExpanderAPS.prototype.setSinks = function(aps)
     potColonies.sort(function (a, b) {
         return a.distance2Aps - b.distance2Aps;
     });
-    console.log("...potential colonies:", potColonies);
+  // console.log("...potential colonies:", potColonies);
     let futureColonies = this.getClassifiedSinks(aps, potColonies);
     if (futureColonies.length > 0) {
-        console.log("...future colonies:", futureColonies);
+      // console.log("...future colonies:", futureColonies);
         this.sinks = futureColonies;
     }
 };
@@ -3891,7 +3894,7 @@ ExpanderAPS.prototype.setScopeRange = function(aps)
 };
 ExpanderAPS.prototype.setSources = function(aps)
 {
-    console.log("ExpanderAPS.setSources:");
+  // console.log("ExpanderAPS.setSources:");
     let expanderCargo = this.getExpanderKit(aps, true);
     let potSources = [];
     let goodSources = [];
@@ -3909,7 +3912,7 @@ ExpanderAPS.prototype.setSources = function(aps)
     });
     this.sources = potSources;
     this.sources.sort(function(a, b) { return a.distance2APS - b.distance2APS});
-    console.log("...potential sources:", this.sources);
+  // console.log("...potential sources:", this.sources);
 };
 ExpanderAPS.prototype.isSource = function(planet)
 {
@@ -3972,11 +3975,11 @@ ExpanderAPS.prototype.planetHasExpKit = function(aps, partially)
         let expanderKit = this.getExpanderKit(aps);
         if (typeof partially === "undefined" || partially === false)
         {
-            console.error("- Planet " + aps.planet.id + " has expander kit = " + (c.balance.clans >= expanderKit.cla && expExcSup >= expanderKit.sup && expExcMcs >= expanderKit.mcs));
+           // console.log("- Planet " + aps.planet.id + " has expander kit = " + (c.balance.clans >= expanderKit.cla && expExcSup >= expanderKit.sup && expExcMcs >= expanderKit.mcs));
             return (c.balance.clans >= expanderKit.cla && expExcSup >= expanderKit.sup && expExcMcs >= expanderKit.mcs);
         } else // partially
         {
-            console.error("- Planet " + aps.planet.id + " has partial expander kit = " + (c.balance.clans >= expanderKit.cla));
+           // console.log("- Planet " + aps.planet.id + " has partial expander kit = " + (c.balance.clans >= expanderKit.cla));
             return (c.balance.clans >= expanderKit.cla);
         }
     }
@@ -4009,11 +4012,11 @@ ExpanderAPS.prototype.loadCargo = function(aps)
         {
             curMCs = aps.loadObject("megacredits", aps.planet, (kDiffMcs*-1));
         }
-        console.log("...loaded: cargo = " + curCargo + " MCs = " + curMCs);
+      // console.log("...loaded: cargo = " + curCargo + " MCs = " + curMCs);
         return true;
     } else
     {
-        console.log("...no Kit(s) available...");
+      // console.log("...no Kit(s) available...");
     }
     return false;
 };
@@ -4083,7 +4086,8 @@ ExpanderAPS.prototype.transferCargo = function(aps, unloadAll)
             }
         }
     }
-};/*
+};
+/*
  *  nuPilot - Terraform Module
  */
 function HizzzAPS()
@@ -4100,7 +4104,7 @@ function HizzzAPS()
     GENERAL REQUIRED METHODS
  */
 HizzzAPS.prototype.handleCargo = function (aps) {
-    console.log("HizzzAPS.handleCargo:");
+  // console.log("HizzzAPS.handleCargo:");
     if (aps.planet && aps.isOwnPlanet)
     {
         if (aps.atBase) { // we are at base (sink)
@@ -4133,7 +4137,7 @@ HizzzAPS.prototype.handleCargo = function (aps) {
                 });
                 let otherHizzerShips = otherHizzerShipsByBase[aps.base.id];
                 if (otherHizzerShips) {
-                    console.log("...other Hizzers:", otherHizzerShips);
+                  // console.log("...other Hizzers:", otherHizzerShips);
                     let engineids = otherHizzerShips.map(function (s) {
                         return s.engineid;
                     });
@@ -4170,13 +4174,13 @@ HizzzAPS.prototype.handleCargo = function (aps) {
             }
             if (weLoad) {
                 let loadLog = this.loadCargo(aps, uniqueBaseIds.length);
-                console.log("...we are loading:", loadLog);
+              // console.log("...we are loading:", loadLog);
                 if (aps.planet.id === aps.destination.id && this.missionCompleted(aps)) {
                     aps.destination = aps.base;
                 }
             } else {
                 if (weUnload) {
-                    console.log("...we are unloading");
+                  // console.log("...we are unloading");
                     aps.unload();
                 }
             }
@@ -4187,7 +4191,7 @@ HizzzAPS.prototype.setDemand = function (aps) {
     aps.demand = []; // reset
 };
 HizzzAPS.prototype.setPotentialDestinations = function(aps) {
-    console.log("Determine potential destinations...");
+  // console.log("Determine potential destinations...");
     // by planet.id sorted sinks (deficiencies)
     if (this.sinks.length === 0) this.setSinks(aps);
     // by planet.id sorted sources (two piles -high/low value- by distance)
@@ -4195,20 +4199,20 @@ HizzzAPS.prototype.setPotentialDestinations = function(aps) {
     //
     if (aps.atBase && this.getBetterPotentialSources(aps)) {
         // if we are at base (sink), set sources as potential destinations
-        console.log("...for hizzer at base (sink)...");
+      // console.log("...for hizzer at base (sink)...");
         aps.potDest = this.sources;
         if (aps.potDest.length === 0 && (aps.colony.natPotRevenue > 1000 || (aps.colony.planet.nativeclans > 0 && aps.colony.planet.nativehappypoints < 100))) {
             aps.potDest = [ aps.colony ];
         }
     } else {
         // set base as only potential destination, if we are at a source
-        console.log("...for hizzer at a (source) planet...");
+      // console.log("...for hizzer at a (source) planet...");
         aps.potDest = this.sinks;
     }
     if (aps.potDest.length === 0) {
-        console.log("...no destinations available...");
+      // console.log("...no destinations available...");
     } else {
-        console.log(aps.potDest);
+      // console.log(aps.potDest);
     }
 };
 HizzzAPS.prototype.setSecondaryDestination = function(aps) {
@@ -4218,7 +4222,7 @@ HizzzAPS.prototype.setPotentialWaypoints = function(aps) {
     aps.potentialWaypoints = autopilot.frnnOwnPlanets;
 };
 HizzzAPS.prototype.validateMissionDestinations = function(aps) {
-    console.log("...filtering HIZZER destinations: " + aps.potDest.length);
+  // console.log("...filtering HIZZER destinations: " + aps.potDest.length);
     //console.log(aps.potDest);
     aps.potDest = aps.potDest.filter(function (c) {
         //if (c.planet.id !== aps.base.id) return !c.isBuildingBase && !c.hasStarbase; // ??? what the heck
@@ -4228,25 +4232,25 @@ HizzzAPS.prototype.validateMissionDestinations = function(aps) {
 HizzzAPS.prototype.hasMissionConflict = function(aps, potPlanet) {
     let conflictAPS = aps.destinationHasSameAPStype(potPlanet.id); // returns stored data for APS that also visit potPlanet with the same mission
     if (conflictAPS) {
-        console.log("There are %s Hizzzer at planet %s", conflictAPS.length, potPlanet.id);
+      // console.log("There are %s Hizzzer at planet %s", conflictAPS.length, potPlanet.id);
         //
         // compare true revenue with potential revenue
         let c = autopilot.getColony(potPlanet.id);
         let trueRevenue = c.getRevenue();
         let potentialRevenue = c.getRevenue(c.taxation, true);
         let diff = trueRevenue / potentialRevenue;
-        console.log("The planet's true revenue %s vs. the planet's potential revenue %s", trueRevenue, potentialRevenue);
+      // console.log("The planet's true revenue %s vs. the planet's potential revenue %s", trueRevenue, potentialRevenue);
         if (diff < 0.5) return conflictAPS.length >= 6; // allow only half of max hizzers (so the deficiency of clans won't be too extreme?)
         //
         return (conflictAPS.length >= 12);
     }
 };
 HizzzAPS.prototype.confirmMission = function (aps) {
-    console.log("Setting ship " + aps.ship.id + " mission: Hizzz!");
+  // console.log("Setting ship " + aps.ship.id + " mission: Hizzz!");
     aps.ship.mission = 8;
 };
 HizzzAPS.prototype.postActivationHook = function (aps) {
-    console.log("Setting ship " + aps.ship.id + " mission: Hizzz!");
+  // console.log("Setting ship " + aps.ship.id + " mission: Hizzz!");
     // colony taxation
     aps.ship.mission = 8;
     if (aps.planet)
@@ -4276,7 +4280,7 @@ HizzzAPS.prototype.getNextPrimaryDestination = function(aps, ctP) {
     INTERNAL METHODS
  */
 HizzzAPS.prototype.loadCargo = function(aps, devisor) {
-    console.log("HizzzAPS.loadCargo:");
+  // console.log("HizzzAPS.loadCargo:");
     if (aps.destination.id === aps.planet.id || aps.planet.id === aps.lastDestination.id) { // destination = planet that is being hizzed
         if (typeof devisor === "undefined") devisor = 1;
         let curC = autopilot.getColony(aps.planet.id, true);
@@ -4286,7 +4290,7 @@ HizzzAPS.prototype.loadCargo = function(aps, devisor) {
         if (devisor > 1 && aps.megacredits >= aps.minCapacity || aps.targetIsSet()) {
             toLoad = 0;
         } // don't load if we already have minCapacity reached or if we are already going back to base (and thus have loaded during initialization and no longer are registered as APS with same target)
-        console.log("...loading:", toLoad);
+      // console.log("...loading:", toLoad);
         let loaded = aps.loadObject("megacredits", aps.planet, toLoad);
         return { item: "megacredits", value: loaded };
     } else {
@@ -4305,7 +4309,7 @@ HizzzAPS.prototype.setSinks = function(aps) {
     this.sinks = [ autopilot.getColony(aps.base.id) ];
 };
 HizzzAPS.prototype.setScopeRange = function(aps) {
-    console.log("hizzer scope Range:", aps.scopeRange);
+  // console.log("hizzer scope Range:", aps.scopeRange);
     let inRange = aps.getAPSinRange(aps.scopeRange);
     if (inRange && inRange.length > 3) {
         aps.scopeRange *= 3;
@@ -4314,24 +4318,24 @@ HizzzAPS.prototype.setScopeRange = function(aps) {
     }
 };
 HizzzAPS.prototype.getBetterPotentialSources = function(aps) {
-    console.log("HizzzAPS.getBetterPotentialSources:");
+  // console.log("HizzzAPS.getBetterPotentialSources:");
     let self = this;
     return this.sources.filter(function (ps) {
         let newRevenue = ps.getRevenue(ps.taxation, false, 1); // true revenue with one more hizzer
-        console.log("true revenue with one more hizzer: ", newRevenue);
-        console.log("actual revenue of current planet: ", aps.colony.revenue);
+      // console.log("true revenue with one more hizzer: ", newRevenue);
+      // console.log("actual revenue of current planet: ", aps.colony.revenue);
         return ps.determineSafety() && ps.planet.id !== aps.planet.id && newRevenue > aps.colony.revenue && !self.hasMissionConflict(aps, ps.planet);
     });
 };
 HizzzAPS.prototype.getSources = function(aps) {
-    console.log("HizzzAPS.getSources:");
+  // console.log("HizzzAPS.getSources:");
     this.setScopeRange(aps);
     let potColonies = [];
     if (aps.ship.engineid < 6) return [ aps.colony ]; // don't look for other sources if we don't have "good" engines
     let planetsInRange = [];
     if (aps.planet && aps.planet.id === aps.base.id) planetsInRange.push(aps.planet); // add base planet if we are at base
     planetsInRange = planetsInRange.concat(autopilot.getTargetsInRange(autopilot.frnnOwnPlanets, aps.base.x, aps.base.y, aps.scopeRange));
-    console.log("...targets in range:", planetsInRange);
+  // console.log("...targets in range:", planetsInRange);
     let self = this;
     planetsInRange.forEach(function (p) {
         let curC = autopilot.getColony(p.id);
@@ -4339,11 +4343,11 @@ HizzzAPS.prototype.getSources = function(aps) {
         curC.eta2Source = Math.floor(aps.getDistance(p) / aps.simpleRange);
         if (curC.isHizzzerSource(aps) && !self.hasMissionConflict(aps, curC.planet)) potColonies.push(curC);
     });
-    console.log("...potential targets:", potColonies);
+  // console.log("...potential targets:", potColonies);
     return potColonies;
 };
 HizzzAPS.prototype.setSources = function(aps) {
-    console.log("HizzzAPS.setSources:");
+  // console.log("HizzzAPS.setSources:");
     // as hizzzer, each planet with taxable population is a source
     // and the object of interest is to produce MCs and transport them to the base
     // priority are planets that generate most MCs
@@ -4354,17 +4358,17 @@ HizzzAPS.prototype.setSources = function(aps) {
     maxIncome.sort(function (a, b) {
         return a.distance2APS - b.distance2APS;
     });
-    console.log("...maxIncome sources:", maxIncome);
+  // console.log("...maxIncome sources:", maxIncome);
     let others = potColonies.filter(function (c) {
         return c.potRevenue < c.maxIncome;
     });
     others.sort(function (a, b) {
         return b.potRevenue - a.potRevenue;
     });
-    console.log("...other sources:", maxIncome);
+  // console.log("...other sources:", maxIncome);
 
     this.sources = [].concat(maxIncome, others);
-    console.log("...sources:", this.sources);
+  // console.log("...sources:", this.sources);
 };
 HizzzAPS.prototype.isSource = function(planet) {
     let c = autopilot.getColony(planet.id);
@@ -4398,25 +4402,25 @@ TerraformerAPS.prototype.setDemand = function (aps)
     aps.demand = []; // reset
 };
 TerraformerAPS.prototype.setPotentialDestinations = function(aps) {
-    console.log("TerraformerAPS.setPotentialDestinations:");
+  // console.log("TerraformerAPS.setPotentialDestinations:");
     this.setSinks(aps);
     if (aps.colony.getTerraformDeficiency(aps) < 0) {
-        console.log("...status: " + aps.colony.getTerraformDeficiency(aps));
+      // console.log("...status: " + aps.colony.getTerraformDeficiency(aps));
         if (this.sinks.length > 0) {
-            console.log("...best other target status: " + this.sinks[0].climateDeficiency);
+          // console.log("...best other target status: " + this.sinks[0].climateDeficiency);
             if (aps.colony.climate === "arctic" || aps.colony.climate === "desert") return; // dont't go anywhere if current planet is an extreme planet
             if (this.sinks[0].climate !== "arctic" && this.sinks[0].climate !== "desert") return; // don't go anywhere unless best other target is a extreme planet
         }
     }
     if (this.sinks.length === 0) {
-        console.warn("...no potential destinations available!");
+       // console.log("...no potential destinations available!");
         aps.isIdle = true;
         if (aps.idleReason.indexOf("Dest") === -1) aps.idleReason.push("Dest");
     } else {
         aps.potDest = this.sinks;
         aps.isIdle = false;
     }
-    console.log("...", aps.potDest);
+  // console.log("...", aps.potDest);
 };
 TerraformerAPS.prototype.setSecondaryDestination = function(aps)
 {
@@ -4476,7 +4480,7 @@ TerraformerAPS.prototype.setSinks = function(aps) {
     // the same goes for planets where the resources are known
     // priority should be given to extreme planets (i.e. colder than 15° C and hotter than 84° C) toDo: unless we are crystal... and natives are not harmed
     this.setScopeRange(aps);
-    console.log("..setting potential terraforming targets");
+  // console.log("..setting potential terraforming targets");
     let targetsInRange = autopilot.getTargetsInRange(autopilot.frnnPlanets, aps.ship.x, aps.ship.y, aps.scopeRange);
     //targetsInRange.push(aps.planet); // add current planet
     let pCs = [];
@@ -4487,7 +4491,7 @@ TerraformerAPS.prototype.setSinks = function(aps) {
         c.climateDeficiency = c.getTerraformDeficiency(aps);
         if (c.climateDeficiency < 0) pCs.push(c);
     });
-    console.log("...targets in scope range: " + targetsInRange.length + " (" + (aps.scopeRange) + ")");
+  // console.log("...targets in scope range: " + targetsInRange.length + " (" + (aps.scopeRange) + ")");
     // EMERGENCIES
     let emergencies = pCs.filter(function (c) {
         return c.climate === "arctic" || c.climate === "desert";
@@ -4523,15 +4527,15 @@ TerraformerAPS.prototype.setSinks = function(aps) {
         return c.planet.nativeclans > 0 && c.planet.nativeracename !== "Amorphous";
     });
     //
-    console.log("... native targets: " + withNatives.length);
-    console.log("... potential targets: " + potential.length);
-    console.log("... amorph targets: " + amorph.length);
+  // console.log("... native targets: " + withNatives.length);
+  // console.log("... potential targets: " + potential.length);
+  // console.log("... amorph targets: " + amorph.length);
     //
     this.sinks = withNatives.concat(potential);
     if (this.sinks.length < 1 && amorph.length > 0) {
         this.sinks = amorph;
     }
-    console.log(this.sinks);
+  // console.log(this.sinks);
 };
 TerraformerAPS.prototype.setScopeRange = function(aps)
 {
@@ -4548,7 +4552,7 @@ TerraformerAPS.prototype.setSources = function(aps)
 {
     // sources are not necessary...
     this.sources = [];
-    console.log(this.sources);
+  // console.log(this.sources);
 };
 TerraformerAPS.prototype.isSource = function(planet)
 {
@@ -4699,7 +4703,7 @@ let autopilot = {
      */
     scanReports: function()
     {
-        console.warn("autopilot.scanReports:");
+      // console.log("autopilot.scanReports:");
         // check messages for combat reports where APS might have been destroyed...
         // this is necessary due to the recycling of shipIDs
         vgap.messages.forEach(function (msg)
@@ -4709,7 +4713,7 @@ let autopilot = {
             if (msg.messagetype === 12) {
                 if (autopilot.oofShips.indexOf(msg.target) === -1)
                 {
-                    console.log("...adding ship to oof-list", msg);
+                  // console.log("...adding ship to oof-list", msg);
                     autopilot.oofShips.push(msg.target);
                 }
             }
@@ -4717,18 +4721,18 @@ let autopilot = {
             {
                 if (msg.ownerid === vgap.player.id)
                 {
-                    console.warn("...one of our ships has been destroyed!", msg);
+                  // console.log("...one of our ships has been destroyed!", msg);
                     // if target is a APS, delete local storage entry
                     let apsData = autopilot.shipIsAps(msg.target);
                     if (apsData) {
-                        console.warn("...the ship is an APS...");
+                      // console.log("...the ship is an APS...");
                         autopilot.apsShips.deactivate(msg.target);
                         autopilot.apsShips.save();
                     }
                 }
             } else if (msg.body.match(/have been robbed/) !== null)
             {
-                console.warn("...one of our ships has been robbed!", msg);
+              // console.log("...one of our ships has been robbed!", msg);
                 if (autopilot.robbedShips.indexOf(msg.target) === -1) autopilot.robbedShips.push(msg.target);
             }
         });
@@ -4745,7 +4749,7 @@ let autopilot = {
      */
     planetaryManagement: function()
     {
-        console.log("autopilot.planetaryManagement:");
+      // console.log("autopilot.planetaryManagement:");
         autopilot.initGlobalMinerals();
         autopilot.initMineralMaxis();
         autopilot.initMyColonies();
@@ -4753,9 +4757,9 @@ let autopilot = {
     },
     initMyColonies: function()
     {
-        console.log("autopilot.initMyColonies:");
+      // console.log("autopilot.initMyColonies:");
         let localPlaneteers = autopilot.loadPlaneteerData();
-        console.log("...loaded planetary manager settings:", localPlaneteers);
+      // console.log("...loaded planetary manager settings:", localPlaneteers);
         //
         autopilot.myColonies = new autopilot.myColoniesIndex([]);
         for (let i = 0; i < vgap.myplanets.length; i++)
@@ -4777,7 +4781,7 @@ let autopilot = {
                 if (c.mineralProduction[m] > autopilot.mineralMaxis.production[m]) autopilot.mineralMaxis.production[m] = c.mineralProduction[m];
             });
         }
-        console.log("...initialized colonies & global minerals.");
+      // console.log("...initialized colonies & global minerals.");
         //console.log(autopilot.globalMinerals);
     },
     updateMyColonies: function()
@@ -4905,7 +4909,7 @@ let autopilot = {
      */
     initShipControl: function()
     {
-        console.log("autopilot.initShipControl:");
+      // console.log("autopilot.initShipControl:");
         // APS - Initial setup...
         autopilot.myShips = new autopilot.myShipsIndex(vgap.myships);
         let apsControl = [];
@@ -4921,7 +4925,7 @@ let autopilot = {
                 }
             });
         }
-        console.log("...loaded apsShips settings:", autopilot.apsShips);
+      // console.log("...loaded apsShips settings:", autopilot.apsShips);
         //
         return apsControl;
     },
@@ -4931,25 +4935,25 @@ let autopilot = {
     setupAPS: function(shipId, cfgData) {
         if (typeof cfgData === "undefined") {
             cfgData = autopilot.shipIsAps(shipId); // false if not in storage
-            console.error("Retry setting up APS " + shipId);
+          // console.log("Retry setting up APS " + shipId);
         } else {
-            console.error("Setting up new APS " + shipId);
+          // console.log("Setting up new APS " + shipId);
         }
 
         let ship = vgap.getShip(shipId);
         let aps = new APS(ship, cfgData); // INITIAL PHASE
         if (aps.isAPS) {
             if (aps.hasToSetPotDes) {
-                console.warn("=> SET POTENTIAL DESTINATIONS: APS " + aps.ship.id);
+              // console.log("=> SET POTENTIAL DESTINATIONS: APS " + aps.ship.id);
                 autopilot.populateFrnnCollections();
                 aps.functionModule.setPotentialDestinations(aps); // PHASE 1
                 if (aps.potDest.length > 0) {
-                    console.warn("SET MISSION DESTINSTION: APS " + aps.ship.id);
+                  // console.log("SET MISSION DESTINSTION: APS " + aps.ship.id);
                     aps.setMissionDestination(); // PHASE 2
                 }
             }
             if (!aps.isIdle) {
-                console.warn("CONFIRM MISSION: APS " + aps.ship.id);
+              // console.log("CONFIRM MISSION: APS " + aps.ship.id);
                 aps.confirmMission(); // PHASE 3
                 if (typeof aps.functionModule.postActivationHook === "function") aps.functionModule.postActivationHook(aps);
             }
@@ -4990,7 +4994,7 @@ let autopilot = {
     setupStorage: function()
     {
         if (typeof(localStorage) === "undefined") {
-            console.warn("Sorry! No Web Storage support..");
+          // console.log("Sorry! No Web Storage support..");
         }
         let isChromium = window.chrome,
             winNav = window.navigator,
@@ -5052,10 +5056,10 @@ let autopilot = {
     },
     saveGameSettings: function(settings)
     {
-        console.log("saveGameSettings");
-        console.log(settings);
+      // console.log("saveGameSettings");
+      // console.log(settings);
         let gData = new APSSettings(settings);
-        console.log(gData);
+      // console.log(gData);
         localStorage.setItem(autopilot.storageCfgId, JSON.stringify(gData.getSettings()));
         autopilot.settings = gData.getSettings();
     },
@@ -5098,9 +5102,9 @@ let autopilot = {
     },
     //
     loadPlaneteerData: function() {
-        console.log("autopilot.loadPlaneteerData:");
+      // console.log("autopilot.loadPlaneteerData:");
         let storedPlaneteerData = JSON.parse(localStorage.getItem(autopilot.pStorageId));
-        console.log("...planeteerData:", storedPlaneteerData);
+      // console.log("...planeteerData:", storedPlaneteerData);
         if (storedPlaneteerData === null) {
             autopilot.planeteers = new autopilot.localPlaneteerIndex([]);
             vgap.myplanets.forEach(function (p) {
@@ -5217,7 +5221,7 @@ let autopilot = {
         autopilot.myHulls = vgap.hulls.filter(function (h) {
             return raceHulls.indexOf(h.id) > -1;
         });
-        console.log("...autopilot.myHulls", autopilot.myHulls);
+      // console.log("...autopilot.myHulls", autopilot.myHulls);
     },
     updateChunnelTraffic: function(ship)
     {
@@ -5558,7 +5562,7 @@ let autopilot = {
             let curDistToStarClusterCenter = autopilot.getDistance(sc[i], object);
             let radiationradius = Math.sqrt(sc[i].mass);
             if (radiationradius > curDistToStarClusterCenter) {
-                console.log("...object (" + object.name + ") inside radiation zone of starcluster.");
+                //console.log("...object (" + object.name + ") inside radiation zone of starcluster.");
                 inside.push(sc[i]);
             }
         }
@@ -5861,9 +5865,8 @@ let autopilot = {
     {
         return (object === "neutronium" || object === "duranium" || object === "tritanium" || object === "molybdenum");
     },
-    getSumOfObjectInRange: function(center, range, object, includePotential)
-    {
-        console.log("autopilot.getSumOfObjectInRange:");
+    getSumOfObjectInRange: function(center, range, object, includePotential) {
+        //console.log("autopilot.getSumOfObjectInRange:");
         if (typeof includePotential === "undefined") includePotential = false;
         let planetsInRange = autopilot.getTargetsInRange(autopilot.frnnOwnPlanets, center.x, center.y, range);
         let coloniesInRange = planetsInRange.map(function (p) {
@@ -5881,7 +5884,7 @@ let autopilot = {
         let total = amounts.reduce(function (total, amount) {
             return total + amount;
         });
-        console.log("...amounts and total:", amounts, total);
+        //console.log("...amounts and total:", amounts, total);
         return total;
     },
     getSumOfAvailableObjectInRange: function(center, range, object, includePotential)
@@ -6263,7 +6266,7 @@ let autopilot = {
      */
     // processload: executed whenever a turn is loaded: either the current turn or an older turn through time machine
     processload: function() {
-        console.log(vgap);
+      // console.log(vgap);
         autopilot.setupStorage(); // local storage setup
         autopilot.loadGameSettings();
         // setup indexed Arrays (PROXY)
@@ -6291,7 +6294,7 @@ let autopilot = {
                             return function (id, prop, diff) {
                                 let c = index[id];
                                 if (autopilot.resources.indexOf(prop) > -1) {
-                                    console.log("...updating balance of colony %d.", id, diff);
+                                    //console.log("...updating balance of colony %d.", id, diff);
                                 }
                                 c.balance[prop] += diff;
                             }
@@ -6335,7 +6338,7 @@ let autopilot = {
                             }
                         } else if (name === "save") {
                             return function () {
-                                console.log("...saving", newArray);
+                                //console.log("...saving", newArray);
                                 localStorage.setItem(autopilot.pStorageId, JSON.stringify(newArray));
                             }
                         } else if (name === "deactivate") {
@@ -6472,7 +6475,7 @@ let autopilot = {
                             }
                         } else if (name === "save") {
                             return function () {
-                                console.log("...saving", newArray);
+                                //console.log("...saving", newArray);
                                 localStorage.setItem(autopilot.storageId, JSON.stringify(newArray));
                             }
                         } else {
@@ -6623,7 +6626,7 @@ let autopilot = {
                             return function (id, prop, value) {
                                 let s = index[id];
                                 if (prop === "mission1target") {
-                                    console.log("...old mission1target %d vs. new mission1target %d %s:", s[prop], value, prop);
+                                    //console.log("...old mission1target %d vs. new mission1target %d %s:", s[prop], value, prop);
                                     if (s.mission === 6 && value === 0) {
                                         let towedIdx = towedIdIndex.indexOf(value);
                                         towedIdIndex.splice(towedIdx, 1);
@@ -6634,7 +6637,7 @@ let autopilot = {
                                         towedIdIndex.splice(towedIdx, 1);
                                     }
                                 } else if (autopilot.resources.indexOf(prop) > -1) {
-                                    console.log("...setting resource %s of ship...", prop);
+                                    //console.log("...setting resource %s of ship...", prop);
                                     let p = vgap.planetAt(s.x ,s.y);
                                     if (p) {
                                         let diff = value - s[prop];
@@ -6653,7 +6656,7 @@ let autopilot = {
                         }
                     },
                     set: function (obj, prop, value) {
-                        console.log('...setting %s to %s...', prop, value, obj);
+                        //console.log('...setting %s to %s...', prop, value, obj);
                     }
                 })
             }
@@ -6740,6 +6743,7 @@ let autopilot = {
 
         if (!vgap.inHistory) // only act, when we are in the present!
         {
+            console.info("nuPilot working...");
             autopilot.populateFrnnCollections();
             autopilot.populateHullCollection();
             autopilot.populateShipCollections();
@@ -6760,7 +6764,7 @@ let autopilot = {
             //
             apsControl.forEach(function(shipcontrol) {
                 if (shipcontrol.hasToSetPotDes) {
-                    console.warn("SET POTENTIAL DESTINATIONS: APS " + shipcontrol.ship.id);
+                  // console.log("SET POTENTIAL DESTINATIONS: APS " + shipcontrol.ship.id);
                     shipcontrol.functionModule.setPotentialDestinations(shipcontrol); // PHASE 1
                 }
             });
@@ -6770,12 +6774,12 @@ let autopilot = {
             apsControl.forEach(function(shipcontrol) {
                 if (shipcontrol.potDest.length > 0)
                 {
-                    console.warn("SET MISSION DESTINATION: APS " + shipcontrol.ship.id);
+                  // console.log("SET MISSION DESTINATION: APS " + shipcontrol.ship.id);
                     shipcontrol.setMissionDestination(); // PHASE 2
                 }
                 if (!shipcontrol.isIdle)
                 {
-                    console.warn("CONFIRM MISSION: APS " + shipcontrol.ship.id);
+                  // console.log("CONFIRM MISSION: APS " + shipcontrol.ship.id);
                     shipcontrol.confirmMission(); // PHASE 3
                     shipcontrol.updateNote();
                 }
@@ -6786,19 +6790,19 @@ let autopilot = {
             apsControl.forEach(function(shipcontrol) {
                 // retry idle ships
                 if (shipcontrol.isIdle && shipcontrol.idleReason.indexOf("fuel") === -1) {
-                    console.error("Retry idle ship " + shipcontrol.ship.id);
+                  // console.log("Retry idle ship " + shipcontrol.ship.id);
                     // no destination found... or no secondary destination found...
                     if (!shipcontrol.destination || (shipcontrol.destination && !shipcontrol.secondaryDestination)) {
-                        console.warn("SET POTENTIAL DESTINATIONS: APS " + shipcontrol.ship.id);
+                      // console.log("SET POTENTIAL DESTINATIONS: APS " + shipcontrol.ship.id);
                         shipcontrol.functionModule.setPotentialDestinations(shipcontrol);
                         if (shipcontrol.potDest.length > 0) {
-                            console.warn("SET MISSION DESTINATION: APS " + shipcontrol.ship.id);
+                          // console.log("SET MISSION DESTINATION: APS " + shipcontrol.ship.id);
                             shipcontrol.setMissionDestination();
                         }
                     }
 
                     if (shipcontrol.destination) {
-                        console.warn("CONFIRM MISSION: APS " + shipcontrol.ship.id);
+                      // console.log("CONFIRM MISSION: APS " + shipcontrol.ship.id);
                         shipcontrol.confirmMission();
                         shipcontrol.updateNote();
                     }
@@ -6806,12 +6810,13 @@ let autopilot = {
                 // set changed for every APS
                 shipcontrol.ship.changed = 1;
             });
+            console.info("nuPilot done!");
         }
         //console.log(vgap.messages);
     },
     // loaddashboard: executed to rebuild the dashboard content after a turn is loaded
     loaddashboard: function() {
-        console.log("LoadDashboard: plugin called.");
+      // console.log("LoadDashboard: plugin called.");
         let a = $("<ul></ul>").appendTo("#DashboardMenu");
         vgap.dash.addLeftMenuItem("nuPilot" + " »", function() {
             vgap.dash.showNuPilotDash();
@@ -6831,15 +6836,15 @@ let autopilot = {
     },
     // showmap: executed when switching from dashboard to starmap
     showmap: function() {
-        console.log("ShowMap: plugin called.");
+      // console.log("ShowMap: plugin called.");
 
     },
     // loadplanet: executed when a planet is selected on dashboard or starmap
     loadplanet: function() {
-        console.log("LoadPlanet: plugin called.");
+      // console.log("LoadPlanet: plugin called.");
         let c = autopilot.myColonies.findById(vgap.planetScreen.planet.id);
         c.updateBalance(false);
-        console.log(c);
+      // console.log(c);
     },
     // loadstarbase: executed when a starbase is selected on dashboard or starmap
     loadstarbase: function() {
@@ -6848,8 +6853,8 @@ let autopilot = {
     },
     // loadship: executed when a planet is selected on dashboard or starmap
     loadship: function() {
-        console.log("LoadShip: plugin called.");
-        console.log(autopilot.myShips);
+      // console.log("LoadShip: plugin called.");
+      // console.log(autopilot.myShips);
         vgap.shipScreen.ship = new Proxy(vgap.shipScreen.ship, {
             set: function(target, prop, value, receiver) {
                 //console.log("Routing set %s through myships proxy...", prop, value, receiver);
@@ -6858,16 +6863,16 @@ let autopilot = {
                 return true;
             },
             get: function (target, name) {
-                //if (name === "targetx" || name === "targety") console.log("Routing get %s through myships proxy...", name, target[name]);
+                //if (name === "targetx" || name === "targety"// console.log("Routing get %s through myships proxy...", name, target[name]);
                 return target[name];
             }
         });
         let apsData = autopilot.shipIsAps(vgap.shipScreen.ship.id);
         if (apsData && apsData.idle) {
-            console.log("Ship idle status: " + apsData.idle);
+          // console.log("Ship idle status: " + apsData.idle);
             autopilot.setupAPS(vgap.shipScreen.ship.id, apsData);
         }
-        console.log(vgap.shipScreen.ship);
+      // console.log(vgap.shipScreen.ship);
     }
 };
 /*
@@ -6949,11 +6954,9 @@ function Colony(pid, build, draw)
     this.mineralDepletions = false;
     this.meanMineralDepletion = false;
     //
-    if (vgap.map.canvas && draw)
-    {
+    if (vgap.map.canvas && draw) {
         this.drawIndicators(); // INDICATORS
-    } else
-    {
+    } else {
         //this.isGuarded = this.getFleet();
         this.setNeighbours();
         this.safetyStatus = false;
@@ -7796,23 +7799,18 @@ Colony.prototype.getMaxFactories = function() {
     }
     return { max: mF, maxNow: Math.floor(maxFact) };
 };
-Colony.prototype.getMaxDefense = function()
-{
+Colony.prototype.getMaxDefense = function() {
     let p = this.planet;
     let maxDefe = 0;
-    if (this.maxColPop >= 50)
-    {
+    if (this.maxColPop >= 50) {
         maxDefe = 50 + Math.sqrt(this.maxColPop - 50);
-    } else
-    {
+    } else {
         maxDefe = this.maxColPop;
     }
     let mD = Math.floor(parseInt(maxDefe));
-    if (p.clans >= 50)
-    {
+    if (p.clans >= 50) {
         maxDefe = 50 + Math.sqrt(p.clans - 50);
-    } else
-    {
+    } else {
         maxDefe = p.clans;
     }
     return { max: mD, maxNow: Math.floor(maxDefe) };
@@ -8152,8 +8150,7 @@ Colony.prototype.buildStructures = function() {
         if (dS.def > 0) this.buildDefense(dS.def);
     }
 };
-Colony.prototype.getMinesForDepletion = function(mineral, turns)
-{
+Colony.prototype.getMinesForDepletion = function(mineral, turns) {
     let density = this.planet["density" + mineral] / 100;
     let deposits = this.planet["ground" + mineral];
     // mines * densNeu = depletionTurns / this.planet.groundneutronium;
@@ -8252,7 +8249,7 @@ Colony.prototype.setStarbaseProduction = function() {
                 sbD.tritanium += (curE.tritanium * h.engines);
                 sbD.molybdenum += (curE.molybdenum * h.engines);
             } else {
-                console.error("engine not found!", sb.enginetechlevel);
+               // console.log("engine not found!", sb.enginetechlevel);
             }
         }
         if (h.beams > 0) {
@@ -8413,7 +8410,7 @@ Colony.prototype.buildSbDefense = function() {
     }
 };
 Colony.prototype.buildSbDefensePosts = function() {
-    console.log("Colony.buildSbDefensePosts:");
+    //console.log("Colony.buildSbDefensePosts:");
     let sb = this.hasStarbase;
     if (sb && sb.builtdefense === 0) {
         let p = this.planet;
@@ -8462,7 +8459,7 @@ Colony.prototype.buildSbDefensePosts = function() {
                 }
             });
             if (finalCosts.length > 0) {
-                console.log("...finalCost for building %d defense posts:", doBuild, finalCosts);
+                //console.log("...finalCost for building %d defense posts:", doBuild, finalCosts);
                 finalCosts.forEach(function (c) {
                     if (c.item === "supplies") {
                         p[c.item] -= c.value;
@@ -8479,7 +8476,7 @@ Colony.prototype.buildSbDefensePosts = function() {
 };
 Colony.prototype.buildSbFighters = function()
 {
-    console.log("Colony.buildSbFighters:");
+    //console.log("Colony.buildSbFighters:");
     let sb = this.hasStarbase;
     if (sb && sb.builtfighters === 0)
     {
@@ -8539,7 +8536,7 @@ Colony.prototype.buildSbFighters = function()
             });
             if (finalCosts.length > 0)
             {
-                console.log("...finalCost for building %d fighters:", doBuild, finalCosts);
+                //console.log("...finalCost for building %d fighters:", doBuild, finalCosts);
                 finalCosts.forEach(function (c) {
                     if (c.item === "supplies")
                     {
@@ -8664,7 +8661,7 @@ Colony.prototype.getNativeHappinessChange = function(taxrate, bonus) {
             //if (addHappyness) console.log("Ships are hissing planet %s: + %s native Happiness", p.id, addHappyness);
         }
     } // Lizards
-    let happychange = (Math.floor( (1000 - Math.sqrt(p.nativeclans) - 85 * taxrate - Math.round( (p.mines + p.factories) / 2 ) - 50 * (10 - p.nativegovernment)) ) / 100) + nativeRaceBonus + nebulaBonus;
+    let happychange = Math.round(Math.round( (1000 - Math.sqrt(p.nativeclans) - 85 * taxrate - Math.round( (p.mines + p.factories) / 2 ) - 50 * (10 - p.nativegovernment)) ) / 100) + nativeRaceBonus + nebulaBonus;
     let maxAddHappyness = 100 - (p.nativehappypoints + happychange) ;
     if (addHappyness > maxAddHappyness) addHappyness = maxAddHappyness;
     return happychange + addHappyness;
@@ -8673,6 +8670,7 @@ Colony.prototype.getNativeHappinessChange = function(taxrate, bonus) {
 Colony.prototype.getMaxHappyNativeTaxRate = function(bonus) {
     for (let i=50; i>0; i--) {
         let happinessChange = this.getNativeHappinessChange(i, bonus);
+        //console.log(happinessChange);
         if (happinessChange > -1) {
             return i;
         }
@@ -8879,8 +8877,7 @@ Colony.prototype.getOptBovSupClans = function()
     }
     return 0;
 };
-Colony.prototype.getColonistHappinessChange = function(taxrate, bonus) // returns -/0/+ amount of happynesspoints = change in happiness using taxrate
-{
+Colony.prototype.getColonistHappinessChange = function(taxrate, bonus) {
     //console.log("Colony.getColonistHappinessChange:");
     let p = this.planet;
     let raceMod = 1;
@@ -8903,11 +8900,10 @@ Colony.prototype.getColonistHappinessChange = function(taxrate, bonus) // return
     if (addHappyness > maxAddHappyness) addHappyness = maxAddHappyness;
     return happychange + addHappyness;
 
-};
+}; // returns -/0/+ amount of happynesspoints = change in happiness using taxrate
 Colony.prototype.getMaxHappyColonistTaxRate = function(bonus) // returns taxrate at which no negative change in happynesspoints occurs (negative approach)
 {
-    for (let i = 50; i > 0; i--)
-    {
+    for (let i = 50; i > 0; i--) {
         let happinessChange = this.getColonistHappinessChange(i, bonus);
         if (happinessChange > -1) {
             return i;
@@ -9537,7 +9533,7 @@ Colony.prototype.getNextBuilderCargo = function (aps, nD) {
 Colony.prototype.getBuilderDemand = function (ooi, sid) {
     let demand = [];
     let b = this.balance;
-    console.log("Get builder demand of colony:", this.pid, b);
+    //console.log("Get builder demand of colony:", this.pid, b);
     if (ooi === "bab") {
         if (this.hasStarbase && this.isFort && this.isFortified) {
             // collect minerals from surrounding planets
@@ -9571,7 +9567,7 @@ Colony.prototype.getBuilderDemand = function (ooi, sid) {
             if (b.molybdenum < 0) demand.push({ item: "molybdenum", value: (b.molybdenum * -1)});
             if (b.megacredits < 0) demand.push({ item: "megacredits", value: (b.megacredits * -1)});
         }
-        console.log(new autopilot.demandIndex(demand));
+        //console.log(new autopilot.demandIndex(demand));
     } else if (ooi === "shb") {
         if (b.duranium < 0) demand.push({ item: "duranium", value: (b.duranium * -1)});
         if (b.tritanium < 0) demand.push({ item: "tritanium", value: (b.tritanium * -1)});
@@ -9712,11 +9708,9 @@ Colony.prototype.drawStarbaseIndicators = function() {
         }
     }
 };
-Colony.prototype.drawFortIndicators = function()
-{
+Colony.prototype.drawFortIndicators = function() {
     let p = this.planet;
-    if (autopilot.settings.planetGFX)
-    {
+    if (autopilot.settings.planetGFX) {
         let markup = {
             attr: {
                 stroke: "#C0C0C0",
@@ -9734,8 +9728,7 @@ Colony.prototype.drawFortIndicators = function()
             let sbDefense = withSb.defense / 200;
             let sbBeamTech = withSb.beamtechlevel / 10;
             // show deficiency to reach max defense
-            if (sbDefense < 1 || sbFighters < 1 || sbBeamTech < 1)
-            {
+            if (sbDefense < 1 || sbFighters < 1 || sbBeamTech < 1) {
                 markup.attr.lineWidth = 3;
                 markup.attr.stroke = autopilot.idColors[autopilot.objectTypeEnum.FORT];
                 if (sbDefense < 1) autopilot.drawScaledQuarterCircle(p.x, p.y, 12, "nw", markup.attr, null, 0.5, 1 - sbDefense);
@@ -9745,12 +9738,16 @@ Colony.prototype.drawFortIndicators = function()
                 markup.attr.lineWidth = 1;
                 markup.attr.stroke = "#C0C0C0";
                 autopilot.drawScaledCircle(p.x, p.y, 12, markup.attr, null, 0.5);
-            } else
-            {
+            } else {
                 // if max defense has been reached, draw additional starbase fortifiying circle stronger
                 markup.attr.lineWidth = 3;
                 markup.attr.stroke = "#e83080";
                 autopilot.drawScaledCircle(p.x, p.y, 12, markup.attr, null, 0.5);
+                // check if planetary defense is max
+                let maxRation = this.structures.defense.now / this.structures.defense.max;
+                //console.log("p%s: defense.max %s, defense.now %s, maxRation=%s", this.planet.id, this.structures.defense.max, this.structures.defense.now, maxRation);
+                markup.attr.stroke = "#e886b0";
+                if (maxRation < 1) autopilot.drawScaledQuarterCircle(p.x, p.y, 12, "nw", markup.attr, null, 0.5, 1 - maxRation);
             }
         }
     }
@@ -10755,7 +10752,7 @@ Colony.prototype.drawMineralDetailIndicator = function()
             let setPlanetMission = function (option, field) {
                 return function () {
                     if (typeof option !== "undefined") {
-                        console.log("Setting " + field + " to " + option);
+                        //console.log("Setting " + field + " to " + option);
                         let updatedData;
                         if (appData) {
                             appData[field] = option;
@@ -10782,7 +10779,7 @@ Colony.prototype.drawMineralDetailIndicator = function()
                         let setPlanetMission = function (option, field) {
                             return function () {
                                 if (typeof option === "undefined") return;
-                                console.log("Setting " + field + " to " + option);
+                                //console.log("Setting " + field + " to " + option);
                                 let updatedData;
                                 if (appData) {
                                     appData[field] = option;
@@ -11163,7 +11160,7 @@ Colony.prototype.drawMineralDetailIndicator = function()
                 desc: "Load supply and unload minerals",
                 shipFunction: "alc",
                 shipMission: false,
-                ooiOptions: [ "all", "dur", "tri", "mol" ],
+                ooiOptions: [ "all", "dur", "tri", "mol", "nad", "nat", "nam" ],
                 action: false,
                 hullId: 105
             },
@@ -11386,6 +11383,9 @@ Colony.prototype.drawMineralDetailIndicator = function()
             dur: "Duranium",
             tri: "Tritanium",
             mol: "Molybdenum",
+            nad: "All but Duranium",
+            nat: "All but Tritanium",
+            nam: "All but Molybdenum",
             neu: "Fuel"
         };
 		let h = "";
@@ -11665,7 +11665,7 @@ Colony.prototype.drawMineralDetailIndicator = function()
 
         // load settings from storage and display...
         let nupSettings = autopilot.loadGameSettings();
-        console.log(nupSettings);
+        //console.log(nupSettings);
 
         this.pane = $("<div class='DashPane'></div>").appendTo(this.content);
         let a = $("<div id='colSettings'></div>").appendTo(this.pane);
