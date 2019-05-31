@@ -16,8 +16,8 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable ship auto-pilots
-// @version       0.14.44
-// @date          2019-05-27
+// @version       0.14.45
+// @date          2019-05-31
 // @author        drgirasol
 // @include       http://planets.nu/*
 // @include       https://planets.nu/*
@@ -8605,7 +8605,7 @@ Colony.prototype.setTaxes = function()
     if (p.colonisthappypoints < 40 && p.colonisttaxrate > 0) p.colonisttaxrate = 0;
     if (p.nativehappypoints < 40 && p.nativetaxrate > 0) p.nativetaxrate = 0;
     // don't care - doomed
-    if (this.isDoomed() && p.colonisttaxrate < 100) p.colonisttaxrate = 100;
+    if (this.isDoomed() && p.nativeclans === 0 && p.colonisttaxrate < 100) p.colonisttaxrate = 100;
     if (this.isDoomed() && p.nativeclans > 0 && p.nativeracename !== "Amorphous" && p.nativetaxrate < 100) p.nativetaxrate = 100;
 };
 //  NATIVES
