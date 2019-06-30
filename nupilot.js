@@ -16,8 +16,8 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable ship auto-pilots
-// @version       0.14.45
-// @date          2019-05-31
+// @version       0.14.47
+// @date          2019-06-30
 // @author        drgirasol
 // @include       http://planets.nu/*
 // @include       https://planets.nu/*
@@ -4405,17 +4405,29 @@ TerraformerAPS.prototype.setPotentialDestinations = function(aps) {
   // console.log("TerraformerAPS.setPotentialDestinations:");
     this.setSinks(aps);
     if (aps.colony.getTerraformDeficiency(aps) < 0) {
-      // console.log("...status: " + aps.colony.getTerraformDeficiency(aps));
+        console.log("...status: " + aps.colony.getTerraformDeficiency(aps));
         if (this.sinks.length > 0) {
           // console.log("...best other target status: " + this.sinks[0].climateDeficiency);
-            if (aps.colony.climate === "arctic" || aps.colony.climate === "desert") return; // dont't go anywhere if current planet is an extreme planet
-            if (this.sinks[0].climate !== "arctic" && this.sinks[0].climate !== "desert") return; // don't go anywhere unless best other target is a extreme planet
-        }
-    }
+            if (aps.colony.climate === "arctic" || (aps.colony.climate === "desert" && vgap.player.raceid !== 7)) {
+                this.sinks[0] = aps.colony;
+                return;
+            } // dont't go anywhere if current planet is an extreme planet
+            if (this.sinks[0].climate !== "arctic" && (this.sinks[0].climate !== "desert" && vgap.player.raceid !== 7)) {
+                this.sinks[0] = aps.colony;
+                return;
+            } // don't go anywhere unless best other target is an extreme planet
+        } // there are other planets with suboptimal temperature
+    } // current planet has suboptimal temperature
     if (this.sinks.length === 0) {
        // console.log("...no potential destinations available!");
-        aps.isIdle = true;
-        if (aps.idleReason.indexOf("Dest") === -1) aps.idleReason.push("Dest");
+        if (aps.ship.engineid < 5) {
+            aps.isIdle = true;
+            if (aps.idleReason.indexOf("Dest") === -1) aps.idleReason.push("Dest");
+        } else {
+            this.sinks[0] = aps.colony;
+            aps.potDest = this.sinks;
+            aps.isIdle = false;
+        }
     } else {
         aps.potDest = this.sinks;
         aps.isIdle = false;
@@ -4482,24 +4494,23 @@ TerraformerAPS.prototype.setSinks = function(aps) {
     this.setScopeRange(aps);
   // console.log("..setting potential terraforming targets");
     let targetsInRange = autopilot.getTargetsInRange(autopilot.frnnPlanets, aps.ship.x, aps.ship.y, aps.scopeRange);
-    //targetsInRange.push(aps.planet); // add current planet
+    targetsInRange.push(aps.planet); // add current planet
     let pCs = [];
-    let self = this;
     targetsInRange.forEach(function (pos) {
         let p = vgap.planetAt(pos.x, pos.y);
         let c = autopilot.getColony(p.id);
         c.climateDeficiency = c.getTerraformDeficiency(aps);
         if (c.climateDeficiency < 0) pCs.push(c);
     });
-  // console.log("...targets in scope range: " + targetsInRange.length + " (" + (aps.scopeRange) + ")");
+    console.log("...targets in scope range: " + targetsInRange.length + " (" + (aps.scopeRange) + ")");
     // EMERGENCIES
     let emergencies = pCs.filter(function (c) {
         return c.climate === "arctic" || c.climate === "desert";
     }); // extreme limiting conditions
     if (vgap.player.raceid === 7) {
         emergencies = pCs.filter(function (c) {
-            return c.climate === "arctic";
-        }); // crystal, only arctic planets
+            return c.planet.temperature === 0;
+        }); // crystal, only planets with temperature of 0 degrees
     }
     let pool = [];
 
@@ -4535,7 +4546,7 @@ TerraformerAPS.prototype.setSinks = function(aps) {
     if (this.sinks.length < 1 && amorph.length > 0) {
         this.sinks = amorph;
     }
-  // console.log(this.sinks);
+    console.log(this.sinks);
 };
 TerraformerAPS.prototype.setScopeRange = function(aps)
 {
@@ -8594,8 +8605,7 @@ Colony.prototype.getMcDeficiency = function() {
     //console.log("getMCDeficiency: ",  deficiency);
     return deficiency;
 };
-Colony.prototype.setTaxes = function()
-{
+Colony.prototype.setTaxes = function() {
     //console.log("APP: Setting taxes...")
     let p = this.planet;
     if (this.isSqueezingPopulations()) { this.taxation = "squeeze"; this.squeezeTaxes(); } // colonists and natives
@@ -8605,7 +8615,7 @@ Colony.prototype.setTaxes = function()
     if (p.colonisthappypoints < 40 && p.colonisttaxrate > 0) p.colonisttaxrate = 0;
     if (p.nativehappypoints < 40 && p.nativetaxrate > 0) p.nativetaxrate = 0;
     // don't care - doomed
-    if (this.isDoomed() && p.nativeclans === 0 && p.colonisttaxrate < 100) p.colonisttaxrate = 100;
+    if (this.isDoomed() && (p.nativeclans === 0 || p.nativeracename === "Amorphous") && p.clans >= 2500 && p.colonisttaxrate < 100) p.colonisttaxrate = 100;
     if (this.isDoomed() && p.nativeclans > 0 && p.nativeracename !== "Amorphous" && p.nativetaxrate < 100) p.nativetaxrate = 100;
 };
 //  NATIVES
