@@ -16,8 +16,8 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable ship auto-pilots
-// @version       0.14.47
-// @date          2019-06-30
+// @version       0.14.48
+// @date          2019-07-07
 // @author        drgirasol
 // @include       http://planets.nu/*
 // @include       https://planets.nu/*
@@ -2696,8 +2696,6 @@ function CollectorAPS()
     this.scopeRange = autopilot.settings.colScopeRange;
     //this.cruiseMode = "fast"; // safe = 1-turn-connetions, fast = direct if faster, direct = always direct
     //this.energyMode = "conservative"; // conservative = use only the required amount of fuel, moderate = use 20 % above required amount, max = use complete tank capacity
-    this.alwaysLoadMC = true; // freighter missions will always include MCs
-    this.sellSupply = "notBov"; // true, false, "notBov" (true, but don't sell supply on Bovinoid planets)
     // data container
     this.sources = [];
     this.sinks = [];
@@ -2719,7 +2717,7 @@ CollectorAPS.prototype.initialLoading = function(aps) {
     return aps.demand.getApsDemand(aps).length;
 };
 CollectorAPS.prototype.handleCargo = function(aps) { // called once on initialization and a second time with aps.confirmMission
-  // console.log("DistributorAPS.handleCargo:");
+    // console.log("DistributorAPS.handleCargo:");
     if (aps.planet && aps.isOwnPlanet) {
         if (aps.destination.id === aps.planet.id) { // we are at base (sink)
             aps.unloadAll();
@@ -3132,29 +3130,24 @@ CollectorAPS.prototype.loadMinerals = function(aps)
 CollectorAPS.prototype.loadCargo = function(aps) { // not called at BASE
     let loaded = 0;
     // mineral handling
+    this.sellSupply(aps);
     if (this.isMineralCollector(aps) && aps.getCurCapacity() > 0) {
       // console.log("...loading minerals...");
         loaded = this.loadMinerals(aps);
     } else if (aps.getCurCapacity(aps.moveablesMap[aps.objectOfInterest]) > 0) {
-      // console.log("...loading other stuff...");
-        if (aps.objectOfInterest === "mcs") {
-            if (this.sellSupply === true || (this.sellSupply === "notBov" && aps.planet.nativeracename !== "Bovinoid")) { // are we transforming supplies to MCs first?
-                aps.colony.sellSupply(true);
-            }
-        }
         loaded = aps.loadObject(aps.moveablesMap[aps.objectOfInterest], aps.planet);
     }
     if (aps.objectOfInterest !== "megacredits") {
-        // we generally collect megacredits if option is active
-        if (this.alwaysLoadMC && !aps.colony.hasStarbase || (aps.colony.hasStarbase && aps.colony.isFort)) {
-            // are we transforming supplies to MCs first?
-            if (this.sellSupply === true || (this.sellSupply === "notBov" && aps.planet.nativeracename !== "Bovinoid")) {
-                aps.colony.sellSupply(true);
-            }
+        if (!aps.colony.hasStarbase || (aps.colony.hasStarbase && aps.colony.isFort)) {
             loaded += aps.loadObject("megacredits", aps.planet);
         }
     }
     return loaded;
+};
+CollectorAPS.prototype.sellSupply = function(aps) {
+    if ((aps.planet.megacredits < 10000 || aps.ship.megacredits < 10000) && aps.objectOfInterest !== "sup") { // are we transforming supplies to MCs?
+        aps.colony.sellSupply(true);
+    }
 };
 /*
  * nuPilot - Distributor Module
@@ -4494,7 +4487,7 @@ TerraformerAPS.prototype.setSinks = function(aps) {
     this.setScopeRange(aps);
   // console.log("..setting potential terraforming targets");
     let targetsInRange = autopilot.getTargetsInRange(autopilot.frnnPlanets, aps.ship.x, aps.ship.y, aps.scopeRange);
-    targetsInRange.push(aps.planet); // add current planet
+    targetsInRange.push(aps.planet); // add current planet (necessary!!!)
     let pCs = [];
     targetsInRange.forEach(function (pos) {
         let p = vgap.planetAt(pos.x, pos.y);
@@ -9316,8 +9309,9 @@ Colony.prototype.sellSupply = function(force, useBalance, amount) {
     if (typeof force === "undefined") force = false;
     let available = p.supplies;
     if (useBalance && this.balance.supplies < p.supplies) available = this.balance.supplies;
-    if (available <= 0) return false;
+    if (available <= 0 || p.megacredits >= 10000) return false;
     if (amount > available) amount = available;
+    if (p.megacredits + amount > 10000) amount = 10000 - p.megacredits; // cap to 10k MCs on planet
     if (this.isSellingSupply || force) {
         //console.log("Planet %s sells %s supplies", this.planet.id, amount);
         p.supplies -= amount;
