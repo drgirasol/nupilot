@@ -16,8 +16,8 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable ship auto-pilots
-// @version       0.14.48
-// @date          2019-07-07
+// @version       0.14.49
+// @date          2019-07-12
 // @author        drgirasol
 // @include       http://planets.nu/*
 // @include       https://planets.nu/*
@@ -4386,31 +4386,15 @@ function TerraformerAPS() {
 /*
     MANDATORY METHODS - called from APS
  */
-TerraformerAPS.prototype.handleCargo = function (aps)
-{
+TerraformerAPS.prototype.handleCargo = function (aps) {
 
 };
-TerraformerAPS.prototype.setDemand = function (aps)
-{
+TerraformerAPS.prototype.setDemand = function (aps) {
     aps.demand = []; // reset
 };
 TerraformerAPS.prototype.setPotentialDestinations = function(aps) {
   // console.log("TerraformerAPS.setPotentialDestinations:");
     this.setSinks(aps);
-    if (aps.colony.getTerraformDeficiency(aps) < 0) {
-        console.log("...status: " + aps.colony.getTerraformDeficiency(aps));
-        if (this.sinks.length > 0) {
-          // console.log("...best other target status: " + this.sinks[0].climateDeficiency);
-            if (aps.colony.climate === "arctic" || (aps.colony.climate === "desert" && vgap.player.raceid !== 7)) {
-                this.sinks[0] = aps.colony;
-                return;
-            } // dont't go anywhere if current planet is an extreme planet
-            if (this.sinks[0].climate !== "arctic" && (this.sinks[0].climate !== "desert" && vgap.player.raceid !== 7)) {
-                this.sinks[0] = aps.colony;
-                return;
-            } // don't go anywhere unless best other target is an extreme planet
-        } // there are other planets with suboptimal temperature
-    } // current planet has suboptimal temperature
     if (this.sinks.length === 0) {
        // console.log("...no potential destinations available!");
         if (aps.ship.engineid < 5) {
@@ -4485,7 +4469,16 @@ TerraformerAPS.prototype.setSinks = function(aps) {
     // the same goes for planets where the resources are known
     // priority should be given to extreme planets (i.e. colder than 15° C and hotter than 84° C) toDo: unless we are crystal... and natives are not harmed
     this.setScopeRange(aps);
-  // console.log("..setting potential terraforming targets");
+    if (aps.colony.getTerraformDeficiency(aps) < 0) {
+        console.log("...status: " + aps.colony.getTerraformDeficiency(aps));
+        // console.log("...best other target status: " + this.sinks[0].climateDeficiency);
+        if (aps.colony.climate === "arctic" || (aps.colony.climate === "desert" && vgap.player.raceid !== 7)) {
+            this.sinks[0] = aps.colony;
+            return;
+        } // dont't go anywhere if current planet is an extreme planet
+    } // current planet has suboptimal temperature
+
+    // console.log("..setting potential terraforming targets");
     let targetsInRange = autopilot.getTargetsInRange(autopilot.frnnPlanets, aps.ship.x, aps.ship.y, aps.scopeRange);
     targetsInRange.push(aps.planet); // add current planet (necessary!!!)
     let pCs = [];
@@ -4539,6 +4532,10 @@ TerraformerAPS.prototype.setSinks = function(aps) {
     if (this.sinks.length < 1 && amorph.length > 0) {
         this.sinks = amorph;
     }
+    if (this.sinks.length > 0 && aps.colony.getTerraformDeficiency(aps) < 0) {
+        if (vgap.player.raceid !== 7 && this.sinks[0].climate !== "arctic" && this.sinks[0].climate !== "desert") this.sinks[0] = aps.colony;
+        if (vgap.player.raceid === 7 && this.sinks[0].climate !== "arctic") this.sinks[0] = aps.colony;
+    } // don't go anywhere unless best other target is an extreme planet
     console.log(this.sinks);
 };
 TerraformerAPS.prototype.setScopeRange = function(aps)
