@@ -16,8 +16,8 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable ship auto-pilots
-// @version       0.14.49
-// @date          2019-07-12
+// @version       0.14.51
+// @date          2019-11-25
 // @author        drgirasol
 // @include       http://planets.nu/*
 // @include       https://planets.nu/*
@@ -128,8 +128,7 @@ function wrapper () { // wrapper for injection
         this.potentialWaypoints = []; // potential next targets
         this.potDest = []; // potential destinations
         //
-        if (typeof cfgData !== "undefined" && cfgData !== false)
-        {
+        if (typeof cfgData !== "undefined" && cfgData !== false) {
             if (!autopilot.apsShips.findById(ship.id)) {
                 let newCfg = new APSdata(cfgData);
                 autopilot.apsShips.push(newCfg.getData());
@@ -145,8 +144,7 @@ function wrapper () { // wrapper for injection
     /*
      * METHODS
      */
-    APS.prototype.initializeBoardComputer = function(configuration)
-    {
+    APS.prototype.initializeBoardComputer = function(configuration) {
        // console.log("APS.initializeBoardComputer:", this.ship.id);
         this.setPlanet();
         this.setMissionAttributes(configuration);
@@ -367,8 +365,7 @@ function wrapper () { // wrapper for injection
         this.baseColony = autopilot.getColony(cfg.base, true);
         if (this.planet && this.planet.id === this.base.id) this.atBase = true; // are we at our base of operation
     };
-    APS.prototype.setMissionAttributes = function(cfg)
-    {
+    APS.prototype.setMissionAttributes = function(cfg) {
        // console.log("APS.setMissionAttributes:");
         this.primaryFunction = cfg.shipFunction;
         if (this.primaryFunction === "hiz" && this.planet && autopilot.hizzzerPlanets.indexOf(this.planet.id) === -1) autopilot.hizzzerPlanets.push(this.planet.id);
@@ -4469,18 +4466,14 @@ TerraformerAPS.prototype.setSinks = function(aps) {
     // the same goes for planets where the resources are known
     // priority should be given to extreme planets (i.e. colder than 15° C and hotter than 84° C) toDo: unless we are crystal... and natives are not harmed
     this.setScopeRange(aps);
-    if (aps.colony.getTerraformDeficiency(aps) < 0) {
-        console.log("...status: " + aps.colony.getTerraformDeficiency(aps));
-        // console.log("...best other target status: " + this.sinks[0].climateDeficiency);
-        if (aps.colony.climate === "arctic" || (aps.colony.climate === "desert" && vgap.player.raceid !== 7)) {
+    //console.log(aps);
+    if (aps.colony && aps.colony.getTerraformDeficiency(aps) < 0 && (aps.colony.climate === "arctic" || (aps.colony.climate === "desert" && vgap.player.raceid !== 7))) {
             this.sinks[0] = aps.colony;
             return;
-        } // dont't go anywhere if current planet is an extreme planet
-    } // current planet has suboptimal temperature
-
-    // console.log("..setting potential terraforming targets");
+    } // dont't go anywhere if current planet is an extreme planet
+    //
     let targetsInRange = autopilot.getTargetsInRange(autopilot.frnnPlanets, aps.ship.x, aps.ship.y, aps.scopeRange);
-    targetsInRange.push(aps.planet); // add current planet (necessary!!!)
+    if (aps.planet) targetsInRange.push(aps.planet); // add current planet (necessary!!!)
     let pCs = [];
     targetsInRange.forEach(function (pos) {
         let p = vgap.planetAt(pos.x, pos.y);
@@ -4523,10 +4516,6 @@ TerraformerAPS.prototype.setSinks = function(aps) {
     let amorph = pCs.filter(function (c) {
         return c.planet.nativeclans > 0 && c.planet.nativeracename !== "Amorphous";
     });
-    //
-  // console.log("... native targets: " + withNatives.length);
-  // console.log("... potential targets: " + potential.length);
-  // console.log("... amorph targets: " + amorph.length);
     //
     this.sinks = withNatives.concat(potential);
     if (this.sinks.length < 1 && amorph.length > 0) {
@@ -4908,8 +4897,7 @@ let autopilot = {
      *      - init localApsIndex (autopilot.apsShips)
      *      - init myShipsIndex (autopilot.myShips)
      */
-    initShipControl: function()
-    {
+    initShipControl: function() {
       // console.log("autopilot.initShipControl:");
         // APS - Initial setup...
         autopilot.myShips = new autopilot.myShipsIndex(vgap.myships);
@@ -6879,8 +6867,7 @@ let autopilot = {
 /*
  *  Planet Object toDo: organize all planet related info here
  */
-function Colony(pid, build, draw)
-{
+function Colony(pid, build, draw) {
     if (typeof build === "undefined") build = false;
     if (typeof draw === "undefined") draw = false;
 
@@ -7073,15 +7060,14 @@ Colony.prototype.setNeighbours = function() {
 };
 Colony.prototype.getSpecialShips = function() {
     let specialShips = [];
-    let specialShipIds = [
+    let specialHullIds = [
         104, // refinery
         105, // alchemy
     ];
     let ships = vgap.shipsAt(this.planet.x, this.planet.y);
-    if (ships.length > 0)
-    {
+    if (ships.length > 0) {
         ships.forEach(function (s) {
-            if (specialShipIds.indexOf(s.hullid) > -1) specialShips.push(s);
+            if (specialHullIds.indexOf(s.hullid) > -1) specialShips.push(s);
         });
     }
     return specialShips;
@@ -7271,8 +7257,7 @@ Colony.prototype.setShipsResourceDemands = function() {
     let self = this;
     if (this.hasSpecialShips.length > 0) {
         this.hasSpecialShips.forEach(function (s) {
-            if (s.hullid === 104)
-            {
+            if (s.hullid === 104) {
                 self.balance.supplies -= 1050;
             } else if (s.hullid === 105) self.balance.supplies -= 2700;
         });
@@ -8459,75 +8444,72 @@ Colony.prototype.buildSbDefensePosts = function() {
                     finalCosts.push({ item: c, value: costs[c] * doBuild });
                 }
             });
-            if (finalCosts.length > 0) {
-                //console.log("...finalCost for building %d defense posts:", doBuild, finalCosts);
-                finalCosts.forEach(function (c) {
-                    if (c.item === "supplies") {
-                        p[c.item] -= c.value;
-                        p.suppliessold += c.value;
-                    } else {
-                        p[c.item] -= c.value;
-                    }
-                });
-                sb.builtdefense = doBuild;
-                sb.defense += doBuild;
+            let self = this;
+            let insufficient = finalCosts.find(function (c) {
+                return self.balance[c.item] < c.value;
+            });
+            if (insufficient) {
+                console.log("Not building SbDefensePosts due to lack of resources!");
+            } else {
+                if (finalCosts.length > 0) {
+                    //console.log("...finalCost for building %d defense posts:", doBuild, finalCosts);
+                    finalCosts.forEach(function (c) {
+                        if (c.item === "supplies") {
+                            p[c.item] -= c.value;
+                            p.suppliessold += c.value;
+                        } else {
+                            p[c.item] -= c.value;
+                        }
+                    });
+                    sb.builtdefense = doBuild;
+                    sb.defense += doBuild;
+                }
             }
         }
     }
 };
-Colony.prototype.buildSbFighters = function()
-{
+Colony.prototype.buildSbFighters = function() {
     //console.log("Colony.buildSbFighters:");
     let sb = this.hasStarbase;
-    if (sb && sb.builtfighters === 0)
-    {
+    if (sb && sb.builtfighters === 0) {
         let p = this.planet;
         let canBuild = this.getSbDefenseThatCanBeBuilt("fighters");
         let wantBuild = 0;
         let doBuild = 0;
         //
-        if (this.isFort)
-        {
-            if (sb.fighters < parseInt(autopilot.settings.minSbFighters))
-            {
+        if (this.isFort) {
+            if (sb.fighters < parseInt(autopilot.settings.minSbFighters)) {
                 wantBuild = parseInt(autopilot.settings.minSbFighters) - sb.fighters;
-            } else
-            {
+            } else {
                 if (sb.starbasetype === 0) { // standard starbase
                     wantBuild = 60 - sb.fighters;
                 }
             }
-            if (canBuild >= wantBuild)
-            {
+            if (canBuild >= wantBuild) {
                 doBuild = wantBuild;
             } else {
                 doBuild = canBuild;
             }
         } else {
-            if (sb.fighters < parseInt(autopilot.settings.minSbFighters))
-            {
+            if (sb.fighters < parseInt(autopilot.settings.minSbFighters)) {
                 wantBuild = parseInt(autopilot.settings.minSbFighters) - sb.fighters;
-            } else
-            {
+            } else {
                 if (sb.starbasetype === 0) { // standard starbase
                     wantBuild = 30 - sb.fighters;
                 }
             }
-            if (canBuild >= wantBuild)
-            {
+            if (canBuild >= wantBuild) {
                 doBuild = wantBuild;
             } else {
                 doBuild = canBuild;
             }
         }
-        if (doBuild > 0)
-        {
+        if (doBuild > 0) {
             let costs = this.sbDefCosts.fighters;
             let costComponents = Object.keys(costs);
             let finalCosts = [];
             costComponents.forEach(function (c) {
-                if (c === "megacredits" && (costs[c] * doBuild) > p.megacredits)
-                {
+                if (c === "megacredits" && (costs[c] * doBuild) > p.megacredits) {
                     let suppliesNeeded = (costs[c] * doBuild) - p.megacredits;
                     finalCosts.push({ item: "supplies", value: suppliesNeeded });
                     finalCosts.push({ item: c, value: p.megacredits });
@@ -8535,12 +8517,10 @@ Colony.prototype.buildSbFighters = function()
                     finalCosts.push({ item: c, value: costs[c] * doBuild });
                 }
             });
-            if (finalCosts.length > 0)
-            {
+            if (finalCosts.length > 0) {
                 //console.log("...finalCost for building %d fighters:", doBuild, finalCosts);
                 finalCosts.forEach(function (c) {
-                    if (c.item === "supplies")
-                    {
+                    if (c.item === "supplies") {
                         p[c.item] -= c.value;
                         p.suppliessold += c.value;
                     } else {
@@ -9027,8 +9007,7 @@ Colony.prototype.isTaxing4Growth = function()
         return false;
     }
 };
-Colony.prototype.isTaxingByDefault = function()
-{
+Colony.prototype.isTaxingByDefault = function() {
     if (this.settings) {
         return (this.settings.taxation === "dft");
     } else {
@@ -9167,14 +9146,12 @@ Colony.prototype.squeezeTaxes = function()
     this.squeezeNatives();
     this.squeezeColonists();
 };
-Colony.prototype.setDefaultTaxrate = function()
-{
+Colony.prototype.setDefaultTaxrate = function() {
     let p = this.planet;
     this.setDefaultColonistTaxrate(); // natives
     if (p.nativeclans > 0 && p.nativeracename !== "Amorphous") this.setDefaultNativeTaxrate(); // natives
 };
-Colony.prototype.setDefaultNativeTaxrate = function()
-{
+Colony.prototype.setDefaultNativeTaxrate = function() {
     // default:
     // - adjust taxrate so there is no change in happiness
     // - limited by colonist population and income (> 99 mcs)
@@ -9184,7 +9161,7 @@ Colony.prototype.setDefaultNativeTaxrate = function()
     let newTaxrate = 1; // minimum
     if (parseInt(p.nativehappypoints) <= 40) newTaxrate = 0;
     //
-    if (parseInt(p.nativehappypoints) > 30) {
+    if (parseInt(p.nativehappypoints) > 40) {
         let happyEquiTaxRate = Math.floor(this.getMaxHappyNativeTaxRate());
         let modIncome = this.getIncomeFromNatives(happyEquiTaxRate);
         let modifier = 1;
@@ -9201,8 +9178,7 @@ Colony.prototype.setDefaultNativeTaxrate = function()
     }
     if (p.nativetaxrate !== newTaxrate) p.nativetaxrate = newTaxrate;
 };
-Colony.prototype.setDefaultColonistTaxrate = function()
-{
+Colony.prototype.setDefaultColonistTaxrate = function() {
     // default:
     // - adjust taxrate so there is no change in happiness
     // - limited by income (> 99 mcs)
