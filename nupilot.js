@@ -16,8 +16,8 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable ship auto-pilots
-// @version       0.14.51
-// @date          2019-11-25
+// @version       0.14.52
+// @date          2019-12-02
 // @author        drgirasol
 // @include       http://planets.nu/*
 // @include       https://planets.nu/*
@@ -1309,6 +1309,7 @@ function wrapper () { // wrapper for injection
         // general filtering of potential destinations (e.g. remove destinations located in problematic zones)
         let self = this;
         let filteredDest = this.potDest.filter(function (c) { // base planet, colonies without mission conflict and safe to approach
+            console.log(c);
             return (!self.getMissionConflict(c.planet)) && c.determineSafety();
         });
         let avoidDest = this.potDest.filter(function (c) {
@@ -4398,7 +4399,7 @@ TerraformerAPS.prototype.setPotentialDestinations = function(aps) {
             aps.isIdle = true;
             if (aps.idleReason.indexOf("Dest") === -1) aps.idleReason.push("Dest");
         } else {
-            this.sinks[0] = aps.colony;
+            if (aps.colony) this.sinks[0] = aps.colony;
             aps.potDest = this.sinks;
             aps.isIdle = false;
         }
@@ -4525,7 +4526,7 @@ TerraformerAPS.prototype.setSinks = function(aps) {
         if (vgap.player.raceid !== 7 && this.sinks[0].climate !== "arctic" && this.sinks[0].climate !== "desert") this.sinks[0] = aps.colony;
         if (vgap.player.raceid === 7 && this.sinks[0].climate !== "arctic") this.sinks[0] = aps.colony;
     } // don't go anywhere unless best other target is an extreme planet
-    console.log(this.sinks);
+    console.log("this.sinks", this.sinks);
 };
 TerraformerAPS.prototype.setScopeRange = function(aps)
 {
