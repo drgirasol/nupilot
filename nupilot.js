@@ -16,8 +16,8 @@
 // ==UserScript==
 // @name          nuPilot
 // @description   Planets.nu plugin to enable ship auto-pilots
-// @version       0.14.52
-// @date          2019-12-02
+// @version       0.14.53
+// @date          2019-12-07
 // @author        drgirasol
 // @include       http://planets.nu/*
 // @include       https://planets.nu/*
@@ -4746,15 +4746,13 @@ let autopilot = {
         autopilot.initMyColonies();
         autopilot.updateMyColonies();
     },
-    initMyColonies: function()
-    {
+    initMyColonies: function() {
       // console.log("autopilot.initMyColonies:");
         let localPlaneteers = autopilot.loadPlaneteerData();
       // console.log("...loaded planetary manager settings:", localPlaneteers);
         //
         autopilot.myColonies = new autopilot.myColoniesIndex([]);
-        for (let i = 0; i < vgap.myplanets.length; i++)
-        {
+        for (let i = 0; i < vgap.myplanets.length; i++) {
             const p = vgap.myplanets[i];
             //autopilot.planeteers.push({ pid: p.id }); // make sure we have a default entry for the colony
             autopilot.myColonies.push(new Colony(p.id, true)); // initialize colony + building
@@ -5877,15 +5875,14 @@ let autopilot = {
         //console.log("...amounts and total:", amounts, total);
         return total;
     },
-    getSumOfAvailableObjectInRange: function(center, range, object, includePotential)
-    {
+    getSumOfAvailableObjectInRange: function(center, range, object, includePotential) {
         if (typeof includePotential === "undefined") includePotential = false;
         let planetsInRange = autopilot.getTargetsInRange(autopilot.frnnOwnPlanets, center.x, center.y, range);
         let coloniesInRange = planetsInRange.map(function (p) {
             return autopilot.myColonies.findById(p.id);
         });
         let regularColonies = coloniesInRange.filter(function (c) {
-            return !c.isBuildingBase && (!c.hasStarbase || c.hasStarbase && c.isFort);
+            return c && !c.isBuildingBase && (!c.hasStarbase || (c.hasStarbase && c.isFort));
         });
         let amounts = regularColonies.map(function (c) {
             //c.updateBalance();
@@ -6278,7 +6275,8 @@ let autopilot = {
                             }
                         } else if (name === "findById") {
                             return function (id) {
-                                return index[id];
+                                if (index[id]) return index[id];
+                                return false;
                             }
                         } else if (name === "updateBalance") {
                             return function (id, prop, diff) {
